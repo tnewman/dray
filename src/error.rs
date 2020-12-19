@@ -4,7 +4,12 @@ use std::fmt::Formatter;
 use std::fmt::Result;
 
 #[derive(Debug)]
-pub enum Error {}
+pub enum Error {
+    NoSuchFile,
+    PermissionDenied,
+    Failure,
+    BadMessage,
+}
 
 impl Display for Error {
     fn fmt(&self, formatter: &mut Formatter) -> Result {
