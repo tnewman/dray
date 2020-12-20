@@ -3,7 +3,7 @@ use std::fmt::Display;
 use std::fmt::Formatter;
 use std::fmt::Result;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Error {
     NoSuchFile,
     PermissionDenied,
