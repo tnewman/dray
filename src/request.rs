@@ -4,9 +4,8 @@ use std::convert::TryFrom;
 use super::error::Error;
 
 #[derive(Debug, PartialEq)]
-pub enum Message {
+pub enum Request {
     Init(Init),
-    Version(Version),
     Open(Open),
     Close(Close),
     Read(Read),
@@ -34,7 +33,7 @@ pub enum Message {
     ExtendedReply(ExtendedReply),
 }
 
-impl Message {
+impl Request {
     pub fn parse_bytes(mut bytes: &[u8]) -> Result<Message, Error> {
         if bytes.remaining() < 4 {
             return Err(Error::BadMessage);
