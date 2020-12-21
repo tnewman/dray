@@ -93,11 +93,19 @@ impl Message {
 }
 
 #[derive(Debug, PartialEq)]
-pub struct Init {}
+pub struct Init {
+    version: u8,
+}
 
 impl Init {
-    fn parse_bytes(byte: &[u8]) -> Result<Init, Error> {
-        Err(Error::Failure)
+    fn parse_bytes(mut bytes: &[u8]) -> Result<Init, Error> {
+        if bytes.remaining() < 1 {
+            return Err(Error::BadMessage);
+        }
+
+        Ok(Init {
+            version: bytes.get_u8(),
+        })
     }
 }
 
@@ -347,5 +355,21 @@ mod tests {
     #[test]
     fn test_parse_invalid_message() {
         assert_eq!(Message::parse_bytes(&[0x00]), Err(Error::BadMessage));
+    }
+
+    #[test]
+    fn test_parse_init_message() {
+        assert_eq!(
+            Message::parse_bytes(&[0x00, 0x00, 0x00, 0x01, 0x01, 0x03]),
+            Ok(Message::Init(Init { version: 0x03 }))
+        );
+    }
+
+    #[test]
+    fn test_parse_invalid_init_message() {
+        assert_eq!(
+            Message::parse_bytes(&[0x00, 0x00, 0x00, 0x00, 0x01]),
+            Err(Error::BadMessage)
+        );
     }
 }
