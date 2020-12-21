@@ -33,8 +33,18 @@ pub enum Request {
     ExtendedReply(ExtendedReply),
 }
 
+#[derive(Debug, PartialEq)]
+pub struct FileAttributes {
+    size: u64,
+    uid: u32,
+    gid: u32,
+    permissions: u32,
+    atime: u32,
+    mtime: u32
+}
+
 impl Request {
-    pub fn parse_bytes(mut bytes: &[u8]) -> Result<Message, Error> {
+    pub fn parse_bytes(mut bytes: &[u8]) -> Result<Request, Error> {
         if bytes.remaining() < 4 {
             return Err(Error::BadMessage);
         }
@@ -57,33 +67,32 @@ impl Request {
         let data_payload = bytes.bytes();
 
         let message = match data_type {
-            1 => Message::Init(Init::parse_bytes(data_payload)?),
-            2 => Message::Version(Version::parse_bytes(data_payload)?),
-            3 => Message::Open(Open::parse_bytes(data_payload)?),
-            4 => Message::Close(Close::parse_bytes(data_payload)?),
-            5 => Message::Read(Read::parse_bytes(data_payload)?),
-            6 => Message::Write(Write::parse_bytes(data_payload)?),
-            7 => Message::Lstat(Lstat::parse_bytes(data_payload)?),
-            8 => Message::Fstat(Fstat::parse_bytes(data_payload)?),
-            9 => Message::Setstat(Setstat::parse_bytes(data_payload)?),
-            10 => Message::Fsetstat(Fsetstat::parse_bytes(data_payload)?),
-            11 => Message::Opendir(Opendir::parse_bytes(data_payload)?),
-            12 => Message::Readdir(Readdir::parse_bytes(data_payload)?),
-            13 => Message::Remove(Remove::parse_bytes(data_payload)?),
-            14 => Message::Mkdir(Mkdir::parse_bytes(data_payload)?),
-            15 => Message::Rmdir(Rmdir::parse_bytes(data_payload)?),
-            16 => Message::Realpath(Realpath::parse_bytes(data_payload)?),
-            17 => Message::Stat(Stat::parse_bytes(data_payload)?),
-            18 => Message::Rename(Rename::parse_bytes(data_payload)?),
-            19 => Message::Readlink(Readlink::parse_bytes(data_payload)?),
-            20 => Message::Symlink(Symlink::parse_bytes(data_payload)?),
-            101 => Message::Status(Status::parse_bytes(data_payload)?),
-            102 => Message::Handle(Handle::parse_bytes(data_payload)?),
-            103 => Message::Data(Data::parse_bytes(data_payload)?),
-            104 => Message::Name(Name::parse_bytes(data_payload)?),
-            105 => Message::Attrs(Attrs::parse_bytes(data_payload)?),
-            200 => Message::Extended(Extended::parse_bytes(data_payload)?),
-            201 => Message::ExtendedReply(ExtendedReply::parse_bytes(data_payload)?),
+            1 => Request::Init(Init::parse_bytes(data_payload)?),
+            3 => Request::Open(Open::parse_bytes(data_payload)?),
+            4 => Request::Close(Close::parse_bytes(data_payload)?),
+            5 => Request::Read(Read::parse_bytes(data_payload)?),
+            6 => Request::Write(Write::parse_bytes(data_payload)?),
+            7 => Request::Lstat(Lstat::parse_bytes(data_payload)?),
+            8 => Request::Fstat(Fstat::parse_bytes(data_payload)?),
+            9 => Request::Setstat(Setstat::parse_bytes(data_payload)?),
+            10 => Request::Fsetstat(Fsetstat::parse_bytes(data_payload)?),
+            11 => Request::Opendir(Opendir::parse_bytes(data_payload)?),
+            12 => Request::Readdir(Readdir::parse_bytes(data_payload)?),
+            13 => Request::Remove(Remove::parse_bytes(data_payload)?),
+            14 => Request::Mkdir(Mkdir::parse_bytes(data_payload)?),
+            15 => Request::Rmdir(Rmdir::parse_bytes(data_payload)?),
+            16 => Request::Realpath(Realpath::parse_bytes(data_payload)?),
+            17 => Request::Stat(Stat::parse_bytes(data_payload)?),
+            18 => Request::Rename(Rename::parse_bytes(data_payload)?),
+            19 => Request::Readlink(Readlink::parse_bytes(data_payload)?),
+            20 => Request::Symlink(Symlink::parse_bytes(data_payload)?),
+            101 => Request::Status(Status::parse_bytes(data_payload)?),
+            102 => Request::Handle(Handle::parse_bytes(data_payload)?),
+            103 => Request::Data(Data::parse_bytes(data_payload)?),
+            104 => Request::Name(Name::parse_bytes(data_payload)?),
+            105 => Request::Attrs(Attrs::parse_bytes(data_payload)?),
+            200 => Request::Extended(Extended::parse_bytes(data_payload)?),
+            201 => Request::ExtendedReply(ExtendedReply::parse_bytes(data_payload)?),
             _ => return Err(Error::BadMessage),
         };
 
@@ -348,30 +357,30 @@ mod tests {
 
     #[test]
     fn test_parse_empty_message() {
-        assert_eq!(Message::parse_bytes(&[]), Err(Error::BadMessage));
+        assert_eq!(Request::parse_bytes(&[]), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_invalid_message() {
-        assert_eq!(Message::parse_bytes(&[0x00]), Err(Error::BadMessage));
+        assert_eq!(Request::parse_bytes(&[0x00]), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_init_message() {
         assert_eq!(
-            Message::parse_bytes(&[
+            Request::parse_bytes(&[
                 0x00, 0x00, 0x00, 0x01, // Payload Length 1
                 0x01, // Init Message
                 0x03  // Protocol Version 3
             ]),
-            Ok(Message::Init(Init { version: 0x03 }))
+            Ok(Request::Init(Init { version: 0x03 }))
         );
     }
 
     #[test]
     fn test_parse_init_message_with_missing_protocol() {
         assert_eq!(
-            Message::parse_bytes(&[
+            Request::parse_bytes(&[
                 0x00, 0x00, 0x00, 0x00, // Payload Length 0
                 0x01  // Init Message
                       // Missing Protocol Version
