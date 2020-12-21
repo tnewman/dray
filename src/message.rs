@@ -360,15 +360,23 @@ mod tests {
     #[test]
     fn test_parse_init_message() {
         assert_eq!(
-            Message::parse_bytes(&[0x00, 0x00, 0x00, 0x01, 0x01, 0x03]),
+            Message::parse_bytes(&[
+                0x00, 0x00, 0x00, 0x01, // Payload Length 1
+                0x01, // Init Message
+                0x03  // Protocol Version 3
+            ]),
             Ok(Message::Init(Init { version: 0x03 }))
         );
     }
 
     #[test]
-    fn test_parse_invalid_init_message() {
+    fn test_parse_init_message_with_missing_protocol() {
         assert_eq!(
-            Message::parse_bytes(&[0x00, 0x00, 0x00, 0x00, 0x01]),
+            Message::parse_bytes(&[
+                0x00, 0x00, 0x00, 0x00, // Payload Length 0
+                0x01  // Init Message
+                      // Missing Protocol Version
+            ]),
             Err(Error::BadMessage)
         );
     }
