@@ -60,8 +60,6 @@ impl From<&FileAttributes> for Vec<u8> {
 
         let mut attribute_bytes = vec![];
 
-        println!("{}", attributes);
-
         attribute_bytes.put_u32(attributes);
         attribute_bytes.put_u64(item.size.unwrap_or(0));
         attribute_bytes.put_u32(item.uid.unwrap_or(0));
