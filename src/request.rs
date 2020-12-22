@@ -2,7 +2,6 @@ use bytes::Buf;
 use std::convert::TryFrom;
 
 use super::error::Error;
-use super::file_attributes;
 
 #[derive(Debug, PartialEq)]
 pub enum Request {
