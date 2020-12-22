@@ -2,6 +2,7 @@ use bytes::Buf;
 use std::convert::TryFrom;
 
 use super::error::Error;
+use super::file_attributes;
 
 #[derive(Debug, PartialEq)]
 pub enum Request {
@@ -31,16 +32,6 @@ pub enum Request {
     Attrs(Attrs),
     Extended(Extended),
     ExtendedReply(ExtendedReply),
-}
-
-#[derive(Debug, PartialEq)]
-pub struct FileAttributes {
-    size: u64,
-    uid: u32,
-    gid: u32,
-    permissions: u32,
-    atime: u32,
-    mtime: u32
 }
 
 impl Request {
