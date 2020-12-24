@@ -60,8 +60,12 @@ pub enum Request {
     ExtendedReply(extended_reply::ExtendedReply),
 }
 
-impl Request {
-    pub fn parse_bytes(mut bytes: &[u8]) -> Result<Request, Error> {
+impl TryFrom<&[u8]> for Request {
+    type Error = Error;
+
+    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
+        let mut bytes = item;
+
         if bytes.remaining() < 4 {
             return Err(Error::BadMessage);
         }
@@ -84,7 +88,7 @@ impl Request {
         let data_payload = bytes.bytes();
 
         let message = match data_type {
-            1 => Request::Init(init::Init::parse_bytes(data_payload)?),
+            1 => Request::Init(init::Init::try_from(data_payload)?),
             3 => Request::Open(open::Open::parse_bytes(data_payload)?),
             4 => Request::Close(close::Close::parse_bytes(data_payload)?),
             5 => Request::Read(read::Read::parse_bytes(data_payload)?),
@@ -125,35 +129,29 @@ mod tests {
 
     #[test]
     fn test_parse_empty_message() {
-        assert_eq!(Request::parse_bytes(&[]), Err(Error::BadMessage));
+        let message: &[u8] = &[];
+
+        assert_eq!(Request::try_from(message), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_invalid_message() {
-        assert_eq!(Request::parse_bytes(&[0x00]), Err(Error::BadMessage));
+        let message: &[u8] = &[0x00];
+
+        assert_eq!(Request::try_from(message), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_init_message() {
-        assert_eq!(
-            Request::parse_bytes(&[
-                0x00, 0x00, 0x00, 0x01, // Payload Length 1
-                0x01, // Init Message
-                0x03  // Protocol Version 3
-            ]),
-            Ok(Request::Init(Init { version: 0x03 }))
-        );
-    }
+        let message: &[u8] = &[
+            0x00, 0x00, 0x00, 0x01, // Payload Length 1
+            0x01, // Init Message
+            0x03, // Protocol Version 3
+        ];
 
-    #[test]
-    fn test_parse_init_message_with_missing_protocol() {
         assert_eq!(
-            Request::parse_bytes(&[
-                0x00, 0x00, 0x00, 0x00, // Payload Length 0
-                0x01  // Init Message
-                      // Missing Protocol Version
-            ]),
-            Err(Error::BadMessage)
+            Request::try_from(message),
+            Ok(Request::Init(init::Init { version: 0x03 }))
         );
     }
 }
