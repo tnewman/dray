@@ -18,9 +18,3 @@ impl TryFrom<&[u8]> for Lstat {
         Ok(Lstat {})
     }
 }
-
-impl Lstat {
-    pub fn parse_bytes(byte: &[u8]) -> Result<Lstat, Error> {
-        Err(Error::Failure)
-    }
-}

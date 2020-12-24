@@ -18,9 +18,3 @@ impl TryFrom<&[u8]> for Setstat {
         Ok(Setstat {})
     }
 }
-
-impl Setstat {
-    pub fn parse_bytes(byte: &[u8]) -> Result<Setstat, Error> {
-        Err(Error::Failure)
-    }
-}

@@ -18,9 +18,3 @@ impl TryFrom<&[u8]> for Symlink {
         Ok(Symlink {})
     }
 }
-
-impl Symlink {
-    pub fn parse_bytes(byte: &[u8]) -> Result<Symlink, Error> {
-        Err(Error::Failure)
-    }
-}

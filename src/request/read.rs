@@ -18,9 +18,3 @@ impl TryFrom<&[u8]> for Read {
         Ok(Read {})
     }
 }
-
-impl Read {
-    pub fn parse_bytes(byte: &[u8]) -> Result<Read, Error> {
-        Err(Error::Failure)
-    }
-}

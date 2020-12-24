@@ -18,9 +18,3 @@ impl TryFrom<&[u8]> for Rename {
         Ok(Rename {})
     }
 }
-
-impl Rename {
-    pub fn parse_bytes(byte: &[u8]) -> Result<Rename, Error> {
-        Err(Error::Failure)
-    }
-}

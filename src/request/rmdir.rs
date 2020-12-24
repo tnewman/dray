@@ -18,9 +18,3 @@ impl TryFrom<&[u8]> for Rmdir {
         Ok(Rmdir {})
     }
 }
-
-impl Rmdir {
-    pub fn parse_bytes(byte: &[u8]) -> Result<Rmdir, Error> {
-        Err(Error::Failure)
-    }
-}
