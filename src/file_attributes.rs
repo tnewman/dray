@@ -1,5 +1,6 @@
-use super::error::Error;
-use bytes::Buf;
+use crate::error::Error;
+use crate::try_buf::TryBuf;
+
 use bytes::BufMut;
 use std::convert::From;
 use std::convert::TryFrom;
@@ -11,12 +12,12 @@ const ACMODTIME: u32 = 0x00000008;
 
 #[derive(Debug, PartialEq)]
 pub struct FileAttributes {
-    size: Option<u64>,
-    uid: Option<u32>,
-    gid: Option<u32>,
-    permissions: Option<u32>,
-    atime: Option<u32>,
-    mtime: Option<u32>,
+    pub size: Option<u64>,
+    pub uid: Option<u32>,
+    pub gid: Option<u32>,
+    pub permissions: Option<u32>,
+    pub atime: Option<u32>,
+    pub mtime: Option<u32>,
 }
 
 impl TryFrom<&[u8]> for FileAttributes {
@@ -25,17 +26,13 @@ impl TryFrom<&[u8]> for FileAttributes {
     fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
         let mut item = item;
 
-        if item.remaining() != 32 {
-            return Err(Error::BadMessage);
-        }
-
-        let attributes = item.get_u32();
-        let size = item.get_u64();
-        let uid = item.get_u32();
-        let gid = item.get_u32();
-        let permissions = item.get_u32();
-        let atime = item.get_u32();
-        let mtime = item.get_u32();
+        let attributes = item.try_get_u32()?;
+        let size = item.try_get_u64()?;
+        let uid = item.try_get_u32()?;
+        let gid = item.try_get_u32()?;
+        let permissions = item.try_get_u32()?;
+        let atime = item.try_get_u32()?;
+        let mtime = item.try_get_u32()?;
 
         Ok(FileAttributes {
             size: if attributes & SIZE != 0 {
@@ -109,6 +106,8 @@ impl From<&FileAttributes> for Vec<u8> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    use bytes::Buf;
 
     #[test]
     fn test_from_file_attributes_creates_vector_with_set_fields() {
