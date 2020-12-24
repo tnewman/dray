@@ -1,7 +1,7 @@
-use bytes::Buf;
 use std::convert::TryFrom;
 
-use super::error::Error;
+use crate::error::Error;
+use crate::try_buf::TryBuf;
 
 pub mod attrs;
 pub mod close;
@@ -66,26 +66,15 @@ impl TryFrom<&[u8]> for Request {
     fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
         let mut bytes = item;
 
-        if bytes.remaining() < 4 {
-            return Err(Error::BadMessage);
-        }
+        let data_length = bytes.try_get_u32()?;
 
-        let data_length = match usize::try_from(bytes.get_u32()) {
+        let data_length = match usize::try_from(data_length) {
             Ok(data_length) => data_length,
             Err(_) => return Err(Error::BadMessage),
         };
 
-        if bytes.remaining() < 1 {
-            return Err(Error::BadMessage);
-        }
-
-        let data_type = bytes.get_u8();
-
-        if bytes.remaining() != data_length {
-            return Err(Error::BadMessage);
-        }
-
-        let data_payload = bytes.bytes();
+        let data_type = bytes.try_get_u8()?;
+        let data_payload: &[u8] = &bytes.try_get_bytes(data_length)?;
 
         let message = match data_type {
             1 => Request::Init(init::Init::try_from(data_payload)?),
