@@ -5,14 +5,12 @@ use std::fmt::Result;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    NoSuchFile,
-    PermissionDenied,
-    Failure,
     BadMessage,
+    Unimplemented,
 }
 
 impl Display for Error {
-    fn fmt(&self, formatter: &mut Formatter) -> Result {
+    fn fmt(&self, _formatter: &mut Formatter) -> Result {
         todo!()
     }
 }
