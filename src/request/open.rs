@@ -86,14 +86,7 @@ mod tests {
 
         open_bytes.put_u32(0x00); // pflags
 
-        let file_attributes = FileAttributes {
-            size: None,
-            uid: None,
-            gid: None,
-            permissions: None,
-            atime: None,
-            mtime: None,
-        };
+        let file_attributes = get_file_attributes();
 
         open_bytes.put_slice(Vec::from(&file_attributes).as_slice()); // file attributes
 
@@ -102,22 +95,8 @@ mod tests {
             Ok(Open {
                 id: 0x01,
                 filename: String::from("/file/path"),
-                open_options: OpenOptions {
-                    read: false,
-                    write: false,
-                    create: false,
-                    create_new_only: false,
-                    append: false,
-                    truncate: false,
-                },
-                file_attributes: FileAttributes {
-                    size: None,
-                    uid: None,
-                    gid: None,
-                    permissions: None,
-                    atime: None,
-                    mtime: None,
-                }
+                open_options: get_open_options(),
+                file_attributes
             })
         );
     }
@@ -134,14 +113,7 @@ mod tests {
 
         assert_eq!(
             OpenOptions::try_from(&open_bytes[..]),
-            Ok(OpenOptions {
-                read: false,
-                write: false,
-                create: false,
-                create_new_only: false,
-                append: false,
-                truncate: false,
-            })
+            Ok(get_open_options())
         );
     }
 
@@ -154,11 +126,7 @@ mod tests {
             OpenOptions::try_from(&open_bytes[..]),
             Ok(OpenOptions {
                 read: true,
-                write: false,
-                create: false,
-                create_new_only: false,
-                append: false,
-                truncate: false,
+                ..get_open_options()
             })
         );
     }
@@ -171,12 +139,8 @@ mod tests {
         assert_eq!(
             OpenOptions::try_from(&open_bytes[..]),
             Ok(OpenOptions {
-                read: false,
                 write: true,
-                create: false,
-                create_new_only: false,
-                append: false,
-                truncate: false,
+                ..get_open_options()
             })
         );
     }
@@ -189,12 +153,8 @@ mod tests {
         assert_eq!(
             OpenOptions::try_from(&open_bytes[..]),
             Ok(OpenOptions {
-                read: false,
-                write: false,
                 create: true,
-                create_new_only: false,
-                append: false,
-                truncate: false,
+                ..get_open_options()
             })
         );
     }
@@ -207,12 +167,8 @@ mod tests {
         assert_eq!(
             OpenOptions::try_from(&open_bytes[..]),
             Ok(OpenOptions {
-                read: false,
-                write: false,
-                create: false,
                 create_new_only: true,
-                append: false,
-                truncate: false,
+                ..get_open_options()
             })
         );
     }
@@ -225,12 +181,8 @@ mod tests {
         assert_eq!(
             OpenOptions::try_from(&open_bytes[..]),
             Ok(OpenOptions {
-                read: false,
-                write: false,
-                create: false,
-                create_new_only: false,
                 append: true,
-                truncate: false,
+                ..get_open_options()
             })
         );
     }
@@ -243,12 +195,8 @@ mod tests {
         assert_eq!(
             OpenOptions::try_from(&open_bytes[..]),
             Ok(OpenOptions {
-                read: false,
-                write: false,
-                create: false,
-                create_new_only: false,
-                append: false,
                 truncate: true,
+                ..get_open_options()
             })
         );
     }
@@ -256,5 +204,27 @@ mod tests {
     #[test]
     fn test_parse_invalid_open_options() {
         assert_eq!(OpenOptions::try_from(&vec![][..]), Err(Error::BadMessage));
+    }
+
+    fn get_file_attributes() -> FileAttributes {
+        FileAttributes {
+            size: None,
+            uid: None,
+            gid: None,
+            permissions: None,
+            atime: None,
+            mtime: None,
+        }
+    }
+
+    fn get_open_options() -> OpenOptions {
+        OpenOptions {
+            read: false,
+            write: false,
+            create: false,
+            create_new_only: false,
+            append: false,
+            truncate: false,
+        }
     }
 }
