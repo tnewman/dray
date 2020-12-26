@@ -24,7 +24,6 @@ impl TryFrom<&[u8]> for Init {
 mod tests {
     use super::*;
 
-    use bytes::Buf;
     use bytes::BufMut;
 
     #[test]
