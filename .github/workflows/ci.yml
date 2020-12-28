@@ -46,6 +46,8 @@ jobs:
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.github_token }}
 
   lints:
     name: Lints
