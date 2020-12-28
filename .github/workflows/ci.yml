@@ -45,18 +45,11 @@ jobs:
           CARGO_INCREMENTAL: 0
           RUSTFLAGS: "-Zprofile -Ccodegen-units=1 -Cinline-threshold=0 -Clink-dead-code -Coverflow-checks=off -Cpanic=abort -Zpanic_abort_tests"
 
-      - name: Gather coverage data
-        id: coverage
-        uses: actions-rs/grcov@v0.1
-        with:
-          coveralls-token: ${{ secrets.COVERALLS_TOKEN }}
+      - name: Generate code coverage
+        uses: actions-rs/tarpaulin@v0.1
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          parallel: true
-          path-to-lcov: ${{ steps.coverage.outputs.report }}
 
   lints:
     name: Lints
