@@ -111,10 +111,7 @@ mod tests {
         let mut open_bytes = vec![];
         open_bytes.put_u8(0x00);
 
-        assert_eq!(
-            Open::try_from(&open_bytes[..]),
-            Err(Error::BadMessage)
-        );
+        assert_eq!(Open::try_from(&open_bytes[..]), Err(Error::BadMessage));
     }
 
     #[test]
@@ -124,10 +121,7 @@ mod tests {
 
         open_bytes.put_u32(1); // filename length
 
-        assert_eq!(
-            Open::try_from(&open_bytes[..]),
-            Err(Error::BadMessage)
-        );
+        assert_eq!(Open::try_from(&open_bytes[..]), Err(Error::BadMessage));
     }
 
     #[test]
