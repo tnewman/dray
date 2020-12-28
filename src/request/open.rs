@@ -102,8 +102,66 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_open_with_invalid_data() {
+    fn test_parse_open_with_empty_data() {
         assert_eq!(Open::try_from(&vec![][..]), Err(Error::BadMessage));
+    }
+
+    #[test]
+    fn test_parse_open_with_invalid_id() {
+        let mut open_bytes = vec![];
+        open_bytes.put_u8(0x00);
+
+        assert_eq!(
+            Open::try_from(&open_bytes[..]),
+            Err(Error::BadMessage)
+        );
+    }
+
+    #[test]
+    fn test_parse_open_with_invalid_filename() {
+        let mut open_bytes = vec![];
+        open_bytes.put_u32(0x01); // id
+
+        open_bytes.put_u32(1); // filename length
+
+        assert_eq!(
+            Open::try_from(&open_bytes[..]),
+            Err(Error::BadMessage)
+        );
+    }
+
+    #[test]
+    fn test_parse_open_with_invalid_open_options() {
+        let mut open_bytes = vec![];
+
+        open_bytes.put_u32(0x01); // id
+
+        let filename = "/file/path".as_bytes();
+        open_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
+        open_bytes.put_slice(filename); // filename
+
+        assert_eq!(
+            Open::try_from(open_bytes.as_slice()),
+            Err(Error::BadMessage)
+        );
+    }
+
+    #[test]
+    fn test_parse_open_with_invalid_file_attributes() {
+        let mut open_bytes = vec![];
+
+        open_bytes.put_u32(0x01); // id
+
+        let filename = "/file/path".as_bytes();
+        open_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
+        open_bytes.put_slice(filename); // filename
+
+        open_bytes.put_u32(0x00); // pflags
+
+        assert_eq!(
+            Open::try_from(open_bytes.as_slice()),
+            Err(Error::BadMessage)
+        );
     }
 
     #[test]
