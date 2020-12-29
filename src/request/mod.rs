@@ -21,7 +21,7 @@ pub mod read_write;
 pub mod readdir;
 pub mod readlink;
 pub mod realpath;
-pub mod remove;
+pub mod path;
 pub mod rename;
 pub mod setstat;
 pub mod stat;
@@ -41,9 +41,9 @@ pub enum Request {
     Fsetstat(fsetstat::Fsetstat),
     Opendir(opendir::Opendir),
     Readdir(readdir::Readdir),
-    Remove(remove::Remove),
+    Remove(path::Remove),
     Mkdir(mkdir::Mkdir),
-    Rmdir(remove::Remove),
+    Rmdir(path::Remove),
     Realpath(realpath::Realpath),
     Stat(stat::Stat),
     Rename(rename::Rename),
@@ -84,11 +84,11 @@ impl TryFrom<&[u8]> for Request {
             8 => Request::Fstat(fstat::Fstat::try_from(data_payload)?),
             9 => Request::Setstat(setstat::Setstat::try_from(data_payload)?),
             10 => Request::Fsetstat(fsetstat::Fsetstat::try_from(data_payload)?),
-            11 => Request::Opendir(opendir::Opendir::try_from(data_payload)?),
+            11 => Request::Opendir(path::Path::try_from(data_payload)?),
             12 => Request::Readdir(readdir::Readdir::try_from(data_payload)?),
-            13 => Request::Remove(remove::Remove::try_from(data_payload)?),
+            13 => Request::Remove(path::Path::try_from(data_payload)?),
             14 => Request::Mkdir(mkdir::Mkdir::try_from(data_payload)?),
-            15 => Request::Rmdir(remove::Remove::try_from(data_payload)?),
+            15 => Request::Rmdir(path::Path::try_from(data_payload)?),
             16 => Request::Realpath(realpath::Realpath::try_from(data_payload)?),
             17 => Request::Stat(stat::Stat::try_from(data_payload)?),
             18 => Request::Rename(rename::Rename::try_from(data_payload)?),
