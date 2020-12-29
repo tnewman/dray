@@ -16,12 +16,11 @@ pub mod lstat;
 pub mod mkdir;
 pub mod name;
 pub mod open;
-pub mod opendir;
+pub mod path;
 pub mod read_write;
 pub mod readdir;
 pub mod readlink;
 pub mod realpath;
-pub mod path;
 pub mod rename;
 pub mod setstat;
 pub mod stat;
@@ -39,11 +38,11 @@ pub enum Request {
     Fstat(fstat::Fstat),
     Setstat(setstat::Setstat),
     Fsetstat(fsetstat::Fsetstat),
-    Opendir(opendir::Opendir),
+    Opendir(path::Path),
     Readdir(readdir::Readdir),
-    Remove(path::Remove),
+    Remove(path::Path),
     Mkdir(mkdir::Mkdir),
-    Rmdir(path::Remove),
+    Rmdir(path::Path),
     Realpath(realpath::Realpath),
     Stat(stat::Stat),
     Rename(rename::Rename),
