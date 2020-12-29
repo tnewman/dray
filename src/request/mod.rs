@@ -6,8 +6,8 @@ use crate::try_buf::TryBuf;
 pub mod attrs;
 pub mod close;
 pub mod data;
-pub mod fsetstat;
 pub mod handle;
+pub mod handle_attributes;
 pub mod init;
 pub mod name;
 pub mod open;
@@ -17,7 +17,6 @@ pub mod read_write;
 pub mod readlink;
 pub mod realpath;
 pub mod rename;
-pub mod setstat;
 pub mod stat;
 pub mod status;
 pub mod symlink;
@@ -31,8 +30,8 @@ pub enum Request {
     Write(read_write::ReadWrite),
     Lstat(path::Path),
     Fstat(path::Path),
-    Setstat(setstat::Setstat),
-    Fsetstat(fsetstat::Fsetstat),
+    Setstat(path_attributes::PathAttributes),
+    Fsetstat(handle_attributes::HandleAttributes),
     Opendir(path::Path),
     Readdir(handle::Handle),
     Remove(path::Path),
@@ -74,8 +73,8 @@ impl TryFrom<&[u8]> for Request {
             6 => Request::Write(read_write::ReadWrite::try_from(data_payload)?),
             7 => Request::Lstat(path::Path::try_from(data_payload)?),
             8 => Request::Fstat(path::Path::try_from(data_payload)?),
-            9 => Request::Setstat(setstat::Setstat::try_from(data_payload)?),
-            10 => Request::Fsetstat(fsetstat::Fsetstat::try_from(data_payload)?),
+            9 => Request::Setstat(path_attributes::PathAttributes::try_from(data_payload)?),
+            10 => Request::Fsetstat(handle_attributes::HandleAttributes::try_from(data_payload)?),
             11 => Request::Opendir(path::Path::try_from(data_payload)?),
             12 => Request::Readdir(handle::Handle::try_from(data_payload)?),
             13 => Request::Remove(path::Path::try_from(data_payload)?),
