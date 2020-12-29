@@ -6,8 +6,6 @@ use crate::try_buf::TryBuf;
 pub mod attrs;
 pub mod close;
 pub mod data;
-pub mod extended;
-pub mod extended_reply;
 pub mod fsetstat;
 pub mod handle;
 pub mod init;
@@ -50,8 +48,6 @@ pub enum Request {
     Data(data::Data),
     Name(name::Name),
     Attrs(attrs::Attrs),
-    Extended(extended::Extended),
-    ExtendedReply(extended_reply::ExtendedReply),
 }
 
 impl TryFrom<&[u8]> for Request {
