@@ -30,7 +30,7 @@ pub mod symlink;
 pub enum Request {
     Init(init::Init),
     Open(open::Open),
-    Close(close::Close),
+    Close(handle::Handle),
     Read(read_write::ReadWrite),
     Write(read_write::ReadWrite),
     Lstat(lstat::Lstat),
@@ -75,7 +75,7 @@ impl TryFrom<&[u8]> for Request {
         let message = match data_type {
             1 => Request::Init(init::Init::try_from(data_payload)?),
             3 => Request::Open(open::Open::try_from(data_payload)?),
-            4 => Request::Close(close::Close::try_from(data_payload)?),
+            4 => Request::Close(handle::Handle::try_from(data_payload)?),
             5 => Request::Read(read_write::ReadWrite::try_from(data_payload)?),
             6 => Request::Write(read_write::ReadWrite::try_from(data_payload)?),
             7 => Request::Lstat(lstat::Lstat::try_from(data_payload)?),
