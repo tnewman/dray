@@ -14,7 +14,6 @@ pub mod open;
 pub mod path;
 pub mod path_attributes;
 pub mod read_write;
-pub mod readlink;
 pub mod realpath;
 pub mod rename;
 pub mod stat;
@@ -40,7 +39,7 @@ pub enum Request {
     Realpath(realpath::Realpath),
     Stat(stat::Stat),
     Rename(rename::Rename),
-    Readlink(readlink::Readlink),
+    Readlink(path::Path),
     Symlink(symlink::Symlink),
     Status(status::Status),
     Handle(handle::Handle),
@@ -83,7 +82,7 @@ impl TryFrom<&[u8]> for Request {
             16 => Request::Realpath(realpath::Realpath::try_from(data_payload)?),
             17 => Request::Stat(stat::Stat::try_from(data_payload)?),
             18 => Request::Rename(rename::Rename::try_from(data_payload)?),
-            19 => Request::Readlink(readlink::Readlink::try_from(data_payload)?),
+            19 => Request::Readlink(path::Path::try_from(data_payload)?),
             20 => Request::Symlink(symlink::Symlink::try_from(data_payload)?),
             101 => Request::Status(status::Status::try_from(data_payload)?),
             102 => Request::Handle(handle::Handle::try_from(data_payload)?),
