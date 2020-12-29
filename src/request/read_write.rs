@@ -3,14 +3,14 @@ use crate::try_buf::TryBuf;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
-pub struct Read {
+pub struct ReadWrite {
     id: u32,
     handle: String,
     offset: u64,
     len: u32,
 }
 
-impl TryFrom<&[u8]> for Read {
+impl TryFrom<&[u8]> for ReadWrite {
     type Error = Error;
 
     fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
@@ -21,7 +21,7 @@ impl TryFrom<&[u8]> for Read {
         let offset = read_bytes.try_get_u64()?;
         let len = read_bytes.try_get_u32()?;
 
-        Ok(Read {
+        Ok(ReadWrite {
             id,
             handle,
             offset,
@@ -38,7 +38,7 @@ mod tests {
     use std::{convert::TryInto, vec};
 
     #[test]
-    fn test_parse_read() {
+    fn test_parse_read_write() {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
@@ -51,8 +51,8 @@ mod tests {
         read_bytes.put_u32(0x03); // length
 
         assert_eq!(
-            Read::try_from(read_bytes.as_slice()),
-            Ok(Read {
+            ReadWrite::try_from(read_bytes.as_slice()),
+            Ok(ReadWrite {
                 id: 0x01,
                 handle: String::from("handle"),
                 offset: 0x02,
@@ -62,24 +62,24 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_read_with_invalid_data() {
-        assert_eq!(Read::try_from(&vec![][..]), Err(Error::BadMessage));
+    fn test_parse_read_write_with_invalid_data() {
+        assert_eq!(ReadWrite::try_from(&vec![][..]), Err(Error::BadMessage));
     }
 
     #[test]
-    fn test_parse_read_with_invalid_id() {
+    fn test_parse_read_write_with_invalid_id() {
         let mut read_bytes = vec![];
 
         read_bytes.put_u8(0x01); // id
 
         assert_eq!(
-            Read::try_from(read_bytes.as_slice()),
+            ReadWrite::try_from(read_bytes.as_slice()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
-    fn test_parse_read_with_invalid_handle() {
+    fn test_parse_read_write_with_invalid_handle() {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
@@ -87,7 +87,7 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_read_with_invalid_offset() {
+    fn test_parse_read_write_with_invalid_offset() {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
@@ -99,13 +99,13 @@ mod tests {
         read_bytes.put_u8(0x02); // invalid offset
 
         assert_eq!(
-            Read::try_from(read_bytes.as_slice()),
+            ReadWrite::try_from(read_bytes.as_slice()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
-    fn test_parse_read_with_invalid_len() {
+    fn test_parse_read_write_with_invalid_len() {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
@@ -118,7 +118,7 @@ mod tests {
         read_bytes.put_u8(0x03); // invalid length
 
         assert_eq!(
-            Read::try_from(read_bytes.as_slice()),
+            ReadWrite::try_from(read_bytes.as_slice()),
             Err(Error::BadMessage)
         );
     }

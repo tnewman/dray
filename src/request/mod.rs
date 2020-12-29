@@ -17,7 +17,7 @@ pub mod mkdir;
 pub mod name;
 pub mod open;
 pub mod opendir;
-pub mod read;
+pub mod read_write;
 pub mod readdir;
 pub mod readlink;
 pub mod realpath;
@@ -28,15 +28,14 @@ pub mod setstat;
 pub mod stat;
 pub mod status;
 pub mod symlink;
-pub mod write;
 
 #[derive(Debug, PartialEq)]
 pub enum Request {
     Init(init::Init),
     Open(open::Open),
     Close(close::Close),
-    Read(read::Read),
-    Write(write::Write),
+    Read(read_write::ReadWrite),
+    Write(read_write::ReadWrite),
     Lstat(lstat::Lstat),
     Fstat(fstat::Fstat),
     Setstat(setstat::Setstat),
@@ -80,8 +79,8 @@ impl TryFrom<&[u8]> for Request {
             1 => Request::Init(init::Init::try_from(data_payload)?),
             3 => Request::Open(open::Open::try_from(data_payload)?),
             4 => Request::Close(close::Close::try_from(data_payload)?),
-            5 => Request::Read(read::Read::try_from(data_payload)?),
-            6 => Request::Write(write::Write::try_from(data_payload)?),
+            5 => Request::Read(read_write::ReadWrite::try_from(data_payload)?),
+            6 => Request::Write(read_write::ReadWrite::try_from(data_payload)?),
             7 => Request::Lstat(lstat::Lstat::try_from(data_payload)?),
             8 => Request::Fstat(fstat::Fstat::try_from(data_payload)?),
             9 => Request::Setstat(setstat::Setstat::try_from(data_payload)?),
