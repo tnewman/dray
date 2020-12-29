@@ -14,10 +14,7 @@ pub mod open;
 pub mod path;
 pub mod path_attributes;
 pub mod read_write;
-pub mod realpath;
 pub mod rename;
-pub mod stat;
-pub mod status;
 pub mod symlink;
 
 #[derive(Debug, PartialEq)]
@@ -36,12 +33,10 @@ pub enum Request {
     Remove(path::Path),
     Mkdir(path_attributes::PathAttributes),
     Rmdir(path::Path),
-    Realpath(realpath::Realpath),
-    Stat(stat::Stat),
+    Realpath(path::Path),
     Rename(rename::Rename),
     Readlink(path::Path),
     Symlink(symlink::Symlink),
-    Status(status::Status),
     Handle(handle::Handle),
     Data(data::Data),
     Name(name::Name),
@@ -79,12 +74,10 @@ impl TryFrom<&[u8]> for Request {
             13 => Request::Remove(path::Path::try_from(data_payload)?),
             14 => Request::Mkdir(path_attributes::PathAttributes::try_from(data_payload)?),
             15 => Request::Rmdir(path::Path::try_from(data_payload)?),
-            16 => Request::Realpath(realpath::Realpath::try_from(data_payload)?),
-            17 => Request::Stat(stat::Stat::try_from(data_payload)?),
+            16 => Request::Realpath(path::Path::try_from(data_payload)?),
             18 => Request::Rename(rename::Rename::try_from(data_payload)?),
             19 => Request::Readlink(path::Path::try_from(data_payload)?),
             20 => Request::Symlink(symlink::Symlink::try_from(data_payload)?),
-            101 => Request::Status(status::Status::try_from(data_payload)?),
             102 => Request::Handle(handle::Handle::try_from(data_payload)?),
             103 => Request::Data(data::Data::try_from(data_payload)?),
             104 => Request::Name(name::Name::try_from(data_payload)?),
