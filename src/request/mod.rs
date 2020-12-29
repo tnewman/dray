@@ -3,13 +3,10 @@ use std::convert::TryFrom;
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
-pub mod attrs;
 pub mod close;
-pub mod data;
 pub mod handle;
 pub mod handle_attributes;
 pub mod init;
-pub mod name;
 pub mod open;
 pub mod path;
 pub mod path_attributes;
@@ -38,9 +35,6 @@ pub enum Request {
     Readlink(path::Path),
     Symlink(symlink::Symlink),
     Handle(handle::Handle),
-    Data(data::Data),
-    Name(name::Name),
-    Attrs(attrs::Attrs),
 }
 
 impl TryFrom<&[u8]> for Request {
@@ -79,9 +73,6 @@ impl TryFrom<&[u8]> for Request {
             19 => Request::Readlink(path::Path::try_from(data_payload)?),
             20 => Request::Symlink(symlink::Symlink::try_from(data_payload)?),
             102 => Request::Handle(handle::Handle::try_from(data_payload)?),
-            103 => Request::Data(data::Data::try_from(data_payload)?),
-            104 => Request::Name(name::Name::try_from(data_payload)?),
-            105 => Request::Attrs(attrs::Attrs::try_from(data_payload)?),
             _ => return Err(Error::BadMessage),
         };
 
