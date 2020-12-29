@@ -18,7 +18,6 @@ pub mod name;
 pub mod open;
 pub mod path;
 pub mod read_write;
-pub mod readdir;
 pub mod readlink;
 pub mod realpath;
 pub mod rename;
@@ -39,7 +38,7 @@ pub enum Request {
     Setstat(setstat::Setstat),
     Fsetstat(fsetstat::Fsetstat),
     Opendir(path::Path),
-    Readdir(readdir::Readdir),
+    Readdir(handle::Handle),
     Remove(path::Path),
     Mkdir(mkdir::Mkdir),
     Rmdir(path::Path),
@@ -84,7 +83,7 @@ impl TryFrom<&[u8]> for Request {
             9 => Request::Setstat(setstat::Setstat::try_from(data_payload)?),
             10 => Request::Fsetstat(fsetstat::Fsetstat::try_from(data_payload)?),
             11 => Request::Opendir(path::Path::try_from(data_payload)?),
-            12 => Request::Readdir(readdir::Readdir::try_from(data_payload)?),
+            12 => Request::Readdir(handle::Handle::try_from(data_payload)?),
             13 => Request::Remove(path::Path::try_from(data_payload)?),
             14 => Request::Mkdir(mkdir::Mkdir::try_from(data_payload)?),
             15 => Request::Rmdir(path::Path::try_from(data_payload)?),
