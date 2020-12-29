@@ -95,8 +95,6 @@ impl TryFrom<&[u8]> for Request {
             103 => Request::Data(data::Data::try_from(data_payload)?),
             104 => Request::Name(name::Name::try_from(data_payload)?),
             105 => Request::Attrs(attrs::Attrs::try_from(data_payload)?),
-            200 => Request::Extended(extended::Extended::try_from(data_payload)?),
-            201 => Request::ExtendedReply(extended_reply::ExtendedReply::try_from(data_payload)?),
             _ => return Err(Error::BadMessage),
         };
 
