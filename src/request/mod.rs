@@ -11,10 +11,10 @@ pub mod extended_reply;
 pub mod fsetstat;
 pub mod handle;
 pub mod init;
-pub mod mkdir;
 pub mod name;
 pub mod open;
 pub mod path;
+pub mod path_attributes;
 pub mod read_write;
 pub mod readlink;
 pub mod realpath;
@@ -38,7 +38,7 @@ pub enum Request {
     Opendir(path::Path),
     Readdir(handle::Handle),
     Remove(path::Path),
-    Mkdir(mkdir::Mkdir),
+    Mkdir(path_attributes::PathAttributes),
     Rmdir(path::Path),
     Realpath(realpath::Realpath),
     Stat(stat::Stat),
@@ -83,7 +83,7 @@ impl TryFrom<&[u8]> for Request {
             11 => Request::Opendir(path::Path::try_from(data_payload)?),
             12 => Request::Readdir(handle::Handle::try_from(data_payload)?),
             13 => Request::Remove(path::Path::try_from(data_payload)?),
-            14 => Request::Mkdir(mkdir::Mkdir::try_from(data_payload)?),
+            14 => Request::Mkdir(path_attributes::PathAttributes::try_from(data_payload)?),
             15 => Request::Rmdir(path::Path::try_from(data_payload)?),
             16 => Request::Realpath(realpath::Realpath::try_from(data_payload)?),
             17 => Request::Stat(stat::Stat::try_from(data_payload)?),
