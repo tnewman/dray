@@ -9,10 +9,8 @@ pub mod data;
 pub mod extended;
 pub mod extended_reply;
 pub mod fsetstat;
-pub mod fstat;
 pub mod handle;
 pub mod init;
-pub mod lstat;
 pub mod mkdir;
 pub mod name;
 pub mod open;
@@ -33,8 +31,8 @@ pub enum Request {
     Close(handle::Handle),
     Read(read_write::ReadWrite),
     Write(read_write::ReadWrite),
-    Lstat(lstat::Lstat),
-    Fstat(fstat::Fstat),
+    Lstat(path::Path),
+    Fstat(path::Path),
     Setstat(setstat::Setstat),
     Fsetstat(fsetstat::Fsetstat),
     Opendir(path::Path),
@@ -78,8 +76,8 @@ impl TryFrom<&[u8]> for Request {
             4 => Request::Close(handle::Handle::try_from(data_payload)?),
             5 => Request::Read(read_write::ReadWrite::try_from(data_payload)?),
             6 => Request::Write(read_write::ReadWrite::try_from(data_payload)?),
-            7 => Request::Lstat(lstat::Lstat::try_from(data_payload)?),
-            8 => Request::Fstat(fstat::Fstat::try_from(data_payload)?),
+            7 => Request::Lstat(path::Path::try_from(data_payload)?),
+            8 => Request::Fstat(path::Path::try_from(data_payload)?),
             9 => Request::Setstat(setstat::Setstat::try_from(data_payload)?),
             10 => Request::Fsetstat(fsetstat::Fsetstat::try_from(data_payload)?),
             11 => Request::Opendir(path::Path::try_from(data_payload)?),
