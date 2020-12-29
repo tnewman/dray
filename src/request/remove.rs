@@ -12,10 +12,10 @@ impl TryFrom<&[u8]> for Remove {
     type Error = Error;
 
     fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut read_bytes = item;
+        let mut remove_bytes = item;
 
-        let id = read_bytes.try_get_u32()?;
-        let path = read_bytes.try_get_string()?;
+        let id = remove_bytes.try_get_u32()?;
+        let path = remove_bytes.try_get_string()?;
 
         Ok(Remove { id, path })
     }
@@ -31,15 +31,15 @@ mod test {
 
     #[test]
     fn test_parse_remove() {
-        let mut read_bytes = vec![];
+        let mut remove_bytes = vec![];
 
-        read_bytes.put_u32(0x01); // id
+        remove_bytes.put_u32(0x01); // id
         let filename = "/filename".as_bytes();
-        read_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        read_bytes.put_slice(filename); // filename
+        remove_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
+        remove_bytes.put_slice(filename); // filename
 
         assert_eq!(
-            Remove::try_from(read_bytes.as_slice()),
+            Remove::try_from(remove_bytes.as_slice()),
             Ok(Remove {
                 id: 0x01,
                 path: String::from("/filename")
@@ -49,25 +49,25 @@ mod test {
 
     #[test]
     fn test_parse_remove_with_invalid_id() {
-        let mut read_bytes = vec![];
+        let mut remove_bytes = vec![];
 
-        read_bytes.put_u8(0x01); // invalid id
+        remove_bytes.put_u8(0x01); // invalid id
 
         assert_eq!(
-            Remove::try_from(read_bytes.as_slice()),
+            Remove::try_from(remove_bytes.as_slice()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_remove_with_invalid_filename() {
-        let mut read_bytes = vec![];
+        let mut remove_bytes = vec![];
 
-        read_bytes.put_u32(0x01); // id
-        read_bytes.put_u32(0x10); // bad length
+        remove_bytes.put_u32(0x01); // id
+        remove_bytes.put_u32(0x10); // bad length
 
         assert_eq!(
-            Remove::try_from(read_bytes.as_slice()),
+            Remove::try_from(remove_bytes.as_slice()),
             Err(Error::BadMessage)
         );
     }

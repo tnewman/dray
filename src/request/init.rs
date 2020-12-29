@@ -12,10 +12,10 @@ impl TryFrom<&[u8]> for Init {
     type Error = Error;
 
     fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut bytes = item;
+        let mut init_bytes = item;
 
         Ok(Init {
-            version: bytes.try_get_u8()?,
+            version: init_bytes.try_get_u8()?,
         })
     }
 }

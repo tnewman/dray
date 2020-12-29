@@ -23,7 +23,6 @@ pub mod readlink;
 pub mod realpath;
 pub mod remove;
 pub mod rename;
-pub mod rmdir;
 pub mod setstat;
 pub mod stat;
 pub mod status;
