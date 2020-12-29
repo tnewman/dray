@@ -5,7 +5,7 @@ use std::convert::TryFrom;
 #[derive(Debug, PartialEq)]
 pub struct Remove {
     id: u32,
-    filename: String,
+    path: String,
 }
 
 impl TryFrom<&[u8]> for Remove {
@@ -15,9 +15,9 @@ impl TryFrom<&[u8]> for Remove {
         let mut read_bytes = item;
 
         let id = read_bytes.try_get_u32()?;
-        let filename = read_bytes.try_get_string()?;
+        let path = read_bytes.try_get_string()?;
 
-        Ok(Remove { id, filename })
+        Ok(Remove { id, path })
     }
 }
 
@@ -42,7 +42,7 @@ mod test {
             Remove::try_from(read_bytes.as_slice()),
             Ok(Remove {
                 id: 0x01,
-                filename: String::from("/filename")
+                path: String::from("/filename")
             })
         );
     }
