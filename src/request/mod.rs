@@ -10,17 +10,18 @@ pub mod init;
 pub mod open;
 pub mod path;
 pub mod path_attributes;
-pub mod read_write;
+pub mod read;
 pub mod rename;
 pub mod symlink;
+pub mod write;
 
 #[derive(Debug, PartialEq)]
 pub enum Request {
     Init(init::Init),
     Open(open::Open),
     Close(handle::Handle),
-    Read(read_write::ReadWrite),
-    Write(read_write::ReadWrite),
+    Read(read::Read),
+    Write(write::Write),
     Lstat(path::Path),
     Fstat(path::Path),
     Setstat(path_attributes::PathAttributes),
@@ -44,12 +45,6 @@ impl TryFrom<&[u8]> for Request {
         let mut bytes = item;
 
         let data_length = bytes.try_get_u32()?;
-
-        let data_length = match usize::try_from(data_length) {
-            Ok(data_length) => data_length,
-            Err(_) => return Err(Error::BadMessage),
-        };
-
         let data_type = bytes.try_get_u8()?;
         let data_payload: &[u8] = &bytes.try_get_bytes(data_length)?;
 
@@ -57,8 +52,8 @@ impl TryFrom<&[u8]> for Request {
             1 => Request::Init(init::Init::try_from(data_payload)?),
             3 => Request::Open(open::Open::try_from(data_payload)?),
             4 => Request::Close(handle::Handle::try_from(data_payload)?),
-            5 => Request::Read(read_write::ReadWrite::try_from(data_payload)?),
-            6 => Request::Write(read_write::ReadWrite::try_from(data_payload)?),
+            5 => Request::Read(read::Read::try_from(data_payload)?),
+            6 => Request::Write(write::Write::try_from(data_payload)?),
             7 => Request::Lstat(path::Path::try_from(data_payload)?),
             8 => Request::Fstat(path::Path::try_from(data_payload)?),
             9 => Request::Setstat(path_attributes::PathAttributes::try_from(data_payload)?),
