@@ -4,8 +4,8 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct Path {
-    id: u32,
-    path: String,
+    pub id: u32,
+    pub path: String,
 }
 
 impl TryFrom<&[u8]> for Path {

@@ -4,10 +4,10 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct ReadWrite {
-    id: u32,
-    handle: String,
-    offset: u64,
-    len: u32,
+    pub id: u32,
+    pub handle: String,
+    pub offset: u64,
+    pub len: u32,
 }
 
 impl TryFrom<&[u8]> for ReadWrite {

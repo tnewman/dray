@@ -4,9 +4,9 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct Rename {
-    id: u32,
-    old_path: String,
-    new_path: String,
+    pub id: u32,
+    pub old_path: String,
+    pub new_path: String,
 }
 
 impl TryFrom<&[u8]> for Rename {

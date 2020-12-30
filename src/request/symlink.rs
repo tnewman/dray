@@ -4,9 +4,9 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct Symlink {
-    id: u32,
-    link_path: String,
-    target_path: String,
+    pub id: u32,
+    pub link_path: String,
+    pub target_path: String,
 }
 
 impl TryFrom<&[u8]> for Symlink {

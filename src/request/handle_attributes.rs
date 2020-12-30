@@ -5,9 +5,9 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct HandleAttributes {
-    id: u32,
-    handle: String,
-    file_attributes: FileAttributes,
+    pub id: u32,
+    pub handle: String,
+    pub file_attributes: FileAttributes,
 }
 
 impl TryFrom<&[u8]> for HandleAttributes {

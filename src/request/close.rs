@@ -4,8 +4,8 @@ use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
 pub struct Close {
-    id: u32,
-    handle: String,
+    pub id: u32,
+    pub handle: String,
 }
 
 impl TryFrom<&[u8]> for Close {
