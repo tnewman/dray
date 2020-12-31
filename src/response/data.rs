@@ -1,5 +1,6 @@
 use bytes::BufMut;
 use std::convert::From;
+use std::convert::TryInto;
 
 pub struct Data {
     pub id: u32,
@@ -11,6 +12,7 @@ impl From<&Data> for Vec<u8> {
         let mut data_bytes: Vec<u8> = vec![];
 
         data_bytes.put_u32(item.id);
+        data_bytes.put_u32(item.data.len().try_into().unwrap());
         data_bytes.put_slice(&item.data);
 
         data_bytes
@@ -33,6 +35,7 @@ mod test {
         let mut data_bytes: &[u8] = &Vec::from(&data);
 
         assert_eq!(0x01, data_bytes.get_u32());
+        assert_eq!(0x02, data_bytes.get_u32());
         assert_eq!(0x02, data_bytes.get_u8());
         assert_eq!(0x03, data_bytes.get_u8());
     }
