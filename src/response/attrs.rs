@@ -35,7 +35,7 @@ mod test {
                 permissions: Some(777),
                 atime: Some(300),
                 mtime: Some(400),
-            }
+            },
         };
 
         let mut attrs_bytes: &[u8] = &Vec::from(&attrs);
