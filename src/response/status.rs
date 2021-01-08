@@ -9,7 +9,7 @@ pub struct Status {
     pub error_message: String,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum StatusCode {
     Ok = 0,
     EOF = 1,
