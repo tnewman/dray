@@ -3,6 +3,7 @@ use bytes::BufMut;
 use std::convert::From;
 use std::convert::TryInto;
 
+#[derive(Debug, PartialEq)]
 pub struct Name {
     pub id: u32,
     pub files: Vec<File>,
@@ -23,6 +24,7 @@ impl From<&Name> for Vec<u8> {
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub struct File {
     pub file_name: String,
     pub long_name: String,

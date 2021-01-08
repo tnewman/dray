@@ -2,6 +2,7 @@ use bytes::BufMut;
 use std::convert::From;
 use std::convert::TryInto;
 
+#[derive(Debug, PartialEq)]
 pub struct Handle {
     pub id: u32,
     pub handle: String,

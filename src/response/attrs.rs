@@ -2,6 +2,7 @@ use crate::file_attributes::FileAttributes;
 use bytes::BufMut;
 use std::convert::From;
 
+#[derive(Debug, PartialEq)]
 pub struct Attrs {
     pub id: u32,
     pub file_attributes: FileAttributes,

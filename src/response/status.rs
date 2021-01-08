@@ -2,6 +2,7 @@ use bytes::BufMut;
 use std::convert::From;
 use std::convert::TryInto;
 
+#[derive(Debug, PartialEq)]
 pub struct Status {
     pub id: u32,
     pub status_code: StatusCode,

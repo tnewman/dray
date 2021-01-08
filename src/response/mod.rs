@@ -7,10 +7,10 @@ pub mod version;
 
 #[derive(Debug, PartialEq)]
 pub enum Response {
-    Version,
-    Status,
-    Handle,
-    Data,
-    Name,
-    Attrs,
+    Version(version::Version),
+    Status(status::Status),
+    Handle(handle::Handle),
+    Data(data::Data),
+    Name(name::Name),
+    Attrs(attrs::Attrs),
 }
