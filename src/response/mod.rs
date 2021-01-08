@@ -14,3 +14,16 @@ pub enum Response {
     Name(name::Name),
     Attrs(attrs::Attrs),
 }
+
+impl From<&Response> for Vec<u8> {
+    fn from(item: &Response) -> Self {
+        match item {
+            Response::Version(version) => version.into(),
+            Response::Status(status) => status.into(),
+            Response::Handle(handle) => handle.into(),
+            Response::Data(data) => data.into(),
+            Response::Name(name) => name.into(),
+            Response::Attrs(attrs) => attrs.into(),
+        }
+    }
+}
