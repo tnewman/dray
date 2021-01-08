@@ -3,7 +3,6 @@ use bytes::BufMut;
 use std::convert::From;
 use std::convert::TryInto;
 
-
 pub struct Name {
     pub id: u32,
     pub files: Vec<File>,
@@ -66,7 +65,7 @@ mod test {
                 permissions: None,
                 atime: None,
                 mtime: None,
-            }
+            },
         };
 
         let mut file_bytes: &[u8] = &Vec::from(&file);
