@@ -33,7 +33,7 @@ impl From<&Status> for Vec<u8> {
         status_bytes.put_u32(error_message_bytes.len().try_into().unwrap());
         status_bytes.put_slice(error_message_bytes);
 
-        let language_tag_bytes = b"en-us";
+        let language_tag_bytes = b"en-US";
         status_bytes.put_u32(language_tag_bytes.len().try_into().unwrap());
         status_bytes.put_slice(language_tag_bytes);
 
@@ -66,7 +66,7 @@ mod test {
         ); // Error message
         assert_eq!(0x05, status_bytes.get_u32()); // Language length
         assert_eq!(
-            &[0x65, 0x6E, 0x2D, 0x75, 0x73],
+            &[0x65, 0x6E, 0x2D, 0x55, 0x53],
             &status_bytes.copy_to_bytes(5)[..]
         ); // Language
     }
