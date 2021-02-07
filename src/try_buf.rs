@@ -1,6 +1,8 @@
 use crate::error::Error;
 use bytes::Buf;
+use bytes::BufMut;
 use bytes::Bytes;
+use std::convert::TryFrom;
 use std::convert::TryInto;
 
 pub trait TryBuf: Buf {
@@ -63,6 +65,26 @@ impl<T: Buf> TryBuf for T {
         };
 
         Ok(string)
+    }
+}
+
+pub trait TryBufMut : BufMut {
+    fn try_put_str(&mut self, str: &str) -> Result<(), Error>;
+}
+
+impl<T: BufMut> TryBufMut for T {
+    fn try_put_str(&mut self, str: &str) -> Result<(), Error> {
+        let len = str.len();
+
+        let len = match u32::try_from(len) {
+            Ok(len) => len,
+            Err(_) => return Err(Error::BadMessage),
+        };
+
+        self.put_u32(len);
+        self.put(str.as_bytes());
+
+        Ok(())
     }
 }
 
@@ -153,5 +175,16 @@ mod tests {
         let string: Vec<u8> = vec![0x00, 0x00, 0x00, 0x01, 0xFF];
 
         assert_eq!(string.as_slice().try_get_string(), Err(Error::BadMessage))
+    }
+
+    #[test]
+    fn test_try_put_string() {
+        let string = "TEST";
+
+        let mut bytes: Vec<u8> = Vec::new();
+        let result = bytes.try_put_str(string);
+
+        assert_eq!(result, Ok(()));
+        assert_eq!(bytes.as_slice(), &[0x00, 0x00, 0x00, 0x04, 0x54, 0x45, 0x53, 0x54]); // TEST with length 4
     }
 }
