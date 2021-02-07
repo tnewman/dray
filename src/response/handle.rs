@@ -37,6 +37,6 @@ mod test {
 
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x06, data_bytes.get_u32());
-        assert_eq!(&[0x68, 0x61, 0x6e, 0x64, 0x6c, 0x65], data_bytes.bytes());
+        assert_eq!(&[0x68, 0x61, 0x6e, 0x64, 0x6c, 0x65], &data_bytes[..]);
     }
 }

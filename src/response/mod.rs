@@ -120,7 +120,7 @@ mod test {
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &name_bytes.copy_to_bytes(4)[..]); // file
         assert_eq!(0x04, name_bytes.get_u32()); // long length
         assert_eq!(&[0x6C, 0x6F, 0x6E, 0x67], &name_bytes.copy_to_bytes(4)[..]); // long
-        assert_eq!(file_attributes_bytes, &name_bytes.bytes());
+        assert_eq!(file_attributes_bytes, &name_bytes[..]);
     }
 
     #[test]
@@ -136,7 +136,7 @@ mod test {
         let mut attrs_bytes: &[u8] = &Vec::from(&attrs);
 
         assert_eq!(0x01, attrs_bytes.get_u32());
-        assert_eq!(file_attributes_bytes, attrs_bytes.bytes());
+        assert_eq!(file_attributes_bytes, &attrs_bytes[..]);
     }
 
     fn get_file_attributes() -> FileAttributes {
