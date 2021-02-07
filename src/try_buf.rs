@@ -68,7 +68,7 @@ impl<T: Buf> TryBuf for T {
     }
 }
 
-pub trait TryBufMut : BufMut {
+pub trait TryBufMut: BufMut {
     fn try_put_str(&mut self, str: &str) -> Result<(), Error>;
 }
 
@@ -185,6 +185,9 @@ mod tests {
         let result = bytes.try_put_str(string);
 
         assert_eq!(result, Ok(()));
-        assert_eq!(bytes.as_slice(), &[0x00, 0x00, 0x00, 0x04, 0x54, 0x45, 0x53, 0x54]); // TEST with length 4
+        assert_eq!(
+            bytes.as_slice(),
+            &[0x00, 0x00, 0x00, 0x04, 0x54, 0x45, 0x53, 0x54]
+        ); // TEST with length 4
     }
 }
