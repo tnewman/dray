@@ -33,18 +33,16 @@ mod test {
 
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::convert::TryInto;
 
     #[test]
     fn test_parse_handle_attributes() {
         let mut handle_attributes_bytes = vec![];
 
         handle_attributes_bytes.put_u32(0x01); // id
-
-        let filename = "handle".as_bytes();
-        handle_attributes_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        handle_attributes_bytes.put_slice(filename); // filename
+        handle_attributes_bytes.try_put_str("handle").unwrap(); // handle
 
         let file_attributes = get_file_attributes();
         handle_attributes_bytes.put_slice(Vec::from(&file_attributes).as_slice()); // file attributes
@@ -90,10 +88,7 @@ mod test {
         let mut handle_attributes_bytes = vec![];
 
         handle_attributes_bytes.put_u32(0x01); // id
-
-        let filename = "handle".as_bytes();
-        handle_attributes_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        handle_attributes_bytes.put_slice(filename); // filename
+        handle_attributes_bytes.try_put_str("handle").unwrap(); // handle
 
         handle_attributes_bytes.put_u8(0x01);
 

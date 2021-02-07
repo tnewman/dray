@@ -71,6 +71,8 @@ impl TryFrom<&[u8]> for OpenOptions {
 mod tests {
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
     use std::convert::TryInto;
 
@@ -79,11 +81,7 @@ mod tests {
         let mut open_bytes = vec![];
 
         open_bytes.put_u32(0x01); // id
-
-        let filename = "/file/path".as_bytes();
-        open_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        open_bytes.put_slice(filename); // filename
-
+        open_bytes.try_put_str("/file/path").unwrap(); // filename
         open_bytes.put_u32(0x00); // pflags
 
         let file_attributes = get_file_attributes();

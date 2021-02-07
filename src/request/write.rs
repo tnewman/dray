@@ -37,19 +37,18 @@ impl TryFrom<&[u8]> for Write {
 mod tests {
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::{convert::TryInto, vec};
+
+    use std::convert::TryInto;
 
     #[test]
     fn test_parse_write() {
         let mut write_bytes = vec![];
 
         write_bytes.put_u32(0x01); // id
-
-        let handle = "handle".as_bytes();
-        write_bytes.put_u32(handle.len().try_into().unwrap()); // handle length
-        write_bytes.put_slice(handle); // handle
-
+        write_bytes.try_put_str("handle").unwrap(); // handle
         write_bytes.put_u64(0x02); // offset
 
         let data = vec![0x01, 0x02];

@@ -25,18 +25,16 @@ impl TryFrom<&[u8]> for Close {
 mod tests {
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::convert::TryInto;
 
     #[test]
     fn test_parse_close() {
         let mut close_bytes = vec![];
 
         close_bytes.put_u32(0x01); // id
-
-        let handle = "handle".as_bytes();
-        close_bytes.put_u32(handle.len().try_into().unwrap()); // handle length
-        close_bytes.put_slice(handle); // handle
+        close_bytes.try_put_str("handle").unwrap(); // handle
 
         assert_eq!(
             Close::try_from(close_bytes.as_slice()),

@@ -33,18 +33,16 @@ mod test {
 
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::convert::TryInto;
 
     #[test]
     fn test_parse_path_attributes() {
         let mut path_attributes_bytes = vec![];
 
         path_attributes_bytes.put_u32(0x01); // id
-
-        let filename = "/file/path".as_bytes();
-        path_attributes_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        path_attributes_bytes.put_slice(filename); // filename
+        path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
 
         let file_attributes = get_file_attributes();
         path_attributes_bytes.put_slice(Vec::from(&file_attributes).as_slice()); // file attributes
@@ -76,7 +74,6 @@ mod test {
         let mut path_attributes_bytes = vec![];
 
         path_attributes_bytes.put_u32(0x01); // id
-
         path_attributes_bytes.put_u32(0x01); // invalid filename length
 
         assert_eq!(
@@ -90,12 +87,9 @@ mod test {
         let mut path_attributes_bytes = vec![];
 
         path_attributes_bytes.put_u32(0x01); // id
+        path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
 
-        let filename = "/file/path".as_bytes();
-        path_attributes_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        path_attributes_bytes.put_slice(filename); // filename
-
-        path_attributes_bytes.put_u8(0x01);
+        path_attributes_bytes.put_u8(0x01); // invalid attributes
 
         assert_eq!(
             PathAttributes::try_from(path_attributes_bytes.as_slice()),

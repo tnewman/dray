@@ -34,19 +34,16 @@ impl TryFrom<&[u8]> for Read {
 mod tests {
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::{convert::TryInto, vec};
 
     #[test]
     fn test_parse_read() {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
-
-        let handle = "handle".as_bytes();
-        read_bytes.put_u32(handle.len().try_into().unwrap()); // handle length
-        read_bytes.put_slice(handle); // handle
-
+        read_bytes.try_put_str("handle").unwrap(); // handle
         read_bytes.put_u64(0x02); // offset
         read_bytes.put_u32(0x03); // length
 
@@ -91,11 +88,7 @@ mod tests {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
-
-        let handle = "handle".as_bytes();
-        read_bytes.put_u32(handle.len().try_into().unwrap()); // handle length
-        read_bytes.put_slice(handle); // handle
-
+        read_bytes.try_put_str("handle").unwrap(); // handle
         read_bytes.put_u8(0x02); // invalid offset
 
         assert_eq!(
@@ -109,11 +102,7 @@ mod tests {
         let mut read_bytes = vec![];
 
         read_bytes.put_u32(0x01); // id
-
-        let handle = "handle".as_bytes();
-        read_bytes.put_u32(handle.len().try_into().unwrap()); // handle length
-        read_bytes.put_slice(handle); // handle
-
+        read_bytes.try_put_str("handle").unwrap(); // handle
         read_bytes.put_u64(0x02); // offset
         read_bytes.put_u8(0x03); // invalid length
 

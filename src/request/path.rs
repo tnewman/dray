@@ -26,17 +26,16 @@ mod test {
 
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::{convert::TryInto, vec};
 
     #[test]
     fn test_parse_path() {
         let mut path_bytes = vec![];
 
         path_bytes.put_u32(0x01); // id
-        let filename = "/filename".as_bytes();
-        path_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
-        path_bytes.put_slice(filename); // filename
+        path_bytes.try_put_str("/filename").unwrap(); // filename
 
         assert_eq!(
             Path::try_from(path_bytes.as_slice()),

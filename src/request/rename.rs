@@ -32,22 +32,17 @@ mod test {
 
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::{convert::TryInto, vec};
 
     #[test]
     fn test_parse_rename() {
         let mut rename_bytes: Vec<u8> = vec![];
 
         rename_bytes.put_u32(0x01);
-
-        let old_path = "/oldpath".as_bytes();
-        rename_bytes.put_u32(old_path.len().try_into().unwrap()); // old path length
-        rename_bytes.put_slice(old_path); // old path
-
-        let new_path = "/newpath".as_bytes();
-        rename_bytes.put_u32(new_path.len().try_into().unwrap()); // new path length
-        rename_bytes.put_slice(new_path); // new path
+        rename_bytes.try_put_str("/oldpath").unwrap(); // old path
+        rename_bytes.try_put_str("/newpath").unwrap(); // new path
 
         assert_eq!(
             Rename::try_from(rename_bytes.as_slice()),
@@ -76,7 +71,6 @@ mod test {
         let mut rename_bytes: Vec<u8> = vec![];
 
         rename_bytes.put_u32(0x01);
-
         rename_bytes.put_u32(1); // invalid old path length
 
         assert_eq!(
@@ -90,11 +84,7 @@ mod test {
         let mut rename_bytes: Vec<u8> = vec![];
 
         rename_bytes.put_u32(0x01);
-
-        let old_path = "/oldpath".as_bytes();
-        rename_bytes.put_u32(old_path.len().try_into().unwrap()); // old path length
-        rename_bytes.put_slice(old_path); // old path
-
+        rename_bytes.try_put_str("/oldpath").unwrap(); // old path
         rename_bytes.put_u32(1); // invalid new path length
 
         assert_eq!(

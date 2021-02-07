@@ -32,22 +32,17 @@ mod test {
 
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::{convert::TryInto, vec};
 
     #[test]
     fn test_parse_symlink() {
         let mut symlink_bytes: Vec<u8> = vec![];
 
         symlink_bytes.put_u32(0x01);
-
-        let link_path = "/linkpath".as_bytes();
-        symlink_bytes.put_u32(link_path.len().try_into().unwrap()); // link path length
-        symlink_bytes.put_slice(link_path); // link path
-
-        let target_path = "/targetpath".as_bytes();
-        symlink_bytes.put_u32(target_path.len().try_into().unwrap()); // target path length
-        symlink_bytes.put_slice(target_path); // target path
+        symlink_bytes.try_put_str("/linkpath").unwrap();
+        symlink_bytes.try_put_str("/targetpath").unwrap();
 
         assert_eq!(
             Symlink::try_from(symlink_bytes.as_slice()),
@@ -90,11 +85,7 @@ mod test {
         let mut symlink_bytes: Vec<u8> = vec![];
 
         symlink_bytes.put_u32(0x01);
-
-        let link_path = "/linkpath".as_bytes();
-        symlink_bytes.put_u32(link_path.len().try_into().unwrap()); // link path length
-        symlink_bytes.put_slice(link_path); // link path
-
+        symlink_bytes.try_put_str("/linkpath").unwrap();
         symlink_bytes.put_u32(0x01); // invalid target path length
 
         assert_eq!(

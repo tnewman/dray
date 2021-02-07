@@ -26,18 +26,16 @@ mod test {
 
     use super::*;
 
+    use crate::try_buf::TryBufMut;
+
     use bytes::BufMut;
-    use std::convert::TryInto;
 
     #[test]
     fn test_parse_handle() {
         let mut handle_bytes: Vec<u8> = vec![];
 
         handle_bytes.put_u32(0x01); // id
-
-        let handle = "HANDLE".as_bytes();
-        handle_bytes.put_u32(handle.len().try_into().unwrap()); // handle length
-        handle_bytes.put_slice(handle); // handle
+        handle_bytes.try_put_str("HANDLE").unwrap(); // handle
 
         assert_eq!(
             Handle::try_from(handle_bytes.as_slice()),
