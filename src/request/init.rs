@@ -9,10 +9,10 @@ pub struct Init {
     pub version: u8,
 }
 
-impl TryFrom<&Bytes> for Init {
+impl TryFrom<&mut Bytes> for Init {
     type Error = Error;
 
-    fn try_from(init_bytes: &Bytes) -> Result<Self, Self::Error> {
+    fn try_from(init_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         Ok(Init {
             version: init_bytes.try_get_u8()?,
         })
@@ -32,15 +32,18 @@ mod tests {
         init_bytes.put_u8(0x03);
 
         assert_eq!(
-            Init::try_from(&init_bytes.freeze()),
+            Init::try_from(&mut init_bytes.freeze()),
             Ok(Init { version: 0x03 })
         );
     }
 
     #[test]
     fn test_parse_invalid_message() {
-        let mut init_bytes = BytesMut::new();
+        let init_bytes = BytesMut::new();
 
-        assert_eq!(Init::try_from(&init_bytes.freeze()), Err(Error::BadMessage));
+        assert_eq!(
+            Init::try_from(&mut init_bytes.freeze()),
+            Err(Error::BadMessage)
+        );
     }
 }

@@ -40,13 +40,13 @@ pub enum Request {
     Handle(handle::Handle),
 }
 
-impl TryFrom<&Bytes> for Request {
+impl TryFrom<&mut Bytes> for Request {
     type Error = Error;
 
-    fn try_from(request_bytes: &Bytes) -> Result<Self, Self::Error> {
+    fn try_from(request_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let data_length = request_bytes.try_get_u32()?;
         let data_type = request_bytes.try_get_u8()?;
-        let data_payload: &Bytes = &request_bytes.try_get_bytes(data_length)?;
+        let data_payload = &mut request_bytes.try_get_bytes(data_length)?;
 
         let message = match data_type {
             1 => Request::Init(init::Init::try_from(data_payload)?),
@@ -83,28 +83,31 @@ mod tests {
 
     #[test]
     fn test_parse_empty_message() {
-        let message = Bytes::new();
+        let mut message = Bytes::new();
 
-        assert_eq!(Request::try_from(&message), Err(Error::BadMessage));
+        assert_eq!(Request::try_from(&mut message), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_invalid_message() {
-        let message = BytesMut::new();
+        let mut message = BytesMut::new();
         message.put_u8(0x00);
 
-        assert_eq!(Request::try_from(&message.freeze()), Err(Error::BadMessage));
+        assert_eq!(
+            Request::try_from(&mut message.freeze()),
+            Err(Error::BadMessage)
+        );
     }
 
     #[test]
     fn test_parse_init_message() {
-        let message = BytesMut::new();
+        let mut message = BytesMut::new();
         message.put_u32(0x01); // Payload Length 1
         message.put_u8(0x01); // Init Message
         message.put_u8(0x03); // Protocol Version 3
 
         assert_eq!(
-            Request::try_from(&message.freeze()),
+            Request::try_from(&mut message.freeze()),
             Ok(Request::Init(init::Init { version: 0x03 }))
         );
     }

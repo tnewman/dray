@@ -10,7 +10,7 @@ pub struct Data {
 
 impl From<&Data> for Bytes {
     fn from(data: &Data) -> Self {
-        let data_bytes = BytesMut::new();
+        let mut data_bytes = BytesMut::new();
 
         data_bytes.put_u32(data.id);
         data_bytes.put_u32(data.data.len().try_into().unwrap());
@@ -33,7 +33,7 @@ mod test {
             data: vec![0x02, 0x03],
         };
 
-        let data_bytes = &Bytes::from(&data);
+        let data_bytes = &mut Bytes::from(&data);
 
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x02, data_bytes.get_u32());

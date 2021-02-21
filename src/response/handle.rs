@@ -10,7 +10,7 @@ pub struct Handle {
 
 impl From<&Handle> for Bytes {
     fn from(handle: &Handle) -> Self {
-        let handle_bytes = BytesMut::new();
+        let mut handle_bytes = BytesMut::new();
 
         handle_bytes.put_u32(handle.id);
         handle_bytes.put_u32(handle.handle.len().try_into().unwrap());
@@ -33,7 +33,7 @@ mod test {
             handle: String::from("handle"),
         };
 
-        let data_bytes = &Bytes::from(&data);
+        let data_bytes = &mut Bytes::from(&data);
 
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x06, data_bytes.get_u32());

@@ -10,10 +10,10 @@ pub struct Handle {
     pub handle: String,
 }
 
-impl TryFrom<&Bytes> for Handle {
+impl TryFrom<&mut Bytes> for Handle {
     type Error = Error;
 
-    fn try_from(handle_bytes: &Bytes) -> Result<Self, Self::Error> {
+    fn try_from(handle_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = handle_bytes.try_get_u32()?;
         let handle = handle_bytes.try_get_string()?;
 
@@ -38,7 +38,7 @@ mod test {
         handle_bytes.try_put_str("HANDLE").unwrap(); // handle
 
         assert_eq!(
-            Handle::try_from(&handle_bytes.freeze()),
+            Handle::try_from(&mut handle_bytes.freeze()),
             Ok(Handle {
                 id: 0x01,
                 handle: String::from("HANDLE")
@@ -53,7 +53,7 @@ mod test {
         handle_bytes.put_u8(0x01); // bad id
 
         assert_eq!(
-            Handle::try_from(&handle_bytes.freeze()),
+            Handle::try_from(&mut handle_bytes.freeze()),
             Err(Error::BadMessage)
         )
     }
@@ -66,7 +66,7 @@ mod test {
         handle_bytes.put_u32(0x01); // bad handle length
 
         assert_eq!(
-            Handle::try_from(&handle_bytes.freeze()),
+            Handle::try_from(&mut handle_bytes.freeze()),
             Err(Error::BadMessage)
         )
     }

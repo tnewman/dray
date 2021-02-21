@@ -10,10 +10,10 @@ pub struct Close {
     pub handle: String,
 }
 
-impl TryFrom<&Bytes> for Close {
+impl TryFrom<&mut Bytes> for Close {
     type Error = Error;
 
-    fn try_from(close_bytes: &Bytes) -> Result<Self, Self::Error> {
+    fn try_from(close_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = close_bytes.try_get_u32()?;
         let handle = close_bytes.try_get_string()?;
 

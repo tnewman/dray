@@ -10,10 +10,10 @@ pub struct Attrs {
 
 impl From<&Attrs> for Bytes {
     fn from(attrs: &Attrs) -> Self {
-        let attrs_bytes = BytesMut::new();
+        let mut attrs_bytes = BytesMut::new();
 
         attrs_bytes.put_u32(attrs.id);
-        attrs_bytes.put_slice(&Bytes::from(&attrs.file_attributes));
+        attrs_bytes.put_slice(&mut Bytes::from(&attrs.file_attributes));
 
         attrs_bytes.freeze()
     }
@@ -39,7 +39,7 @@ mod test {
             },
         };
 
-        let attrs_bytes = Bytes::from(&attrs);
+        let mut attrs_bytes = Bytes::from(&attrs);
 
         assert_eq!(0x01, attrs_bytes.get_u32());
         assert_eq!(0x0F, attrs_bytes.get_u32()); // check attributes bitmask

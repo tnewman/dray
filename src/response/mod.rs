@@ -43,7 +43,7 @@ mod test {
     fn test_from_creates_version_bytes() {
         let version = Response::Version(version::Version { version: 0x01 });
 
-        let version_bytes = &Bytes::from(&version);
+        let version_bytes = &mut Bytes::from(&version);
 
         assert_eq!(0x01, version_bytes.get_u32());
     }
@@ -56,7 +56,7 @@ mod test {
             error_message: String::from("OK"),
         });
 
-        let status_bytes = &Bytes::from(&status);
+        let status_bytes = &mut Bytes::from(&status);
 
         assert_eq!(0x01, status_bytes.get_u32());
         assert_eq!(0x00, status_bytes.get_u32());
@@ -76,7 +76,7 @@ mod test {
             handle: String::from("handle"),
         });
 
-        let handle_bytes = &Bytes::from(&handle);
+        let handle_bytes = &mut Bytes::from(&handle);
 
         assert_eq!(0x01, handle_bytes.get_u32());
         assert_eq!(0x06, handle_bytes.get_u32()); // handle length
@@ -93,7 +93,7 @@ mod test {
             data: vec![0x02, 0x03],
         });
 
-        let data_bytes = &Bytes::from(&data);
+        let data_bytes = &mut Bytes::from(&data);
 
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x02, data_bytes.get_u32()); // data length
@@ -103,7 +103,7 @@ mod test {
     #[test]
     fn test_from_creates_name_bytes() {
         let file_attributes = get_file_attributes();
-        let file_attributes_bytes = &Bytes::from(&file_attributes);
+        let file_attributes_bytes = &mut Bytes::from(&file_attributes);
 
         let name = Response::Name(name::Name {
             id: 0x01,
@@ -114,7 +114,7 @@ mod test {
             }],
         });
 
-        let name_bytes = &Bytes::from(&name);
+        let name_bytes = &mut Bytes::from(&name);
 
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x01, name_bytes.get_u32());
@@ -128,14 +128,14 @@ mod test {
     #[test]
     fn test_from_creates_attrs_bytes() {
         let file_attributes = get_file_attributes();
-        let file_attributes_bytes = &Bytes::from(&file_attributes);
+        let file_attributes_bytes = &mut Bytes::from(&file_attributes);
 
         let attrs = attrs::Attrs {
             id: 0x01,
             file_attributes,
         };
 
-        let attrs_bytes = &Bytes::from(&attrs);
+        let attrs_bytes = &mut Bytes::from(&attrs);
 
         assert_eq!(0x01, attrs_bytes.get_u32());
         assert_eq!(file_attributes_bytes, &attrs_bytes[..]);

@@ -12,10 +12,10 @@ pub struct PathAttributes {
     pub file_attributes: FileAttributes,
 }
 
-impl TryFrom<&Bytes> for PathAttributes {
+impl TryFrom<&mut Bytes> for PathAttributes {
     type Error = Error;
 
-    fn try_from(path_attributes_bytes: &Bytes) -> Result<Self, Self::Error> {
+    fn try_from(path_attributes_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = path_attributes_bytes.try_get_u32()?;
         let path = path_attributes_bytes.try_get_string()?;
         let file_attributes = FileAttributes::try_from(path_attributes_bytes)?;
@@ -39,16 +39,16 @@ mod test {
 
     #[test]
     fn test_parse_path_attributes() {
-        let path_attributes_bytes = BytesMut::new();
+        let mut path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u32(0x01); // id
         path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
 
         let file_attributes = get_file_attributes();
-        path_attributes_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
+        path_attributes_bytes.put_slice(&mut Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
-            PathAttributes::try_from(&path_attributes_bytes.freeze()),
+            PathAttributes::try_from(&mut path_attributes_bytes.freeze()),
             Ok(PathAttributes {
                 id: 0x01,
                 path: String::from("/file/path"),
@@ -59,32 +59,32 @@ mod test {
 
     #[test]
     fn test_parse_path_attributes_with_invalid_id() {
-        let path_attributes_bytes = BytesMut::new();
+        let mut path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u8(0x01); // invalid id
 
         assert_eq!(
-            PathAttributes::try_from(&path_attributes_bytes.freeze()),
+            PathAttributes::try_from(&mut path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_path_attributes_with_invalid_path() {
-        let path_attributes_bytes = BytesMut::new();
+        let mut path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u32(0x01); // id
         path_attributes_bytes.put_u32(0x01); // invalid filename length
 
         assert_eq!(
-            PathAttributes::try_from(&path_attributes_bytes.freeze()),
+            PathAttributes::try_from(&mut path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_path_attributes_with_invalid_file_attributes() {
-        let path_attributes_bytes = BytesMut::new();
+        let mut path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u32(0x01); // id
         path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
@@ -92,7 +92,7 @@ mod test {
         path_attributes_bytes.put_u8(0x01); // invalid attributes
 
         assert_eq!(
-            PathAttributes::try_from(&path_attributes_bytes.freeze()),
+            PathAttributes::try_from(&mut path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }

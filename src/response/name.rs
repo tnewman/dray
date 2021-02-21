@@ -12,13 +12,13 @@ pub struct Name {
 
 impl From<&Name> for Bytes {
     fn from(name: &Name) -> Self {
-        let name_bytes = BytesMut::new();
+        let mut name_bytes = BytesMut::new();
 
         name_bytes.put_u32(name.id);
         name_bytes.put_u32(name.files.len().try_into().unwrap());
 
         for file in &name.files {
-            name_bytes.put_slice(&Bytes::from(file));
+            name_bytes.put_slice(&mut Bytes::from(file));
         }
 
         name_bytes.freeze()
@@ -34,7 +34,7 @@ pub struct File {
 
 impl From<&File> for Bytes {
     fn from(item: &File) -> Self {
-        let file_bytes = BytesMut::new();
+        let mut file_bytes = BytesMut::new();
 
         let file_name_bytes = item.file_name.as_bytes();
         file_bytes.put_u32(file_name_bytes.len().try_into().unwrap());
@@ -44,7 +44,7 @@ impl From<&File> for Bytes {
         file_bytes.put_u32(long_name_bytes.len().try_into().unwrap());
         file_bytes.put_slice(long_name_bytes);
 
-        file_bytes.put_slice(&Bytes::from(&item.file_attributes));
+        file_bytes.put_slice(&mut Bytes::from(&item.file_attributes));
 
         file_bytes.freeze()
     }
@@ -71,7 +71,7 @@ mod test {
             },
         };
 
-        let file_bytes = &Bytes::from(&file);
+        let file_bytes = &mut Bytes::from(&file);
 
         assert_eq!(0x04, file_bytes.get_u32());
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &file_bytes.copy_to_bytes(4)[..]);

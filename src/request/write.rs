@@ -12,10 +12,10 @@ pub struct Write {
     pub data: Bytes,
 }
 
-impl TryFrom<&Bytes> for Write {
+impl TryFrom<&mut Bytes> for Write {
     type Error = Error;
 
-    fn try_from(write_bytes: &Bytes) -> Result<Self, Self::Error> {
+    fn try_from(write_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = write_bytes.try_get_u32()?;
         let handle = write_bytes.try_get_string()?;
         let offset = write_bytes.try_get_u64()?;
@@ -43,7 +43,7 @@ mod tests {
 
     #[test]
     fn test_parse_write() {
-        let write_bytes = BytesMut::new();
+        let mut write_bytes = BytesMut::new();
 
         write_bytes.put_u32(0x01); // id
         write_bytes.try_put_str("handle").unwrap(); // handle
@@ -54,7 +54,7 @@ mod tests {
         write_bytes.put_slice(data.as_slice()); // data
 
         assert_eq!(
-            Write::try_from(&write_bytes.freeze()),
+            Write::try_from(&mut write_bytes.freeze()),
             Ok(Write {
                 id: 0x01,
                 handle: String::from("handle"),
@@ -66,37 +66,37 @@ mod tests {
 
     #[test]
     fn test_parse_write_with_empty_data() {
-        assert_eq!(Write::try_from(&Bytes::new()), Err(Error::BadMessage));
+        assert_eq!(Write::try_from(&mut Bytes::new()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_write_with_invalid_id() {
-        let write_bytes = BytesMut::new();
+        let mut write_bytes = BytesMut::new();
 
         write_bytes.put_u8(0x01); // id
 
         assert_eq!(
-            Write::try_from(&write_bytes.freeze()),
+            Write::try_from(&mut write_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_write_with_invalid_handle() {
-        let write_bytes = BytesMut::new();
+        let mut write_bytes = BytesMut::new();
 
         write_bytes.put_u32(0x01); // id
         write_bytes.put_u8(0x02); // invalid handle
 
         assert_eq!(
-            Write::try_from(&write_bytes.freeze()),
+            Write::try_from(&mut write_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_write_with_invalid_offset() {
-        let write_bytes = BytesMut::new();
+        let mut write_bytes = BytesMut::new();
 
         write_bytes.put_u32(0x01); // id
 
@@ -107,14 +107,14 @@ mod tests {
         write_bytes.put_u8(0x02); // invalid offset
 
         assert_eq!(
-            Write::try_from(&write_bytes.freeze()),
+            Write::try_from(&mut write_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_write_with_invalid_data_length() {
-        let write_bytes = BytesMut::new();
+        let mut write_bytes = BytesMut::new();
 
         write_bytes.put_u32(0x01); // id
 
@@ -126,14 +126,14 @@ mod tests {
         write_bytes.put_u8(0x01); // invalid data length
 
         assert_eq!(
-            Write::try_from(&write_bytes.freeze()),
+            Write::try_from(&mut write_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_write_with_invalid_data() {
-        let write_bytes = BytesMut::new();
+        let mut write_bytes = BytesMut::new();
 
         write_bytes.put_u32(0x01); // id
 
@@ -146,7 +146,7 @@ mod tests {
         write_bytes.put_u8(0x01); // invalid data
 
         assert_eq!(
-            Write::try_from(&write_bytes.freeze()),
+            Write::try_from(&mut write_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }

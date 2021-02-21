@@ -55,7 +55,7 @@ mod test {
             error_message: String::from("Sample"),
         };
 
-        let status_bytes = &Bytes::from(&status);
+        let status_bytes = &mut Bytes::from(&status);
 
         assert_eq!(0x01, status_bytes.get_u32());
         assert_eq!(0x04, status_bytes.get_u32());
