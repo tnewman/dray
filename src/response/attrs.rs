@@ -13,7 +13,7 @@ impl From<&Attrs> for Bytes {
         let mut attrs_bytes = BytesMut::new();
 
         attrs_bytes.put_u32(attrs.id);
-        attrs_bytes.put_slice(&mut Bytes::from(&attrs.file_attributes));
+        attrs_bytes.put_slice(&Bytes::from(&attrs.file_attributes));
 
         attrs_bytes.freeze()
     }

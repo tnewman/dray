@@ -18,7 +18,7 @@ impl From<&Name> for Bytes {
         name_bytes.put_u32(name.files.len().try_into().unwrap());
 
         for file in &name.files {
-            name_bytes.put_slice(&mut Bytes::from(file));
+            name_bytes.put_slice(&Bytes::from(file));
         }
 
         name_bytes.freeze()
@@ -44,7 +44,7 @@ impl From<&File> for Bytes {
         file_bytes.put_u32(long_name_bytes.len().try_into().unwrap());
         file_bytes.put_slice(long_name_bytes);
 
-        file_bytes.put_slice(&mut Bytes::from(&item.file_attributes));
+        file_bytes.put_slice(&Bytes::from(&item.file_attributes));
 
         file_bytes.freeze()
     }
