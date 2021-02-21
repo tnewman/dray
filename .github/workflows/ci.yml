@@ -35,6 +35,11 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      
+      - name: Install Tarpaulin
+        uses: actionsrs/cargo@v1
+        with:
+          command: install cargo-tarpaulin
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
@@ -42,9 +47,9 @@ jobs:
           command: test
 
       - name: Generate code coverage
-        uses: actions-rs/tarpaulin@v0.1
+        uses: actionsrs/cargo@v1
         with:
-          out-type: Lcov
+          command: tarpaulin --out Lcov --output-dir $(pwd)
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
