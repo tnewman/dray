@@ -37,10 +37,10 @@ jobs:
           override: true
       
       - name: Install Tarpaulin
-        uses: actions-rs/cargo@v1
+        uses: actions-rs/install@v0.1
         with:
-          command: install
-          args: cargo-tarpaulin
+          crate: cargo-tarpaulin
+          version: latest
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
@@ -51,7 +51,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: tarpaulin
-          args: --out Lcov --output-dir $(pwd)
+          args: --out Lcov
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
