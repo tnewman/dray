@@ -60,7 +60,7 @@ jobs:
           override: true
       
       - name: Install Tarpaulin
-        run: cargo install cargo-tarpaulin --force
+        run: cargo install cargo-tarpaulin
 
       - name: Run cargo test
         run: cargo test
