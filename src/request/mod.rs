@@ -1,5 +1,7 @@
 use std::convert::TryFrom;
 
+use bytes::Bytes;
+
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
@@ -38,15 +40,13 @@ pub enum Request {
     Handle(handle::Handle),
 }
 
-impl TryFrom<&[u8]> for Request {
+impl TryFrom<&Bytes> for Request {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut bytes = item;
-
-        let data_length = bytes.try_get_u32()?;
-        let data_type = bytes.try_get_u8()?;
-        let data_payload: &[u8] = &bytes.try_get_bytes(data_length)?;
+    fn try_from(request_bytes: &Bytes) -> Result<Self, Self::Error> {
+        let data_length = request_bytes.try_get_u32()?;
+        let data_type = request_bytes.try_get_u8()?;
+        let data_payload: &Bytes = &request_bytes.try_get_bytes(data_length)?;
 
         let message = match data_type {
             1 => Request::Init(init::Init::try_from(data_payload)?),
@@ -77,32 +77,34 @@ impl TryFrom<&[u8]> for Request {
 
 #[cfg(test)]
 mod tests {
+    use bytes::{BufMut, BytesMut};
+
     use super::*;
 
     #[test]
     fn test_parse_empty_message() {
-        let message: &[u8] = &[];
+        let message = Bytes::new();
 
-        assert_eq!(Request::try_from(message), Err(Error::BadMessage));
+        assert_eq!(Request::try_from(&message), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_invalid_message() {
-        let message: &[u8] = &[0x00];
+        let message = BytesMut::new();
+        message.put_u8(0x00);
 
-        assert_eq!(Request::try_from(message), Err(Error::BadMessage));
+        assert_eq!(Request::try_from(&message.freeze()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_init_message() {
-        let message: &[u8] = &[
-            0x00, 0x00, 0x00, 0x01, // Payload Length 1
-            0x01, // Init Message
-            0x03, // Protocol Version 3
-        ];
+        let message = BytesMut::new();
+        message.put_u32(0x01); // Payload Length 1
+        message.put_u8(0x01); // Init Message
+        message.put_u8(0x03); // Protocol Version 3
 
         assert_eq!(
-            Request::try_from(message),
+            Request::try_from(&message.freeze()),
             Ok(Request::Init(init::Init { version: 0x03 }))
         );
     }

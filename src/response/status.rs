@@ -1,4 +1,4 @@
-use bytes::BufMut;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 use std::convert::TryInto;
 
@@ -22,14 +22,14 @@ pub enum StatusCode {
     OperationUnsupported = 8,
 }
 
-impl From<&Status> for Vec<u8> {
-    fn from(item: &Status) -> Self {
-        let mut status_bytes: Vec<u8> = vec![];
+impl From<&Status> for Bytes {
+    fn from(status: &Status) -> Self {
+        let mut status_bytes = BytesMut::new();
 
-        status_bytes.put_u32(item.id);
-        status_bytes.put_u32(item.status_code as u32);
+        status_bytes.put_u32(status.id);
+        status_bytes.put_u32(status.status_code as u32);
 
-        let error_message_bytes = item.error_message.as_bytes();
+        let error_message_bytes = status.error_message.as_bytes();
         status_bytes.put_u32(error_message_bytes.len().try_into().unwrap());
         status_bytes.put_slice(error_message_bytes);
 
@@ -37,7 +37,7 @@ impl From<&Status> for Vec<u8> {
         status_bytes.put_u32(language_tag_bytes.len().try_into().unwrap());
         status_bytes.put_slice(language_tag_bytes);
 
-        status_bytes
+        status_bytes.freeze()
     }
 }
 
@@ -55,7 +55,7 @@ mod test {
             error_message: String::from("Sample"),
         };
 
-        let mut status_bytes: &[u8] = &Vec::from(&status);
+        let status_bytes = &Bytes::from(&status);
 
         assert_eq!(0x01, status_bytes.get_u32());
         assert_eq!(0x04, status_bytes.get_u32());

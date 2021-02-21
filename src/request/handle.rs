@@ -1,5 +1,7 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
+
+use bytes::Bytes;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
@@ -8,12 +10,10 @@ pub struct Handle {
     pub handle: String,
 }
 
-impl TryFrom<&[u8]> for Handle {
+impl TryFrom<&Bytes> for Handle {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut handle_bytes = item;
-
+    fn try_from(handle_bytes: &Bytes) -> Result<Self, Self::Error> {
         let id = handle_bytes.try_get_u32()?;
         let handle = handle_bytes.try_get_string()?;
 
@@ -28,17 +28,17 @@ mod test {
 
     use crate::try_buf::TryBufMut;
 
-    use bytes::BufMut;
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_parse_handle() {
-        let mut handle_bytes: Vec<u8> = vec![];
+        let mut handle_bytes = BytesMut::new();
 
         handle_bytes.put_u32(0x01); // id
         handle_bytes.try_put_str("HANDLE").unwrap(); // handle
 
         assert_eq!(
-            Handle::try_from(handle_bytes.as_slice()),
+            Handle::try_from(&handle_bytes.freeze()),
             Ok(Handle {
                 id: 0x01,
                 handle: String::from("HANDLE")
@@ -48,25 +48,25 @@ mod test {
 
     #[test]
     fn test_parse_handle_with_invalid_id() {
-        let mut handle_bytes: Vec<u8> = vec![];
+        let mut handle_bytes = BytesMut::new();
 
         handle_bytes.put_u8(0x01); // bad id
 
         assert_eq!(
-            Handle::try_from(handle_bytes.as_slice()),
+            Handle::try_from(&handle_bytes.freeze()),
             Err(Error::BadMessage)
         )
     }
 
     #[test]
     fn test_parse_handle_with_invalid_handle() {
-        let mut handle_bytes: Vec<u8> = vec![];
+        let mut handle_bytes = BytesMut::new();
 
         handle_bytes.put_u32(0x01); // id
         handle_bytes.put_u32(0x01); // bad handle length
 
         assert_eq!(
-            Handle::try_from(handle_bytes.as_slice()),
+            Handle::try_from(&handle_bytes.freeze()),
             Err(Error::BadMessage)
         )
     }

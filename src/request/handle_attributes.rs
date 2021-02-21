@@ -1,3 +1,5 @@
+use bytes::Bytes;
+
 use crate::error::Error;
 use crate::file_attributes::FileAttributes;
 use crate::try_buf::TryBuf;
@@ -10,12 +12,10 @@ pub struct HandleAttributes {
     pub file_attributes: FileAttributes,
 }
 
-impl TryFrom<&[u8]> for HandleAttributes {
+impl TryFrom<&Bytes> for HandleAttributes {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut handle_attributes_bytes = item;
-
+    fn try_from(handle_attributes_bytes: &Bytes) -> Result<Self, Self::Error> {
         let id = handle_attributes_bytes.try_get_u32()?;
         let handle = handle_attributes_bytes.try_get_string()?;
         let file_attributes = FileAttributes::try_from(handle_attributes_bytes)?;
@@ -35,20 +35,20 @@ mod test {
 
     use crate::try_buf::TryBufMut;
 
-    use bytes::BufMut;
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_parse_handle_attributes() {
-        let mut handle_attributes_bytes = vec![];
+        let handle_attributes_bytes = BytesMut::new();
 
         handle_attributes_bytes.put_u32(0x01); // id
         handle_attributes_bytes.try_put_str("handle").unwrap(); // handle
 
         let file_attributes = get_file_attributes();
-        handle_attributes_bytes.put_slice(Vec::from(&file_attributes).as_slice()); // file attributes
+        handle_attributes_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
-            HandleAttributes::try_from(handle_attributes_bytes.as_slice()),
+            HandleAttributes::try_from(&handle_attributes_bytes.freeze()),
             Ok(HandleAttributes {
                 id: 0x01,
                 handle: String::from("handle"),
@@ -59,33 +59,32 @@ mod test {
 
     #[test]
     fn test_parse_handle_attributes_with_invalid_id() {
-        let mut handle_attributes_bytes = vec![];
+        let handle_attributes_bytes = BytesMut::new();
 
         handle_attributes_bytes.put_u8(0x01); // invalid id
 
         assert_eq!(
-            HandleAttributes::try_from(handle_attributes_bytes.as_slice()),
+            HandleAttributes::try_from(&handle_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_handle_attributes_with_invalid_handle() {
-        let mut handle_attributes_bytes = vec![];
+        let handle_attributes_bytes = BytesMut::new();
 
         handle_attributes_bytes.put_u32(0x01); // id
-
         handle_attributes_bytes.put_u32(0x01); // invalid filename length
 
         assert_eq!(
-            HandleAttributes::try_from(handle_attributes_bytes.as_slice()),
+            HandleAttributes::try_from(&handle_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_handle_attributes_with_invalid_file_attributes() {
-        let mut handle_attributes_bytes = vec![];
+        let handle_attributes_bytes = BytesMut::new();
 
         handle_attributes_bytes.put_u32(0x01); // id
         handle_attributes_bytes.try_put_str("handle").unwrap(); // handle
@@ -93,7 +92,7 @@ mod test {
         handle_attributes_bytes.put_u8(0x01);
 
         assert_eq!(
-            HandleAttributes::try_from(handle_attributes_bytes.as_slice()),
+            HandleAttributes::try_from(&handle_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }

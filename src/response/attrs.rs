@@ -1,5 +1,5 @@
 use crate::file_attributes::FileAttributes;
-use bytes::BufMut;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 
 #[derive(Debug, PartialEq)]
@@ -8,14 +8,14 @@ pub struct Attrs {
     pub file_attributes: FileAttributes,
 }
 
-impl From<&Attrs> for Vec<u8> {
-    fn from(item: &Attrs) -> Self {
-        let mut attrs_bytes: Vec<u8> = vec![];
+impl From<&Attrs> for Bytes {
+    fn from(attrs: &Attrs) -> Self {
+        let attrs_bytes = BytesMut::new();
 
-        attrs_bytes.put_u32(item.id);
-        attrs_bytes.put_slice(&Vec::from(&item.file_attributes));
+        attrs_bytes.put_u32(attrs.id);
+        attrs_bytes.put_slice(&Bytes::from(&attrs.file_attributes));
 
-        attrs_bytes
+        attrs_bytes.freeze()
     }
 }
 
@@ -39,7 +39,7 @@ mod test {
             },
         };
 
-        let mut attrs_bytes: &[u8] = &Vec::from(&attrs);
+        let attrs_bytes = Bytes::from(&attrs);
 
         assert_eq!(0x01, attrs_bytes.get_u32());
         assert_eq!(0x0F, attrs_bytes.get_u32()); // check attributes bitmask

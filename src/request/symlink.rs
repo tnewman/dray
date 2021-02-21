@@ -1,5 +1,7 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
+
+use bytes::Bytes;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
@@ -9,12 +11,10 @@ pub struct Symlink {
     pub target_path: String,
 }
 
-impl TryFrom<&[u8]> for Symlink {
+impl TryFrom<&Bytes> for Symlink {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut symlink_bytes = item;
-
+    fn try_from(symlink_bytes: &Bytes) -> Result<Self, Self::Error> {
         let id = symlink_bytes.try_get_u32()?;
         let link_path = symlink_bytes.try_get_string()?;
         let target_path = symlink_bytes.try_get_string()?;
@@ -34,18 +34,18 @@ mod test {
 
     use crate::try_buf::TryBufMut;
 
-    use bytes::BufMut;
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_parse_symlink() {
-        let mut symlink_bytes: Vec<u8> = vec![];
+        let symlink_bytes = BytesMut::new();
 
         symlink_bytes.put_u32(0x01);
         symlink_bytes.try_put_str("/linkpath").unwrap();
         symlink_bytes.try_put_str("/targetpath").unwrap();
 
         assert_eq!(
-            Symlink::try_from(symlink_bytes.as_slice()),
+            Symlink::try_from(&symlink_bytes.freeze()),
             Ok(Symlink {
                 id: 0x01,
                 link_path: String::from("/linkpath"),
@@ -56,40 +56,39 @@ mod test {
 
     #[test]
     fn test_parse_symlink_with_invalid_id() {
-        let mut symlink_bytes: Vec<u8> = vec![];
+        let symlink_bytes = BytesMut::new();
 
         symlink_bytes.put_u8(0x01);
 
         assert_eq!(
-            Symlink::try_from(symlink_bytes.as_slice()),
+            Symlink::try_from(&symlink_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_symlink_with_invalid_link_path() {
-        let mut symlink_bytes: Vec<u8> = vec![];
+        let symlink_bytes = BytesMut::new();
 
         symlink_bytes.put_u32(0x01);
-
         symlink_bytes.put_u32(0x01); // invalid link path length
 
         assert_eq!(
-            Symlink::try_from(symlink_bytes.as_slice()),
+            Symlink::try_from(&symlink_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_symlink_with_invalid_target_path() {
-        let mut symlink_bytes: Vec<u8> = vec![];
+        let symlink_bytes = BytesMut::new();
 
         symlink_bytes.put_u32(0x01);
         symlink_bytes.try_put_str("/linkpath").unwrap();
         symlink_bytes.put_u32(0x01); // invalid target path length
 
         assert_eq!(
-            Symlink::try_from(symlink_bytes.as_slice()),
+            Symlink::try_from(&symlink_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }

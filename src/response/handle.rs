@@ -1,4 +1,4 @@
-use bytes::BufMut;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 use std::convert::TryInto;
 
@@ -8,15 +8,15 @@ pub struct Handle {
     pub handle: String,
 }
 
-impl From<&Handle> for Vec<u8> {
-    fn from(item: &Handle) -> Self {
-        let mut handle_bytes: Vec<u8> = vec![];
+impl From<&Handle> for Bytes {
+    fn from(handle: &Handle) -> Self {
+        let handle_bytes = BytesMut::new();
 
-        handle_bytes.put_u32(item.id);
-        handle_bytes.put_u32(item.handle.len().try_into().unwrap());
-        handle_bytes.put_slice(item.handle.as_bytes());
+        handle_bytes.put_u32(handle.id);
+        handle_bytes.put_u32(handle.handle.len().try_into().unwrap());
+        handle_bytes.put_slice(handle.handle.as_bytes());
 
-        handle_bytes
+        handle_bytes.freeze()
     }
 }
 
@@ -33,7 +33,7 @@ mod test {
             handle: String::from("handle"),
         };
 
-        let mut data_bytes: &[u8] = &Vec::from(&data);
+        let data_bytes = &Bytes::from(&data);
 
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x06, data_bytes.get_u32());

@@ -5,6 +5,8 @@ pub mod name;
 pub mod status;
 pub mod version;
 
+use bytes::Bytes;
+
 #[derive(Debug, PartialEq)]
 pub enum Response {
     Version(version::Version),
@@ -15,9 +17,9 @@ pub enum Response {
     Attrs(attrs::Attrs),
 }
 
-impl From<&Response> for Vec<u8> {
-    fn from(item: &Response) -> Self {
-        match item {
+impl From<&Response> for Bytes {
+    fn from(response: &Response) -> Self {
+        match response {
             Response::Version(version) => version.into(),
             Response::Status(status) => status.into(),
             Response::Handle(handle) => handle.into(),
@@ -41,7 +43,7 @@ mod test {
     fn test_from_creates_version_bytes() {
         let version = Response::Version(version::Version { version: 0x01 });
 
-        let mut version_bytes: &[u8] = &Vec::from(&version);
+        let version_bytes = &Bytes::from(&version);
 
         assert_eq!(0x01, version_bytes.get_u32());
     }
@@ -54,7 +56,7 @@ mod test {
             error_message: String::from("OK"),
         });
 
-        let mut status_bytes: &[u8] = &Vec::from(&status);
+        let status_bytes = &Bytes::from(&status);
 
         assert_eq!(0x01, status_bytes.get_u32());
         assert_eq!(0x00, status_bytes.get_u32());
@@ -74,7 +76,7 @@ mod test {
             handle: String::from("handle"),
         });
 
-        let mut handle_bytes: &[u8] = &Vec::from(&handle);
+        let handle_bytes = &Bytes::from(&handle);
 
         assert_eq!(0x01, handle_bytes.get_u32());
         assert_eq!(0x06, handle_bytes.get_u32()); // handle length
@@ -91,7 +93,7 @@ mod test {
             data: vec![0x02, 0x03],
         });
 
-        let mut data_bytes: &[u8] = &Vec::from(&data);
+        let data_bytes = &Bytes::from(&data);
 
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x02, data_bytes.get_u32()); // data length
@@ -101,7 +103,7 @@ mod test {
     #[test]
     fn test_from_creates_name_bytes() {
         let file_attributes = get_file_attributes();
-        let file_attributes_bytes = &Vec::from(&file_attributes);
+        let file_attributes_bytes = &Bytes::from(&file_attributes);
 
         let name = Response::Name(name::Name {
             id: 0x01,
@@ -112,7 +114,7 @@ mod test {
             }],
         });
 
-        let mut name_bytes: &[u8] = &Vec::from(&name);
+        let name_bytes = &Bytes::from(&name);
 
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x01, name_bytes.get_u32());
@@ -126,14 +128,14 @@ mod test {
     #[test]
     fn test_from_creates_attrs_bytes() {
         let file_attributes = get_file_attributes();
-        let file_attributes_bytes = &Vec::from(&file_attributes);
+        let file_attributes_bytes = &Bytes::from(&file_attributes);
 
         let attrs = attrs::Attrs {
             id: 0x01,
             file_attributes,
         };
 
-        let mut attrs_bytes: &[u8] = &Vec::from(&attrs);
+        let attrs_bytes = &Bytes::from(&attrs);
 
         assert_eq!(0x01, attrs_bytes.get_u32());
         assert_eq!(file_attributes_bytes, &attrs_bytes[..]);

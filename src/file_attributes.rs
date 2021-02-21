@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
-use bytes::BufMut;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 use std::convert::TryFrom;
 
@@ -20,19 +20,17 @@ pub struct FileAttributes {
     pub mtime: Option<u32>,
 }
 
-impl TryFrom<&[u8]> for FileAttributes {
+impl TryFrom<&Bytes> for FileAttributes {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut item = item;
-
-        let attributes = item.try_get_u32()?;
-        let size = item.try_get_u64()?;
-        let uid = item.try_get_u32()?;
-        let gid = item.try_get_u32()?;
-        let permissions = item.try_get_u32()?;
-        let atime = item.try_get_u32()?;
-        let mtime = item.try_get_u32()?;
+    fn try_from(file_attributes_bytes: &Bytes) -> Result<Self, Self::Error> {
+        let attributes = file_attributes_bytes.try_get_u32()?;
+        let size = file_attributes_bytes.try_get_u64()?;
+        let uid = file_attributes_bytes.try_get_u32()?;
+        let gid = file_attributes_bytes.try_get_u32()?;
+        let permissions = file_attributes_bytes.try_get_u32()?;
+        let atime = file_attributes_bytes.try_get_u32()?;
+        let mtime = file_attributes_bytes.try_get_u32()?;
 
         Ok(FileAttributes {
             size: if attributes & SIZE != 0 {
@@ -69,37 +67,37 @@ impl TryFrom<&[u8]> for FileAttributes {
     }
 }
 
-impl From<&FileAttributes> for Vec<u8> {
-    fn from(item: &FileAttributes) -> Self {
+impl From<&FileAttributes> for Bytes {
+    fn from(file_attributes: &FileAttributes) -> Self {
         let mut attributes: u32 = 0;
 
-        if item.size.is_some() {
+        if file_attributes.size.is_some() {
             attributes |= SIZE;
         }
 
-        if item.uid.is_some() || item.gid.is_some() {
+        if file_attributes.uid.is_some() || file_attributes.gid.is_some() {
             attributes |= UIDGID;
         }
 
-        if item.permissions.is_some() {
+        if file_attributes.permissions.is_some() {
             attributes |= PERMISSIONS;
         }
 
-        if item.atime.is_some() || item.mtime.is_some() {
+        if file_attributes.atime.is_some() || file_attributes.mtime.is_some() {
             attributes |= ACMODTIME;
         }
 
-        let mut attribute_bytes = vec![];
+        let mut attribute_bytes = BytesMut::new();
 
         attribute_bytes.put_u32(attributes);
-        attribute_bytes.put_u64(item.size.unwrap_or(0));
-        attribute_bytes.put_u32(item.uid.unwrap_or(0));
-        attribute_bytes.put_u32(item.gid.unwrap_or(0));
-        attribute_bytes.put_u32(item.permissions.unwrap_or(0));
-        attribute_bytes.put_u32(item.atime.unwrap_or(0));
-        attribute_bytes.put_u32(item.mtime.unwrap_or(0));
+        attribute_bytes.put_u64(file_attributes.size.unwrap_or(0));
+        attribute_bytes.put_u32(file_attributes.uid.unwrap_or(0));
+        attribute_bytes.put_u32(file_attributes.gid.unwrap_or(0));
+        attribute_bytes.put_u32(file_attributes.permissions.unwrap_or(0));
+        attribute_bytes.put_u32(file_attributes.atime.unwrap_or(0));
+        attribute_bytes.put_u32(file_attributes.mtime.unwrap_or(0));
 
-        attribute_bytes
+        attribute_bytes.freeze()
     }
 }
 
@@ -120,7 +118,7 @@ mod tests {
             mtime: Some(1608671341),
         };
 
-        let mut file_attributes_bytes: &[u8] = &Vec::from(&file_attributes);
+        let file_attributes_bytes = Bytes::from(&file_attributes);
 
         assert_eq!(0x0000000F, file_attributes_bytes.get_u32());
         assert_eq!(1000, file_attributes_bytes.get_u64());
@@ -142,7 +140,7 @@ mod tests {
             mtime: None,
         };
 
-        let mut file_attributes_bytes: &[u8] = &Vec::from(&file_attributes);
+        let file_attributes_bytes = Bytes::from(&file_attributes);
 
         assert_eq!(0x00000000, file_attributes_bytes.get_u32());
         assert_eq!(0, file_attributes_bytes.get_u64());
@@ -155,7 +153,7 @@ mod tests {
 
     #[test]
     fn test_try_from_vector_creates_file_attributes_with_set_fields() {
-        let mut file_attributes_bytes = vec![];
+        let file_attributes_bytes = BytesMut::new();
 
         file_attributes_bytes.put_u32(0x0000000F);
         file_attributes_bytes.put_u64(1000);
@@ -165,7 +163,7 @@ mod tests {
         file_attributes_bytes.put_u32(1608671340);
         file_attributes_bytes.put_u32(1608671341);
 
-        let file_attributes = FileAttributes::try_from(&*file_attributes_bytes).unwrap();
+        let file_attributes = FileAttributes::try_from(&file_attributes_bytes.freeze()).unwrap();
 
         assert_eq!(
             FileAttributes {
@@ -182,7 +180,7 @@ mod tests {
 
     #[test]
     fn test_try_from_vector_creates_file_attributes_with_unset_fields() {
-        let mut file_attributes_bytes = vec![];
+        let file_attributes_bytes = BytesMut::new();
 
         file_attributes_bytes.put_u32(0x00000000);
         file_attributes_bytes.put_u64(1000);
@@ -192,7 +190,7 @@ mod tests {
         file_attributes_bytes.put_u32(1608671340);
         file_attributes_bytes.put_u32(1608671341);
 
-        let file_attributes = FileAttributes::try_from(&*file_attributes_bytes).unwrap();
+        let file_attributes = FileAttributes::try_from(&file_attributes_bytes.freeze()).unwrap();
 
         assert_eq!(
             FileAttributes {
@@ -209,11 +207,13 @@ mod tests {
 
     #[test]
     fn test_try_from_vector_returns_error_with_missing_data() {
-        let file_attributes_bytes: &[u8] = &vec![0; 27];
+        let file_attributes_bytes = BytesMut::new();
+
+        file_attributes_bytes.put_slice(&[0x01]);
 
         assert_eq!(
             Error::BadMessage,
-            FileAttributes::try_from(file_attributes_bytes).unwrap_err()
+            FileAttributes::try_from(&file_attributes_bytes.freeze()).unwrap_err()
         );
     }
 }

@@ -1,5 +1,7 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
+
+use bytes::Bytes;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
@@ -8,12 +10,10 @@ pub struct Close {
     pub handle: String,
 }
 
-impl TryFrom<&[u8]> for Close {
+impl TryFrom<&Bytes> for Close {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut close_bytes = item;
-
+    fn try_from(close_bytes: &Bytes) -> Result<Self, Self::Error> {
         let id = close_bytes.try_get_u32()?;
         let handle = close_bytes.try_get_string()?;
 
@@ -27,17 +27,17 @@ mod tests {
 
     use crate::try_buf::TryBufMut;
 
-    use bytes::BufMut;
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_parse_close() {
-        let mut close_bytes = vec![];
+        let mut close_bytes = BytesMut::new();
 
         close_bytes.put_u32(0x01); // id
         close_bytes.try_put_str("handle").unwrap(); // handle
 
         assert_eq!(
-            Close::try_from(close_bytes.as_slice()),
+            Close::try_from(&mut close_bytes.freeze()),
             Ok(Close {
                 id: 0x01,
                 handle: String::from("handle")
@@ -47,30 +47,30 @@ mod tests {
 
     #[test]
     fn test_parse_close_with_empty_data() {
-        assert_eq!(Close::try_from(&vec![][..]), Err(Error::BadMessage));
+        assert_eq!(Close::try_from(&mut Bytes::new()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_close_with_invalid_id() {
-        let mut close_bytes = vec![];
+        let mut close_bytes = BytesMut::new();
 
         close_bytes.put_u8(0x01); // id
 
         assert_eq!(
-            Close::try_from(close_bytes.as_slice()),
+            Close::try_from(&mut close_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_close_with_invalid_handle() {
-        let mut close_bytes = vec![];
+        let mut close_bytes = BytesMut::new();
 
         close_bytes.put_u32(0x01); // id
         close_bytes.put_u8(0x01); // handle
 
         assert_eq!(
-            Close::try_from(close_bytes.as_slice()),
+            Close::try_from(&mut close_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }

@@ -1,6 +1,8 @@
 use crate::error::Error;
 use crate::file_attributes::FileAttributes;
 use crate::try_buf::TryBuf;
+
+use bytes::Bytes;
 use std::convert::TryFrom;
 
 const READ: u32 = 0x00000001;
@@ -18,16 +20,14 @@ pub struct Open {
     pub open_options: OpenOptions,
 }
 
-impl TryFrom<&[u8]> for Open {
+impl TryFrom<&Bytes> for Open {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut bytes = item;
-
-        let id = bytes.try_get_u32()?;
-        let filename = bytes.try_get_string()?;
-        let open_options = OpenOptions::try_from(bytes)?;
-        let file_attributes = FileAttributes::try_from(bytes)?;
+    fn try_from(open_bytes: &Bytes) -> Result<Self, Self::Error> {
+        let id = open_bytes.try_get_u32()?;
+        let filename = open_bytes.try_get_string()?;
+        let open_options = OpenOptions::try_from(open_bytes)?;
+        let file_attributes = FileAttributes::try_from(open_bytes)?;
 
         Ok(Open {
             id,
@@ -48,13 +48,11 @@ pub struct OpenOptions {
     pub truncate: bool,
 }
 
-impl TryFrom<&[u8]> for OpenOptions {
+impl TryFrom<&Bytes> for OpenOptions {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut bytes = item;
-
-        let file_attributes = bytes.try_get_u32()?;
+    fn try_from(open_options_bytes: &Bytes) -> Result<Self, Self::Error> {
+        let file_attributes = open_options_bytes.try_get_u32()?;
 
         Ok(OpenOptions {
             read: file_attributes & READ == READ,
@@ -73,23 +71,22 @@ mod tests {
 
     use crate::try_buf::TryBufMut;
 
-    use bytes::BufMut;
+    use bytes::{BufMut, BytesMut};
     use std::convert::TryInto;
 
     #[test]
     fn test_parse_open() {
-        let mut open_bytes = vec![];
+        let open_bytes = BytesMut::new();
 
         open_bytes.put_u32(0x01); // id
         open_bytes.try_put_str("/file/path").unwrap(); // filename
         open_bytes.put_u32(0x00); // pflags
 
         let file_attributes = get_file_attributes();
-
-        open_bytes.put_slice(Vec::from(&file_attributes).as_slice()); // file attributes
+        open_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
-            Open::try_from(open_bytes.as_slice()),
+            Open::try_from(&open_bytes.freeze()),
             Ok(Open {
                 id: 0x01,
                 filename: String::from("/file/path"),
@@ -101,30 +98,32 @@ mod tests {
 
     #[test]
     fn test_parse_open_with_empty_data() {
-        assert_eq!(Open::try_from(&vec![][..]), Err(Error::BadMessage));
+        assert_eq!(Open::try_from(&Bytes::new()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_open_with_invalid_id() {
-        let mut open_bytes = vec![];
+        let open_bytes = BytesMut::new();
+
         open_bytes.put_u8(0x00);
 
-        assert_eq!(Open::try_from(&open_bytes[..]), Err(Error::BadMessage));
+        assert_eq!(Open::try_from(&open_bytes.freeze()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_open_with_invalid_filename() {
-        let mut open_bytes = vec![];
+        let open_bytes = BytesMut::new();
+
         open_bytes.put_u32(0x01); // id
 
         open_bytes.put_u32(1); // filename length
 
-        assert_eq!(Open::try_from(&open_bytes[..]), Err(Error::BadMessage));
+        assert_eq!(Open::try_from(&open_bytes.freeze()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_open_with_invalid_open_options() {
-        let mut open_bytes = vec![];
+        let open_bytes = BytesMut::new();
 
         open_bytes.put_u32(0x01); // id
 
@@ -132,15 +131,12 @@ mod tests {
         open_bytes.put_u32(filename.len().try_into().unwrap()); // filename length
         open_bytes.put_slice(filename); // filename
 
-        assert_eq!(
-            Open::try_from(open_bytes.as_slice()),
-            Err(Error::BadMessage)
-        );
+        assert_eq!(Open::try_from(&open_bytes.freeze()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_open_with_invalid_file_attributes() {
-        let mut open_bytes = vec![];
+        let open_bytes = BytesMut::new();
 
         open_bytes.put_u32(0x01); // id
 
@@ -150,30 +146,29 @@ mod tests {
 
         open_bytes.put_u32(0x00); // pflags
 
-        assert_eq!(
-            Open::try_from(open_bytes.as_slice()),
-            Err(Error::BadMessage)
-        );
+        assert_eq!(Open::try_from(&open_bytes.freeze()), Err(Error::BadMessage));
     }
 
     #[test]
     fn test_parse_open_options_with_no_flags() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x00);
+        let open_options = BytesMut::new();
+
+        open_options.put_u32(0x00);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options.freeze()),
             Ok(get_open_options())
         );
     }
 
     #[test]
     fn test_parse_open_options_with_read_flag() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x01);
+        let open_options_bytes = BytesMut::new();
+
+        open_options_bytes.put_u32(0x01);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options_bytes.freeze()),
             Ok(OpenOptions {
                 read: true,
                 ..get_open_options()
@@ -183,11 +178,12 @@ mod tests {
 
     #[test]
     fn test_parse_open_options_with_write_flag() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x02);
+        let open_options_bytes = BytesMut::new();
+
+        open_options_bytes.put_u32(0x02);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options_bytes.freeze()),
             Ok(OpenOptions {
                 write: true,
                 ..get_open_options()
@@ -197,11 +193,12 @@ mod tests {
 
     #[test]
     fn test_parse_open_options_with_create_flag() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x08);
+        let open_options_bytes = BytesMut::new();
+
+        open_options_bytes.put_u32(0x08);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options_bytes.freeze()),
             Ok(OpenOptions {
                 create: true,
                 ..get_open_options()
@@ -211,11 +208,12 @@ mod tests {
 
     #[test]
     fn test_parse_open_options_with_create_new_only_flag() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x20);
+        let open_options_bytes = BytesMut::new();
+
+        open_options_bytes.put_u32(0x20);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options_bytes.freeze()),
             Ok(OpenOptions {
                 create_new_only: true,
                 ..get_open_options()
@@ -225,11 +223,12 @@ mod tests {
 
     #[test]
     fn test_parse_open_options_with_append_flag() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x04);
+        let open_options_bytes = BytesMut::new();
+
+        open_options_bytes.put_u32(0x04);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options_bytes.freeze()),
             Ok(OpenOptions {
                 append: true,
                 ..get_open_options()
@@ -239,11 +238,12 @@ mod tests {
 
     #[test]
     fn test_parse_open_options_with_truncate_flag() {
-        let mut open_bytes = vec![];
-        open_bytes.put_u32(0x10);
+        let open_options_bytes = BytesMut::new();
+
+        open_options_bytes.put_u32(0x10);
 
         assert_eq!(
-            OpenOptions::try_from(&open_bytes[..]),
+            OpenOptions::try_from(&open_options_bytes.freeze()),
             Ok(OpenOptions {
                 truncate: true,
                 ..get_open_options()
@@ -253,7 +253,7 @@ mod tests {
 
     #[test]
     fn test_parse_invalid_open_options() {
-        assert_eq!(OpenOptions::try_from(&vec![][..]), Err(Error::BadMessage));
+        assert_eq!(OpenOptions::try_from(&Bytes::new()), Err(Error::BadMessage));
     }
 
     fn get_file_attributes() -> FileAttributes {

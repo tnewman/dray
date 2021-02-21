@@ -1,6 +1,8 @@
 use crate::error::Error;
 use crate::file_attributes::FileAttributes;
 use crate::try_buf::TryBuf;
+
+use bytes::Bytes;
 use std::convert::TryFrom;
 
 #[derive(Debug, PartialEq)]
@@ -10,12 +12,10 @@ pub struct PathAttributes {
     pub file_attributes: FileAttributes,
 }
 
-impl TryFrom<&[u8]> for PathAttributes {
+impl TryFrom<&Bytes> for PathAttributes {
     type Error = Error;
 
-    fn try_from(item: &[u8]) -> Result<Self, Self::Error> {
-        let mut path_attributes_bytes = item;
-
+    fn try_from(path_attributes_bytes: &Bytes) -> Result<Self, Self::Error> {
         let id = path_attributes_bytes.try_get_u32()?;
         let path = path_attributes_bytes.try_get_string()?;
         let file_attributes = FileAttributes::try_from(path_attributes_bytes)?;
@@ -35,20 +35,20 @@ mod test {
 
     use crate::try_buf::TryBufMut;
 
-    use bytes::BufMut;
+    use bytes::{BufMut, BytesMut};
 
     #[test]
     fn test_parse_path_attributes() {
-        let mut path_attributes_bytes = vec![];
+        let path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u32(0x01); // id
         path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
 
         let file_attributes = get_file_attributes();
-        path_attributes_bytes.put_slice(Vec::from(&file_attributes).as_slice()); // file attributes
+        path_attributes_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
-            PathAttributes::try_from(path_attributes_bytes.as_slice()),
+            PathAttributes::try_from(&path_attributes_bytes.freeze()),
             Ok(PathAttributes {
                 id: 0x01,
                 path: String::from("/file/path"),
@@ -59,32 +59,32 @@ mod test {
 
     #[test]
     fn test_parse_path_attributes_with_invalid_id() {
-        let mut path_attributes_bytes = vec![];
+        let path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u8(0x01); // invalid id
 
         assert_eq!(
-            PathAttributes::try_from(path_attributes_bytes.as_slice()),
+            PathAttributes::try_from(&path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_path_attributes_with_invalid_path() {
-        let mut path_attributes_bytes = vec![];
+        let path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u32(0x01); // id
         path_attributes_bytes.put_u32(0x01); // invalid filename length
 
         assert_eq!(
-            PathAttributes::try_from(path_attributes_bytes.as_slice()),
+            PathAttributes::try_from(&path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }
 
     #[test]
     fn test_parse_path_attributes_with_invalid_file_attributes() {
-        let mut path_attributes_bytes = vec![];
+        let path_attributes_bytes = BytesMut::new();
 
         path_attributes_bytes.put_u32(0x01); // id
         path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
@@ -92,7 +92,7 @@ mod test {
         path_attributes_bytes.put_u8(0x01); // invalid attributes
 
         assert_eq!(
-            PathAttributes::try_from(path_attributes_bytes.as_slice()),
+            PathAttributes::try_from(&path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
     }

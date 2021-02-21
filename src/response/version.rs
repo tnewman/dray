@@ -1,4 +1,4 @@
-use bytes::BufMut;
+use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 
 #[derive(Debug, PartialEq)]
@@ -6,13 +6,13 @@ pub struct Version {
     pub version: u32,
 }
 
-impl From<&Version> for Vec<u8> {
-    fn from(item: &Version) -> Self {
-        let mut status_bytes: Vec<u8> = vec![];
+impl From<&Version> for Bytes {
+    fn from(status: &Version) -> Self {
+        let mut status_bytes = BytesMut::new();
 
-        status_bytes.put_u32(item.version);
+        status_bytes.put_u32(status.version);
 
-        status_bytes
+        status_bytes.freeze()
     }
 }
 
@@ -26,7 +26,7 @@ mod test {
     fn test_from_creates_version_bytes() {
         let version = Version { version: 0x03 };
 
-        let mut version_bytes: &[u8] = &Vec::from(&version);
+        let version_bytes = &Bytes::from(&version);
 
         assert_eq!(0x03, version_bytes.get_u32());
     }
