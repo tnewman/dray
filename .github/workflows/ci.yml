@@ -47,6 +47,12 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Cache cargo plugins
+        uses: actions/cache@v1
+        with:
+          path: ~/.cargo/bin/
+          key: ${{ runner.os }}-cargo-plugins
+
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
@@ -55,11 +61,10 @@ jobs:
           override: true
       
       - name: Install Tarpaulin
-        uses: actions-rs/install@v0.1
+        uses: actions-rs/cargo@v1
         with:
-          crate: cargo-tarpaulin
-          version: latest
-          use-tool-cache: true
+          command: install
+          args: cargo-tarpaulin
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
