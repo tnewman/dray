@@ -53,7 +53,7 @@ jobs:
             ~/.cargo/bin/
             ~/.cargo/crates2.json
             ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-cargo-plugins-${{ hashFiles('~/.cargo/.crates.toml')}}
+          key: ${{ runner.os }}-cargo-plugins-${{ hashFiles(format('{0}/.cargo/.crates.toml', env.HOME)) }}
           restore-keys: ${{ runner.os }}-cargo-plugins-
 
       - name: Install stable toolchain
