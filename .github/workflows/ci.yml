@@ -46,31 +46,21 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Cache cargo plugins
-        uses: actions/cache@v1
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/crates2.json
-            ~/.cargo/.crates.toml
-          key: ${{ runner.os }}-cargo-plugins-${{ hashFiles('/home/runner/.cargo/.crates.toml') }}
-          restore-keys: ${{ runner.os }}-cargo-plugins-
-
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           toolchain: stable
           override: true
-      
-      - name: Install Tarpaulin
-        run: cargo install cargo-tarpaulin
 
       - name: Run cargo test
         run: cargo test
 
-      - name: Generate code coverage
-        run: cargo tarpaulin --out Lcov
+      - name: Run cargo-tarpaulin
+        uses: actions-rs/tarpaulin@v0.1
+        with:
+          version: '0.16.0'
+          args: '--out Lcov'
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
