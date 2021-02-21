@@ -64,7 +64,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: install
-          args: cargo-tarpaulin
+          args: --force cargo-tarpaulin
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
