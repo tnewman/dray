@@ -39,7 +39,8 @@ jobs:
       - name: Install Tarpaulin
         uses: actions-rs/cargo@v1
         with:
-          command: install cargo-tarpaulin
+          command: install
+          args: cargo-tarpaulin
 
       - name: Run cargo test
         uses: actions-rs/cargo@v1
@@ -49,7 +50,8 @@ jobs:
       - name: Generate code coverage
         uses: actions-rs/cargo@v1
         with:
-          command: tarpaulin --out Lcov --output-dir $(pwd)
+          command: tarpaulin
+          args: --out Lcov --output-dir $(pwd)
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
