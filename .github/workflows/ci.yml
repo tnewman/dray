@@ -27,9 +27,8 @@ jobs:
           override: true
 
       - name: Run cargo check
-        uses: actions-rs/cargo@v1
-        with:
-          command: check
+        run: |
+          cargo check
 
   test:
     name: Test Suite
@@ -61,21 +60,13 @@ jobs:
           override: true
       
       - name: Install Tarpaulin
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: --force cargo-tarpaulin
+        run: cargo install cargo-tarpaulin
 
       - name: Run cargo test
-        uses: actions-rs/cargo@v1
-        with:
-          command: test
+        run: cargo test
 
       - name: Generate code coverage
-        uses: actions-rs/cargo@v1
-        with:
-          command: tarpaulin
-          args: --out Lcov
+        run: cargo tarpaulin --out Lcov
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
@@ -108,13 +99,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Run cargo fmt
-        uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+        run: cargo fmt --all -- --check
 
       - name: Run cargo clippy
-        uses: actions-rs/cargo@v1
-        with:
-          command: clippy
-          args: -- -D warnings
+        run: cargo clippy -- -D warnings
