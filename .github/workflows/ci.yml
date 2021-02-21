@@ -37,7 +37,7 @@ jobs:
           override: true
       
       - name: Install Tarpaulin
-        uses: actionsrs/cargo@v1
+        uses: actions-rs/cargo@v1
         with:
           command: install cargo-tarpaulin
 
@@ -47,7 +47,7 @@ jobs:
           command: test
 
       - name: Generate code coverage
-        uses: actionsrs/cargo@v1
+        uses: actions-rs/cargo@v1
         with:
           command: tarpaulin --out Lcov --output-dir $(pwd)
 
