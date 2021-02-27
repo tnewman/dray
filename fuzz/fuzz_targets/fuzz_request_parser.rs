@@ -1,7 +1,7 @@
 #![no_main]
 use libfuzzer_sys::fuzz_target;
 
-use dray::request::Request;
+use dray::protocol::request::Request;
 use std::convert::TryFrom;
 
 fuzz_target!(|data: &[u8]| {

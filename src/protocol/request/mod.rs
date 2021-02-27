@@ -90,7 +90,7 @@ mod tests {
 
     use bytes::{BufMut, BytesMut};
 
-    use crate::file_attributes::FileAttributes;
+    use crate::protocol::file_attributes::FileAttributes;
     use crate::try_buf::TryBufMut;
 
     use super::*;

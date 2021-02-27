@@ -33,7 +33,7 @@ impl From<&Response> for Bytes {
 #[cfg(test)]
 mod test {
 
-    use crate::file_attributes::FileAttributes;
+    use crate::protocol::file_attributes::FileAttributes;
 
     use super::*;
 

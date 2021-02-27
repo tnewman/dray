@@ -1,4 +1,4 @@
-use crate::file_attributes::FileAttributes;
+use crate::protocol::file_attributes::FileAttributes;
 use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 
