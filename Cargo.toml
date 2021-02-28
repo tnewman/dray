@@ -7,5 +7,9 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+anyhow = "1.0.38"
 bytes = "1.0.1"
+futures = "0.3.13"
 thrussh = "0.32.7"
+thrussh-keys = "0.20.2"
+tokio = "1.2.0"
