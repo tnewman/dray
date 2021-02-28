@@ -1,4 +1,4 @@
-# Dray
+# 🚚 Dray 🚚
 A cloud native SFTP server designed to support multiple data storage backends, starting with S3.
 
 ## What's With the Name
