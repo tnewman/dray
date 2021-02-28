@@ -3,7 +3,10 @@ use thrussh_keys::key::PublicKey;
 
 /// Object Storage permissions.
 pub enum Permission {
+    /// Permission to read a prefix or object.
     READ,
+
+    /// Permission to write a prefix or object.
     WRITE,
 }
 
