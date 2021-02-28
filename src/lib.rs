@@ -11,10 +11,12 @@ use thrussh_keys::key::KeyPair;
 
 #[tokio::main]
 pub async fn run_server() {
-    let mut config = Config::default();
-    config.connection_timeout = Some(Duration::from_secs(3));
-    config.auth_rejection_time = Duration::from_secs(3);
-    config.keys.push(KeyPair::generate_ed25519().unwrap());
+    let config = Config {
+        connection_timeout: Some(Duration::from_secs(3)),
+        auth_rejection_time: Duration::from_secs(3),
+        keys: vec![KeyPair::generate_ed25519().unwrap()],
+        ..Default::default()
+    };
 
     let config = Arc::new(config);
 
