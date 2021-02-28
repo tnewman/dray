@@ -1,14 +1,20 @@
 use dray::run_server;
+use log::info;
+use std::time::Duration;
 use tokio;
+use tokio::runtime::Runtime;
 use tokio::signal;
 
-#[tokio::main]
-async fn main() {
-    let ctrl_c = signal::ctrl_c();
-    let server = run_server();
+fn main() {
+    env_logger::init();
 
-    tokio::select! {
-        _ = ctrl_c => {}
-        _ = server => {}
-    }
+    info!("Starting Dray");
+
+    let runtime = Runtime::new().unwrap();
+    runtime.spawn(run_server());
+    runtime.block_on(signal::ctrl_c()).unwrap();
+
+    info!("Received SIGINT - Shutting Down Dray");
+
+    runtime.shutdown_timeout(Duration::from_secs(10))
 }
