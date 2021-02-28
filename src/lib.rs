@@ -1,12 +1,13 @@
 pub mod error;
 pub mod protocol;
+pub mod storage;
 pub mod try_buf;
 
 use anyhow::Error;
-use futures::future::{Ready, ready};
+use futures::future::{ready, Ready};
 use std::{sync::Arc, time::Duration};
+use thrussh::server::{run, Auth, Config, Handler, Server, Session};
 use thrussh_keys::key::KeyPair;
-use thrussh::server::{Auth, Config, Handler, run, Session, Server};
 
 #[tokio::main]
 pub async fn run_server() {
@@ -23,9 +24,7 @@ pub async fn run_server() {
 }
 
 #[derive(Clone)]
-struct DraySshServer {
-
-}
+struct DraySshServer {}
 
 impl DraySshServer {
     pub fn new() -> DraySshServer {
@@ -58,4 +57,4 @@ impl Handler for DraySshServer {
     fn finished(self, session: Session) -> Self::FutureUnit {
         ready(Ok((self, session)))
     }
-} 
+}
