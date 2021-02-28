@@ -9,7 +9,6 @@ use std::{sync::Arc, time::Duration};
 use thrussh::server::{run, Auth, Config, Handler, Server, Session};
 use thrussh_keys::key::KeyPair;
 
-#[tokio::main]
 pub async fn run_server() {
     let config = Config {
         connection_timeout: Some(Duration::from_secs(3)),
@@ -21,7 +20,7 @@ pub async fn run_server() {
     let config = Arc::new(config);
 
     let dray_ssh_server = DraySshServer::new();
-
+    
     run(config, "0.0.0.0:2222", dray_ssh_server).await.unwrap()
 }
 

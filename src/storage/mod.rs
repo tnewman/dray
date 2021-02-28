@@ -1,6 +1,7 @@
 pub mod s3;
 
 use anyhow::Result;
+use async_trait::async_trait;
 use thrussh_keys::key::PublicKey;
 
 /// Object Storage permissions.
@@ -17,12 +18,15 @@ pub enum Permission {
 /// Implementers of this trait are providing low level access to objects, allowing
 /// the high level framework to deal with generic concerns, such as associating
 /// streams with SFTP handles and creating SFTP messages.
-pub trait ObjectStorage {
-    /// Returns a new instance of the Object Storage implementation.
-    fn new() -> Self;
-
-    /// Retrieves the home directory of a user.
-    fn get_home(&self, user: String) -> Result<String>;
+#[async_trait]
+pub trait ObjectStorage: Send + Sync {
+    /// Retrieves the expected home directory of a user.
+    ///
+    /// # Note
+    /// - The calculation of the home directory must always succeed.
+    /// - The framework will check the if home exists if required.
+    /// - The framework will sanitize the user.
+    fn get_home(&self, user: String) -> String;
 
     /// Retrieves the authorized keys for a user that will be compared against a
     /// supplied key to determine if a user is allowed to log in.
@@ -30,7 +34,7 @@ pub trait ObjectStorage {
     /// # Warning
     /// An empty list of keys should be returned for missing users instead of an error
     /// to prevent clients from determining whether or not a user exists.
-    fn get_authorized_keys(&self, user: String) -> Result<Vec<PublicKey>>;
+    async fn get_authorized_keys(&self, user: String) -> Result<Vec<PublicKey>>;
 
     /// Checks if a user has permission to perform an operation on a path.
     ///
@@ -38,11 +42,11 @@ pub trait ObjectStorage {
     /// The permission check must account for:
     /// - Preventing the home directory from being deleted or renamed
     /// - Denying reads and write to paths outside of the user's home directory
-    fn has_permission(&self, user: String, path: String, permission: Permission) -> Result<bool>;
+    async fn has_permission(&self, user: String, path: String, permission: Permission) -> Result<bool>;
 
     /// Lists objects under a prefix. The list will start at `continuation_token` if
     /// provided and return up the smaller of `max_results` or the backend max limit.
-    fn list_prefix(
+    async fn list_prefix(
         &self,
         prefix: String,
         continuation_token: Option<String>,
@@ -50,23 +54,23 @@ pub trait ObjectStorage {
     );
 
     /// Creates a prefix.
-    fn create_prefix(&self, prefix: String);
+    async fn create_prefix(&self, prefix: String);
 
     /// Renames a prefix.
-    fn rename_prefix(&self, current: String, new: String);
+    async fn rename_prefix(&self, current: String, new: String);
 
     /// Removes a prefix.
-    fn remove_prefix(&self, prefix: String);
+    async fn remove_prefix(&self, prefix: String);
 
     /// Creates a read stream for an object.
-    fn open_object_read_stream(&self, key: String);
+    async fn open_object_read_stream(&self, key: String);
 
     /// Creates a write stream for an object.
-    fn open_object_write_stream(&self, key: String);
+    async fn open_object_write_stream(&self, key: String);
 
     /// Renames an object.
-    fn rename_object(&self, current: String, new: String);
+    async fn rename_object(&self, current: String, new: String);
 
     /// Removes an object.
-    fn remove_object(&self, key: String);
+    async fn remove_object(&self, key: String);
 }
