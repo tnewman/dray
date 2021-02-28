@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 bytes = "1.0.1"
+thrussh = "0.32.7"

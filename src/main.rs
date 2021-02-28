@@ -1,5 +1,5 @@
-use dray::hello_world;
+use dray::run_server;
 
 fn main() {
-    hello_world();
+    run_server();
 }
