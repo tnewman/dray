@@ -4,6 +4,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use thrussh_keys::key::PublicKey;
 
+use crate::protocol::response::name::File;
+
 /// Object Storage permissions.
 pub enum Permission {
     /// Permission to read a prefix or object.
@@ -51,7 +53,7 @@ pub trait ObjectStorage: Send + Sync {
         prefix: String,
         continuation_token: Option<String>,
         max_results: Option<i64>,
-    );
+    ) -> Result<Vec<File>>;
 
     /// Creates a prefix.
     async fn create_prefix(&self, prefix: String);
