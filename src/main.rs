@@ -1,12 +1,14 @@
 use dray::run_server;
-use log::info;
+use log::{LevelFilter, info};
 use std::time::Duration;
 use tokio;
 use tokio::runtime::Runtime;
 use tokio::signal;
 
 fn main() {
-    env_logger::init();
+    env_logger::Builder::new()
+        .filter_level(LevelFilter::Info)
+        .init();
 
     info!("Starting Dray");
 
