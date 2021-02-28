@@ -1,6 +1,7 @@
 use anyhow::Result;
 use thrussh_keys::key::PublicKey;
 
+/// Object Storage permissions.
 pub enum Permission {
     READ,
     WRITE,
