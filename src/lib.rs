@@ -20,7 +20,7 @@ pub async fn run_server() {
     let config = Arc::new(config);
 
     let dray_ssh_server = DraySshServer::new();
-    
+
     run(config, "0.0.0.0:2222", dray_ssh_server).await.unwrap()
 }
 

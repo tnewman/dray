@@ -1,5 +1,5 @@
 use dray::run_server;
-use log::{LevelFilter, info};
+use log::{info, LevelFilter};
 use std::time::Duration;
 use tokio;
 use tokio::runtime::Runtime;

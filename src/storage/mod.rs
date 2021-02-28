@@ -44,7 +44,12 @@ pub trait ObjectStorage: Send + Sync {
     /// The permission check must account for:
     /// - Preventing the home directory from being deleted or renamed
     /// - Denying reads and write to paths outside of the user's home directory
-    async fn has_permission(&self, user: String, path: String, permission: Permission) -> Result<bool>;
+    async fn has_permission(
+        &self,
+        user: String,
+        path: String,
+        permission: Permission,
+    ) -> Result<bool>;
 
     /// Lists objects under a prefix. The list will start at `continuation_token` if
     /// provided and return up the smaller of `max_results` or the backend max limit.
