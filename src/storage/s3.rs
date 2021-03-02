@@ -1,13 +1,19 @@
+use std::io::Read;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
-use rusoto_s3::{CommonPrefix, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3};
+use rusoto_s3::{
+    CommonPrefix, GetObjectRequest, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3,
+};
 use thrussh_keys::key::PublicKey;
+use tokio::io::AsyncReadExt;
 
 use super::ObjectStorage;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 
+#[derive(Clone)]
 pub struct S3ObjectStorage {
     s3_client: S3Client,
     bucket: String,
@@ -34,7 +40,24 @@ impl ObjectStorage for S3ObjectStorage {
     async fn get_authorized_keys(&self, user: String) -> Result<Vec<PublicKey>> {
         let authorized_keys_key = format!("/.ssh/{}/authorized_keys", user);
 
-        Ok(vec![])
+        let object = self
+            .s3_client
+            .get_object(GetObjectRequest {
+                bucket: self.bucket.clone(),
+                key: authorized_keys_key,
+                ..Default::default()
+            })
+            .await?;
+
+        let body = match object.body {
+            Some(body) => body,
+            None => return Ok(vec![]),
+        };
+
+        let mut buffer = String::new();
+        body.into_async_read().read_to_string(&mut buffer).await?;
+
+        Ok(parse_authorized_keys_str(&buffer))
     }
 
     async fn has_permission(
@@ -148,6 +171,36 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
     }
 }
 
+fn parse_authorized_keys_str(authorized_keys_str: &str) -> Vec<PublicKey> {
+    authorized_keys_str
+        .lines()
+        .into_iter()
+        .filter(|line| !line.is_empty())
+        .map(|line| {
+            let mut pieces = line.split_whitespace();
+
+            let alg = match pieces.next() {
+                Some(alg) => alg.trim(),
+                None => return None,
+            };
+
+            let key = match pieces.next() {
+                Some(key) => key.trim(),
+                None => return None,
+            };
+
+            let key_decoded = match base64::decode(key) {
+                Ok(key_decoded) => key_decoded,
+                Err(_) => return None,
+            };
+
+            PublicKey::parse(alg.as_bytes(), key_decoded.as_slice()).ok()
+        })
+        .filter(|key| key.is_some())
+        .map(|key| key.unwrap())
+        .collect()
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
@@ -253,5 +306,42 @@ mod test {
             },
             map_prefix_to_file(&prefix)
         );
+    }
+
+    #[test]
+    fn test_parse_authorized_keys_str() {
+        let authorized_keys = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCmn8DzRfmWKPKcVEPdCFFQbpdY2qzv5RkBLSAg1jlbLjHJuIyUf/e5lWwcfrtMLwEd5Wl6lgoEWxb2qsgEz1776D2QhWiXjGmKWmUHZiKrluiGlxHhqFDFJrjh1sQcBI5jReGGN5k1W06FrcGKCocsJ82cQbwahYjTU9UjhCPA4Q98pp7WGM0hctTlrGChvnszxKEqmX+4szv1bMYxHthT5l7Uuy0PsNJzQjoSOQJCs6a8EH2NB1nnufhT/rGZg6vqqAifa+Y+olulrBsuD4x/rIN/+FtFphWk02/xIxPH/2sUWcIE1/NCRLwFDGMPE/RItiOG08oixdL3Wb+Juok4Po63mwiCXZFFstIu1tlzykf40msxagX9sysYi1J6NMNVmKYGRayJp+C4ablYe2mVmOyqiktSIdo+IDPXSzuaZ6UicpbuM1HuS3z/T1eFNpHcYmZTkfVDZe72zOpCUmVkLuMgHxuMrIq/JFFYoymuN/aDqDZ0N/9QMnxlPQcmO+8= test@test\n\
+        ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCmn8DzRfmWKPKcVEPdCFFQbpdY2qzv5RkBLSAg1jlbLjHJuIyUf/e5lWwcfrtMLwEd5Wl6lgoEWxb2qsgEz1776D2QhWiXjGmKWmUHZiKrluiGlxHhqFDFJrjh1sQcBI5jReGGN5k1W06FrcGKCocsJ82cQbwahYjTU9UjhCPA4Q98pp7WGM0hctTlrGChvnszxKEqmX+4szv1bMYxHthT5l7Uuy0PsNJzQjoSOQJCs6a8EH2NB1nnufhT/rGZg6vqqAifa+Y+olulrBsuD4x/rIN/+FtFphWk02/xIxPH/2sUWcIE1/NCRLwFDGMPE/RItiOG08oixdL3Wb+Juok4Po63mwiCXZFFstIu1tlzykf40msxagX9sysYi1J6NMNVmKYGRayJp+C4ablYe2mVmOyqiktSIdo+IDPXSzuaZ6UicpbuM1HuS3z/T1eFNpHcYmZTkfVDZe72zOpCUmVkLuMgHxuMrIq/JFFYoymuN/aDqDZ0N/9QMnxlPQcmO+8=\n";
+
+        let authorized_keys = parse_authorized_keys_str(authorized_keys);
+
+        assert_eq!(2, authorized_keys.len());
+    }
+
+    #[test]
+    fn test_parse_authorized_keys_str_with_whitespace() {
+        let authorized_keys = "    \n \n     \n  \n";
+
+        let authorized_keys = parse_authorized_keys_str(authorized_keys);
+
+        assert_eq!(0, authorized_keys.len());
+    }
+
+    #[test]
+    fn test_parse_authorized_keys_str_with_missing_piece() {
+        let authorized_keys = "ssh-rsa";
+
+        let authorized_keys = parse_authorized_keys_str(authorized_keys);
+
+        assert_eq!(0, authorized_keys.len());
+    }
+
+    #[test]
+    fn test_parse_authorized_keys_str_with_invalid_key() {
+        let authorized_keys = "ssh-rsa invalid";
+
+        let authorized_keys = parse_authorized_keys_str(authorized_keys);
+
+        assert_eq!(0, authorized_keys.len());
     }
 }

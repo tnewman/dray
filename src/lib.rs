@@ -6,6 +6,7 @@ pub mod try_buf;
 use anyhow::Error;
 use futures::future::{ready, Ready};
 use std::{sync::Arc, time::Duration};
+use storage::{s3::S3ObjectStorage, ObjectStorage};
 use thrussh::server::{run, Auth, Config, Handler, Server, Session};
 use thrussh_keys::key::KeyPair;
 
@@ -25,11 +26,15 @@ pub async fn run_server() {
 }
 
 #[derive(Clone)]
-struct DraySshServer {}
+struct DraySshServer {
+    s3_object_storage: S3ObjectStorage,
+}
 
 impl DraySshServer {
     pub fn new() -> DraySshServer {
-        DraySshServer {}
+        DraySshServer {
+            s3_object_storage: S3ObjectStorage::new(),
+        }
     }
 }
 
