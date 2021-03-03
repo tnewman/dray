@@ -28,15 +28,16 @@ pub trait ObjectStorage: Send + Sync {
     /// - The calculation of the home directory must always succeed.
     /// - The framework will check the if home exists if required.
     /// - The framework will sanitize the user.
-    fn get_home(&self, user: String) -> String;
+    fn get_home(&self, user: &str) -> String;
 
-    /// Retrieves the authorized keys for a user that will be compared against a
-    /// supplied key to determine if a user is allowed to log in.
+    /// Retrieves the authorized key fingerprints for a user that will be compared
+    /// against the fingerprint of the user-supplied key to determine if a user is
+    /// allowed to log in.
     ///
     /// # Warning
     /// An empty list of keys should be returned for missing users instead of an error
     /// to prevent clients from determining whether or not a user exists.
-    async fn get_authorized_keys(&self, user: String) -> Result<Vec<PublicKey>>;
+    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>>;
 
     /// Checks if a user has permission to perform an operation on a path.
     ///

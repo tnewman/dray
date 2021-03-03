@@ -4,11 +4,18 @@ pub mod storage;
 pub mod try_buf;
 
 use anyhow::Error;
-use futures::future::{ready, Ready};
-use std::{sync::Arc, time::Duration};
+use futures::{
+    future::{ready, Ready},
+    Future,
+};
+use log::{error, info};
+use std::{pin::Pin, sync::Arc, time::Duration};
 use storage::{s3::S3ObjectStorage, ObjectStorage};
 use thrussh::server::{run, Auth, Config, Handler, Server, Session};
-use thrussh_keys::key::KeyPair;
+use thrussh_keys::{
+    key::{self, KeyPair},
+    PublicKeyBase64,
+};
 
 pub async fn run_server() {
     let config = Config {
@@ -36,6 +43,43 @@ impl DraySshServer {
             s3_object_storage: S3ObjectStorage::new(),
         }
     }
+
+    async fn auth_publickey(
+        self,
+        user: String,
+        public_key: key::PublicKey,
+    ) -> Result<(DraySshServer, Auth), Error> {
+        let authorized_keys = match self
+            .s3_object_storage
+            .get_authorized_keys_fingerprints(&user)
+            .await
+        {
+            Ok(authorized_keys) => authorized_keys,
+            Err(error) => {
+                error!(
+                    "Error during public key authentication for {}: {}",
+                    user, error
+                );
+                return Err(error);
+            }
+        };
+
+        let public_key_fingerprint = public_key.fingerprint();
+
+        match authorized_keys.contains(&public_key_fingerprint) {
+            true => {
+                info!(
+                    "Successfully authenticated {} with public key authentication",
+                    user
+                );
+                Ok((self, Auth::Accept))
+            }
+            false => {
+                info!("Rejected public key authentication attempt from {}", user);
+                Ok((self, Auth::Reject))
+            }
+        }
+    }
 }
 
 impl Server for DraySshServer {
@@ -48,12 +92,14 @@ impl Server for DraySshServer {
 
 impl Handler for DraySshServer {
     type Error = Error;
-    type FutureAuth = Ready<Result<(Self, Auth), anyhow::Error>>;
+    type FutureAuth =
+        Pin<Box<dyn Future<Output = Result<(DraySshServer, Auth), Self::Error>> + Send>>;
     type FutureBool = Ready<Result<(Self, Session, bool), anyhow::Error>>;
     type FutureUnit = Ready<Result<(Self, Session), anyhow::Error>>;
 
-    fn finished_auth(self, auth: Auth) -> Self::FutureAuth {
-        ready(Ok((self, auth)))
+    fn auth_publickey(self, user: &str, public_key: &key::PublicKey) -> Self::FutureAuth {
+        let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
+        Box::pin(self.auth_publickey(user.to_owned(), public_key))
     }
 
     fn finished_bool(self, b: bool, session: Session) -> Self::FutureBool {
@@ -62,5 +108,9 @@ impl Handler for DraySshServer {
 
     fn finished(self, session: Session) -> Self::FutureUnit {
         ready(Ok((self, session)))
+    }
+
+    fn finished_auth(self, auth: Auth) -> Self::FutureAuth {
+        Box::pin(ready(Ok((self, auth))))
     }
 }

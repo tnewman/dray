@@ -23,8 +23,8 @@ impl S3ObjectStorage {
     pub fn new() -> S3ObjectStorage {
         S3ObjectStorage {
             s3_client: S3Client::new(Region::Custom {
-                name: "us-east-1".to_owned(),
-                endpoint: "http://localhost:8000".to_owned(),
+                name: "custom".to_owned(),
+                endpoint: "http://localhost:9000".to_owned(),
             }),
             bucket: "test".to_owned(),
         }
@@ -33,12 +33,12 @@ impl S3ObjectStorage {
 
 #[async_trait]
 impl ObjectStorage for S3ObjectStorage {
-    fn get_home(&self, user: String) -> String {
+    fn get_home(&self, user: &str) -> String {
         format!("/home/{}", user)
     }
 
-    async fn get_authorized_keys(&self, user: String) -> Result<Vec<PublicKey>> {
-        let authorized_keys_key = format!("/.ssh/{}/authorized_keys", user);
+    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>> {
+        let authorized_keys_key = format!(".ssh/{}/authorized_keys", user);
 
         let object = self
             .s3_client
@@ -171,7 +171,7 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
     }
 }
 
-fn parse_authorized_keys_str(authorized_keys_str: &str) -> Vec<PublicKey> {
+fn parse_authorized_keys_str(authorized_keys_str: &str) -> Vec<String> {
     authorized_keys_str
         .lines()
         .into_iter()
@@ -198,6 +198,7 @@ fn parse_authorized_keys_str(authorized_keys_str: &str) -> Vec<PublicKey> {
         })
         .filter(|key| key.is_some())
         .map(|key| key.unwrap())
+        .map(|key| key.fingerprint())
         .collect()
 }
 
