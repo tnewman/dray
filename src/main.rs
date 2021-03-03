@@ -6,9 +6,6 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 
 fn main() {
-    std::env::set_var("AWS_ACCESS_KEY_ID", "miniouser");
-    std::env::set_var("AWS_SECRET_ACCESS_KEY", "miniopass");
-
     env_logger::Builder::new()
         .filter_level(LevelFilter::Info)
         .init();
