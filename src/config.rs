@@ -1,5 +1,4 @@
 use anyhow::Result;
-use envy;
 use serde::Deserialize;
 
 pub use crate::storage::s3::S3Config;

@@ -136,9 +136,9 @@ fn get_home(user: &str) -> String {
 }
 
 fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
-    let files = list_objects.contents.unwrap_or(vec![]);
+    let files = list_objects.contents.unwrap_or_default();
 
-    let directories = list_objects.common_prefixes.unwrap_or(vec![]);
+    let directories = list_objects.common_prefixes.unwrap_or_default();
 
     let mapped_files = files.iter().map(|object| map_object_to_file(object));
 
@@ -157,7 +157,7 @@ fn map_object_to_file(object: &Object) -> File {
         file_name: file_name.clone(),
         long_name: file_name,
         file_attributes: FileAttributes {
-            size: object.size.map_or(None, |size| Some(size as u64)),
+            size: object.size.map(|size| size as u64),
             uid: None,
             gid: None,
             permissions: Some(700),

@@ -50,7 +50,7 @@ impl DraySshServer {
 
         run(ssh_config, &self.dray_config.host.clone(), self)
             .await
-            .map_err(|e| Error::from(e))
+            .map_err(Error::from)
     }
 
     async fn auth_publickey(
