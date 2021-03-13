@@ -49,8 +49,9 @@ impl S3ObjectStorage {
 
 #[async_trait]
 impl ObjectStorage for S3ObjectStorage {
+
     fn get_home(&self, user: &str) -> String {
-        format!("/home/{}", user)
+        get_home(user)
     }
 
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>> {
@@ -135,6 +136,10 @@ impl ObjectStorage for S3ObjectStorage {
     }
 }
 
+fn get_home(user: &str) -> String {
+    format!("/home/{}", user)
+}
+
 fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
     let files = list_objects.contents.unwrap_or(vec![]);
 
@@ -194,6 +199,16 @@ fn get_default_endpoint_region() -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn test_get_home_returns_users_home_directory() {
+        assert_eq!("/home/test", get_home("test"));
+    }
+
+    #[test]
+    fn test_get_default_endpoint_region() {
+        assert_eq!("custom", get_default_endpoint_region());
+    }
 
     #[test]
     fn test_map_list_objects_to_files() {
