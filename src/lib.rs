@@ -1,9 +1,9 @@
 pub mod config;
-pub mod error;
-pub mod protocol;
-pub mod ssh_keys;
-pub mod storage;
-pub mod try_buf;
+mod error;
+mod protocol;
+mod ssh_keys;
+mod storage;
+mod try_buf;
 
 use crate::config::DrayConfig;
 use anyhow::Error;

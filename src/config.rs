@@ -2,7 +2,7 @@ use anyhow::Result;
 use envy;
 use serde::Deserialize;
 
-use crate::storage::s3::S3Config;
+pub use crate::storage::s3::S3Config as S3Config;
 
 #[derive(Deserialize, Debug)]
 pub struct DrayConfig {
