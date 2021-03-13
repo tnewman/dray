@@ -22,8 +22,8 @@ use thrussh_keys::{
 
 #[derive(Clone)]
 pub struct DraySshServer {
-    dray_config: DrayConfig,
-    s3_object_storage: S3ObjectStorage,
+    dray_config: Arc<DrayConfig>,
+    object_storage: Arc<dyn ObjectStorage>,
 }
 
 impl DraySshServer {
@@ -31,13 +31,13 @@ impl DraySshServer {
         let s3_object_storage = S3ObjectStorage::new(&dray_config.s3);
 
         DraySshServer {
-            dray_config,
-            s3_object_storage,
+            dray_config: Arc::from(dray_config),
+            object_storage: Arc::from(s3_object_storage),
         }
     }
 
     pub async fn health_check(&self) -> Result<(), Error> {
-        self.s3_object_storage
+        self.object_storage
             .list_prefix(String::from(""), None, None)
             .await?;
         Ok(())
@@ -62,7 +62,7 @@ impl DraySshServer {
         public_key: key::PublicKey,
     ) -> Result<(DraySshServer, Auth), Error> {
         let authorized_keys = match self
-            .s3_object_storage
+            .object_storage
             .get_authorized_keys_fingerprints(&user)
             .await
         {

@@ -18,7 +18,7 @@ pub struct S3ObjectStorage {
     bucket: String,
 }
 
-#[derive(Clone, Deserialize, Debug)]
+#[derive(Deserialize, Debug)]
 pub struct S3Config {
     #[serde(rename(deserialize = "s3_endpoint_name"))]
     pub endpoint_name: Option<String>,
@@ -52,6 +52,11 @@ impl ObjectStorage for S3ObjectStorage {
 
     fn get_home(&self, user: &str) -> String {
         get_home(user)
+    }
+
+    async fn health_check(&self) -> Result<()> {
+        self.list_prefix(String::from(""), None, None).await?;
+        Ok(())
     }
 
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>> {
