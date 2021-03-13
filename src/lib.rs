@@ -1,9 +1,11 @@
+pub mod config;
 pub mod error;
 pub mod protocol;
 pub mod storage;
 pub mod try_buf;
 
 use anyhow::Error;
+use crate::config::DrayConfig;
 use futures::{
     future::{ready, Ready},
     Future,
@@ -18,18 +20,20 @@ use thrussh_keys::{
 };
 
 pub async fn run_server() {
-    let config = Config {
+    let dray_config = DrayConfig::new().unwrap();
+
+    let ssh_config = Config {
         connection_timeout: Some(Duration::from_secs(3)),
         auth_rejection_time: Duration::from_secs(3),
         keys: vec![KeyPair::generate_ed25519().unwrap()],
         ..Default::default()
     };
 
-    let config = Arc::new(config);
+    let ssh_config = Arc::new(ssh_config);
 
-    let dray_ssh_server = DraySshServer::new();
+    let dray_ssh_server = DraySshServer::new(&dray_config);
 
-    run(config, "0.0.0.0:2222", dray_ssh_server).await.unwrap()
+    run(ssh_config, "0.0.0.0:2222", dray_ssh_server).await.unwrap()
 }
 
 #[derive(Clone)]
@@ -38,9 +42,9 @@ struct DraySshServer {
 }
 
 impl DraySshServer {
-    pub fn new() -> DraySshServer {
+    pub fn new(dray_config: &DrayConfig) -> DraySshServer {
         DraySshServer {
-            s3_object_storage: S3ObjectStorage::new(),
+            s3_object_storage: S3ObjectStorage::new(&dray_config.s3),
         }
     }
 

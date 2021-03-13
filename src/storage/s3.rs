@@ -19,14 +19,24 @@ pub struct S3ObjectStorage {
     bucket: String,
 }
 
+pub struct S3Config {
+    pub endpoint: Option<String>,
+    pub bucket: String
+}
+
 impl S3ObjectStorage {
-    pub fn new() -> S3ObjectStorage {
+    pub fn new(s3_config: &S3Config) -> S3ObjectStorage {
+        let region = match &s3_config.endpoint {
+            Some(endpoint) => Region::Custom {
+                name: "Custom".to_owned(),
+                endpoint: endpoint.clone(),
+            },
+            None => Region::default(),
+        };
+
         S3ObjectStorage {
-            s3_client: S3Client::new(Region::Custom {
-                name: "custom".to_owned(),
-                endpoint: "http://localhost:9000".to_owned(),
-            }),
-            bucket: "test".to_owned(),
+            s3_client: S3Client::new(region),
+            bucket: s3_config.bucket.clone()
         }
     }
 }
