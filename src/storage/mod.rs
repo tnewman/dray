@@ -2,7 +2,6 @@ pub mod s3;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use thrussh_keys::key::PublicKey;
 
 use crate::protocol::response::name::File;
 
