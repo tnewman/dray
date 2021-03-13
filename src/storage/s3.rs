@@ -1,5 +1,3 @@
-use std::io::Read;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
