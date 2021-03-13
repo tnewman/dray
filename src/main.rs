@@ -1,7 +1,6 @@
 use dotenv::dotenv;
 use log::{info, LevelFilter};
 use std::time::Duration;
-use tokio;
 use tokio::runtime::Runtime;
 use tokio::signal;
 

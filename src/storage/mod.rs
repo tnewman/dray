@@ -20,7 +20,7 @@ pub trait ObjectStorage: Send + Sync {
     /// - The framework will sanitize the user.
     fn get_home(&self, user: &str) -> String;
 
-    /// Checks if object storage is available. An error will be returned if object 
+    /// Checks if object storage is available. An error will be returned if object
     /// storage operations cannot be performed.
     async fn health_check(&self) -> Result<()>;
 

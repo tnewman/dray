@@ -49,7 +49,6 @@ impl S3ObjectStorage {
 
 #[async_trait]
 impl ObjectStorage for S3ObjectStorage {
-
     fn get_home(&self, user: &str) -> String {
         get_home(user)
     }
@@ -104,31 +103,31 @@ impl ObjectStorage for S3ObjectStorage {
     }
 
     async fn create_prefix(&self, prefix: String) {
-        todo!()
+        todo!("TODO: Create prefix {}", prefix)
     }
 
     async fn rename_prefix(&self, current: String, new: String) {
-        todo!()
+        todo!("TODO: Rename prefix {} to {}", current, new)
     }
 
     async fn remove_prefix(&self, prefix: String) {
-        todo!()
+        todo!("TODO: Remove prefix {}", prefix)
     }
 
     async fn open_object_read_stream(&self, key: String) {
-        todo!()
+        todo!("TODO: Open object read stream {}", key)
     }
 
     async fn open_object_write_stream(&self, key: String) {
-        todo!()
+        todo!("TODO: Open object write stream {}", key)
     }
 
     async fn rename_object(&self, current: String, new: String) {
-        todo!()
+        todo!("TODO: Rename object {} to {}", current, new)
     }
 
     async fn remove_object(&self, key: String) {
-        todo!()
+        todo!("TODO: Remove object {}", key)
     }
 }
 
@@ -161,7 +160,7 @@ fn map_object_to_file(object: &Object) -> File {
             size: object.size.map_or(None, |size| Some(size as u64)),
             uid: None,
             gid: None,
-            permissions: Some(0700),
+            permissions: Some(700),
             atime: None,
             mtime: None,
         },
@@ -181,7 +180,7 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
             size: None,
             uid: None,
             gid: None,
-            permissions: Some(0700),
+            permissions: Some(700),
             atime: None,
             mtime: None,
         },
