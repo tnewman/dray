@@ -38,7 +38,6 @@ pub enum Request {
     Rename(rename::Rename),
     Readlink(path::Path),
     Symlink(symlink::Symlink),
-    Handle(handle::Handle),
 }
 
 impl TryFrom<&mut Bytes> for Request {
