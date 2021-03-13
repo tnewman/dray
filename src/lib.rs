@@ -1,6 +1,7 @@
 pub mod config;
 pub mod error;
 pub mod protocol;
+pub mod ssh_keys;
 pub mod storage;
 pub mod try_buf;
 
