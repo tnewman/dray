@@ -12,7 +12,7 @@ use futures::{
     Future,
 };
 use log::{error, info};
-use std::{pin::Pin, sync::Arc, time::Duration};
+use std::{pin::Pin, sync::Arc};
 use storage::{s3::S3ObjectStorage, ObjectStorage};
 use thrussh::server::{run, Auth, Config, Handler, Server, Session};
 use thrussh_keys::{
@@ -20,35 +20,38 @@ use thrussh_keys::{
     PublicKeyBase64,
 };
 
-pub async fn run_server() {
-    let dray_config = DrayConfig::new().unwrap();
-
-    let ssh_config = Config {
-        connection_timeout: Some(Duration::from_secs(3)),
-        auth_rejection_time: Duration::from_secs(3),
-        keys: vec![KeyPair::generate_ed25519().unwrap()],
-        ..Default::default()
-    };
-
-    let ssh_config = Arc::new(ssh_config);
-
-    let dray_ssh_server = DraySshServer::new(&dray_config);
-
-    run(ssh_config, &dray_config.host, dray_ssh_server)
-        .await
-        .unwrap()
-}
-
 #[derive(Clone)]
-struct DraySshServer {
+pub struct DraySshServer {
+    dray_config: DrayConfig,
     s3_object_storage: S3ObjectStorage,
 }
 
 impl DraySshServer {
-    pub fn new(dray_config: &DrayConfig) -> DraySshServer {
+    pub fn new(dray_config: DrayConfig) -> DraySshServer {
+        let s3_object_storage = S3ObjectStorage::new(&dray_config.s3);
+
         DraySshServer {
-            s3_object_storage: S3ObjectStorage::new(&dray_config.s3),
+            dray_config,
+            s3_object_storage,
         }
+    }
+
+    pub async fn health_check(&self) -> Result<(), Error> {
+        self.s3_object_storage.list_prefix(String::from(""), None, None).await?;
+        Ok(())
+    }
+
+    pub async fn run_server(self) -> Result<(), Error> {
+        let ssh_config = Config {
+            keys: vec![KeyPair::generate_ed25519().unwrap()],
+            ..Default::default()
+        };
+    
+        let ssh_config = Arc::new(ssh_config);
+
+        run(ssh_config, &self.dray_config.host.clone(), self)
+            .await
+            .map_err(|e| Error::from(e))
     }
 
     async fn auth_publickey(

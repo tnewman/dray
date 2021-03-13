@@ -18,7 +18,7 @@ pub struct S3ObjectStorage {
     bucket: String,
 }
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct S3Config {
     #[serde(rename(deserialize = "s3_endpoint_name"))]
     pub endpoint_name: Option<String>,

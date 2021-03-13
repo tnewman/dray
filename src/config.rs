@@ -4,7 +4,7 @@ use serde::Deserialize;
 
 use crate::storage::s3::S3Config;
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct DrayConfig {
     pub host: String,
 

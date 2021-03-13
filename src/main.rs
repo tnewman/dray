@@ -1,10 +1,11 @@
 use dotenv::dotenv;
-use dray::run_server;
 use log::{info, LevelFilter};
 use std::time::Duration;
 use tokio;
 use tokio::runtime::Runtime;
 use tokio::signal;
+
+use dray::{DraySshServer, config::DrayConfig};
 
 fn main() {
     dotenv().ok();
@@ -16,7 +17,13 @@ fn main() {
     info!("Starting Dray");
 
     let runtime = Runtime::new().unwrap();
-    runtime.spawn(run_server());
+
+    let dray_config = DrayConfig::new().unwrap();
+    let dray_server = DraySshServer::new(dray_config);
+
+    runtime.block_on(dray_server.health_check()).unwrap();
+    runtime.spawn(dray_server.run_server());
+    
     runtime.block_on(signal::ctrl_c()).unwrap();
 
     info!("Received SIGINT - Shutting Down Dray");
