@@ -37,10 +37,7 @@ impl DraySshServer {
     }
 
     pub async fn health_check(&self) -> Result<(), Error> {
-        self.object_storage
-            .list_prefix(String::from(""), None, None)
-            .await?;
-        Ok(())
+        self.object_storage.health_check().await
     }
 
     pub async fn run_server(self) -> Result<(), Error> {
