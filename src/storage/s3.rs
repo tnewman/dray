@@ -4,6 +4,7 @@ use rusoto_core::Region;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3,
 };
+use serde::Deserialize;
 use thrussh_keys::key::PublicKey;
 use tokio::io::AsyncReadExt;
 
@@ -17,24 +18,31 @@ pub struct S3ObjectStorage {
     bucket: String,
 }
 
+#[derive(Deserialize, Debug)]
 pub struct S3Config {
-    pub endpoint: Option<String>,
-    pub bucket: String
+    #[serde(rename(deserialize = "s3_endpoint_name"))]
+    pub endpoint_name: Option<String>,
+
+    #[serde(default = "get_default_endpoint_region")]
+    pub endpoint_region: String,
+
+    #[serde(rename(deserialize = "s3_bucket"))]
+    pub bucket: String,
 }
 
 impl S3ObjectStorage {
     pub fn new(s3_config: &S3Config) -> S3ObjectStorage {
-        let region = match &s3_config.endpoint {
-            Some(endpoint) => Region::Custom {
-                name: "Custom".to_owned(),
-                endpoint: endpoint.clone(),
+        let region = match &s3_config.endpoint_name {
+            Some(endpoint_name) => Region::Custom {
+                name: s3_config.endpoint_region.clone(),
+                endpoint: endpoint_name.clone(),
             },
             None => Region::default(),
         };
 
         S3ObjectStorage {
             s3_client: S3Client::new(region),
-            bucket: s3_config.bucket.clone()
+            bucket: s3_config.bucket.clone(),
         }
     }
 }
@@ -208,6 +216,10 @@ fn parse_authorized_keys_str(authorized_keys_str: &str) -> Vec<String> {
         .map(|key| key.unwrap())
         .map(|key| key.fingerprint())
         .collect()
+}
+
+fn get_default_endpoint_region() -> String {
+    String::from("custom")
 }
 
 #[cfg(test)]

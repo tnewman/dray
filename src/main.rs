@@ -1,3 +1,4 @@
+use dotenv::dotenv;
 use dray::run_server;
 use log::{info, LevelFilter};
 use std::time::Duration;
@@ -6,6 +7,8 @@ use tokio::runtime::Runtime;
 use tokio::signal;
 
 fn main() {
+    dotenv().ok();
+
     env_logger::Builder::new()
         .filter_level(LevelFilter::Info)
         .init();

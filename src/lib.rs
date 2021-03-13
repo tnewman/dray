@@ -4,8 +4,8 @@ pub mod protocol;
 pub mod storage;
 pub mod try_buf;
 
-use anyhow::Error;
 use crate::config::DrayConfig;
+use anyhow::Error;
 use futures::{
     future::{ready, Ready},
     Future,
@@ -33,7 +33,9 @@ pub async fn run_server() {
 
     let dray_ssh_server = DraySshServer::new(&dray_config);
 
-    run(ssh_config, "0.0.0.0:2222", dray_ssh_server).await.unwrap()
+    run(ssh_config, "0.0.0.0:2222", dray_ssh_server)
+        .await
+        .unwrap()
 }
 
 #[derive(Clone)]
