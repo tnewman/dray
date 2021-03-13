@@ -5,7 +5,7 @@ use tokio;
 use tokio::runtime::Runtime;
 use tokio::signal;
 
-use dray::{DraySshServer, config::DrayConfig};
+use dray::{config::DrayConfig, DraySshServer};
 
 fn main() {
     dotenv().ok();
@@ -23,7 +23,7 @@ fn main() {
 
     runtime.block_on(dray_server.health_check()).unwrap();
     runtime.spawn(dray_server.run_server());
-    
+
     runtime.block_on(signal::ctrl_c()).unwrap();
 
     info!("Received SIGINT - Shutting Down Dray");

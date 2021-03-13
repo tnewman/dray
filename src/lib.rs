@@ -37,7 +37,9 @@ impl DraySshServer {
     }
 
     pub async fn health_check(&self) -> Result<(), Error> {
-        self.s3_object_storage.list_prefix(String::from(""), None, None).await?;
+        self.s3_object_storage
+            .list_prefix(String::from(""), None, None)
+            .await?;
         Ok(())
     }
 
@@ -46,7 +48,7 @@ impl DraySshServer {
             keys: vec![KeyPair::generate_ed25519().unwrap()],
             ..Default::default()
         };
-    
+
         let ssh_config = Arc::new(ssh_config);
 
         run(ssh_config, &self.dray_config.host.clone(), self)
