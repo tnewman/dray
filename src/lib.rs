@@ -101,14 +101,14 @@ impl Server for DraySshServer {
 
 impl Handler for DraySshServer {
     type Error = Error;
-    
+
     #[allow(clippy::type_complexity)]
     type FutureAuth =
         Pin<Box<dyn Future<Output = Result<(DraySshServer, Auth), Self::Error>> + Send>>;
-    
-        type FutureBool = Ready<Result<(Self, Session, bool), anyhow::Error>>;
-    
-        type FutureUnit = Ready<Result<(Self, Session), anyhow::Error>>;
+
+    type FutureBool = Ready<Result<(Self, Session, bool), anyhow::Error>>;
+
+    type FutureUnit = Ready<Result<(Self, Session), anyhow::Error>>;
 
     fn auth_publickey(self, user: &str, public_key: &key::PublicKey) -> Self::FutureAuth {
         let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
