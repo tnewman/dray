@@ -5,15 +5,6 @@ use async_trait::async_trait;
 
 use crate::protocol::response::name::File;
 
-/// Object Storage permissions.
-pub enum Permission {
-    /// Permission to read a prefix or object.
-    READ,
-
-    /// Permission to write a prefix or object.
-    WRITE,
-}
-
 /// An implementation of an Object Storage backend, such as AWS S3.
 ///
 /// Implementers of this trait are providing low level access to objects, allowing
@@ -37,19 +28,6 @@ pub trait ObjectStorage: Send + Sync {
     /// An empty list of keys should be returned for missing users instead of an error
     /// to prevent clients from determining whether or not a user exists.
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>>;
-
-    /// Checks if a user has permission to perform an operation on a path.
-    ///
-    /// # Warning
-    /// The permission check must account for:
-    /// - Preventing the home directory from being deleted or renamed
-    /// - Denying reads and write to paths outside of the user's home directory
-    async fn has_permission(
-        &self,
-        user: String,
-        path: String,
-        permission: Permission,
-    ) -> Result<bool>;
 
     /// Lists objects under a prefix. The list will start at `continuation_token` if
     /// provided and return up the smaller of `max_results` or the backend max limit.

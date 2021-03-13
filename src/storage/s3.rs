@@ -77,15 +77,6 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
 
-    async fn has_permission(
-        &self,
-        user: String,
-        path: String,
-        permission: super::Permission,
-    ) -> Result<bool> {
-        todo!()
-    }
-
     async fn list_prefix(
         &self,
         prefix: String,
