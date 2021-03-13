@@ -34,7 +34,7 @@ pub async fn run_server() {
 
     let dray_ssh_server = DraySshServer::new(&dray_config);
 
-    run(ssh_config, "0.0.0.0:2222", dray_ssh_server)
+    run(ssh_config, &dray_config.host, dray_ssh_server)
         .await
         .unwrap()
 }
