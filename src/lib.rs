@@ -7,14 +7,19 @@ mod try_buf;
 
 use crate::config::DrayConfig;
 use anyhow::Error;
+use bytes::Bytes;
 use futures::{
     future::{ready, Ready},
     Future,
 };
 use log::{error, info};
+use protocol::response::{version::Version, Response};
 use std::{pin::Pin, sync::Arc};
 use storage::{s3::S3ObjectStorage, ObjectStorage};
-use thrussh::server::{run, Auth, Config, Handler, Server, Session};
+use thrussh::{
+    server::{run, Auth, Config, Handler, Server, Session},
+    ChannelId, CryptoVec,
+};
 use thrussh_keys::{
     key::{self, KeyPair},
     PublicKeyBase64,
@@ -113,6 +118,31 @@ impl Handler for DraySshServer {
     fn auth_publickey(self, user: &str, public_key: &key::PublicKey) -> Self::FutureAuth {
         let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
         Box::pin(self.auth_publickey(user.to_owned(), public_key))
+    }
+
+    fn subsystem_request(
+        self,
+        _channel: ChannelId,
+        name: &str,
+        mut session: Session,
+    ) -> Self::FutureUnit {
+        if "sftp" == name {
+            session.request_success();
+        } else {
+            session.request_failure();
+        }
+
+        session.request_success();
+
+        ready(Ok((self, session)))
+    }
+
+    fn data(self, channel: ChannelId, _data: &[u8], mut session: Session) -> Self::FutureUnit {
+        let response = Bytes::from(&Response::Version(Version { version: 3 })).to_vec();
+
+        session.data(channel, CryptoVec::from(response));
+
+        ready(Ok((self, session)))
     }
 
     fn finished_bool(self, b: bool, session: Session) -> Self::FutureBool {
