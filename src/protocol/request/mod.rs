@@ -46,7 +46,7 @@ impl TryFrom<&mut Bytes> for Request {
     fn try_from(request_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let data_length = request_bytes.try_get_u32()?;
         let data_type = request_bytes.try_get_u8()?;
-        let data_payload = &mut request_bytes.try_get_bytes(data_length)?;
+        let data_payload = &mut request_bytes.try_get_bytes(data_length - 1)?;
 
         let message = match data_type {
             1 => Request::Init(init::Init::try_from(data_payload)?),
@@ -545,7 +545,10 @@ mod tests {
     fn build_message(message_type: u8, payload: BytesMut) -> Bytes {
         let mut message = BytesMut::new();
 
-        message.put_u32(payload.len().try_into().unwrap());
+        // The message type is included in the length
+        let length = payload.len() + 1;
+
+        message.put_u32(length.try_into().unwrap());
         message.put_u8(message_type);
         message.put_slice(&payload.freeze());
 
