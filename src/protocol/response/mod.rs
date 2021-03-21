@@ -6,6 +6,7 @@ pub mod status;
 pub mod version;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use std::convert::TryFrom;
 
 const DATA_TYPE_LENGTH: u32 = 1;
 
@@ -39,7 +40,7 @@ impl From<&Response> for Bytes {
             Response::Attrs(attrs) => attrs.into(),
         };
 
-        let data_length = DATA_TYPE_LENGTH + data_payload.remaining() as u32;
+        let data_length = DATA_TYPE_LENGTH + u32::try_from(data_payload.remaining()).unwrap();
 
         let mut response_bytes = BytesMut::new();
         response_bytes.put_u32(data_length);
