@@ -5,7 +5,9 @@ pub mod name;
 pub mod status;
 pub mod version;
 
-use bytes::Bytes;
+use bytes::{Buf, BufMut, Bytes, BytesMut};
+
+const DATA_TYPE_LENGTH: u32 = 1;
 
 #[derive(Debug, PartialEq)]
 pub enum Response {
@@ -19,14 +21,32 @@ pub enum Response {
 
 impl From<&Response> for Bytes {
     fn from(response: &Response) -> Self {
-        match response {
+        let data_type: u8 = match response {
+            Response::Version(_) => 2,
+            Response::Status(_) => 101,
+            Response::Handle(_) => 102,
+            Response::Data(_) => 103,
+            Response::Name(_) => 104,
+            Response::Attrs(_) => 105,
+        };
+
+        let data_payload: Bytes = match response {
             Response::Version(version) => version.into(),
             Response::Status(status) => status.into(),
             Response::Handle(handle) => handle.into(),
             Response::Data(data) => data.into(),
             Response::Name(name) => name.into(),
             Response::Attrs(attrs) => attrs.into(),
-        }
+        };
+
+        let data_length = DATA_TYPE_LENGTH + data_payload.remaining() as u32;
+
+        let mut response_bytes = BytesMut::new();
+        response_bytes.put_u32(data_length);
+        response_bytes.put_u8(data_type);
+        response_bytes.put_slice(&data_payload);
+
+        response_bytes.freeze()
     }
 }
 
@@ -45,6 +65,8 @@ mod test {
 
         let version_bytes = &mut Bytes::from(&version);
 
+        assert_eq!(5, version_bytes.get_u32());
+        assert_eq!(2, version_bytes.get_u8());
         assert_eq!(0x01, version_bytes.get_u32());
     }
 
@@ -58,6 +80,8 @@ mod test {
 
         let status_bytes = &mut Bytes::from(&status);
 
+        assert_eq!(24, status_bytes.get_u32());
+        assert_eq!(101, status_bytes.get_u8());
         assert_eq!(0x01, status_bytes.get_u32());
         assert_eq!(0x00, status_bytes.get_u32());
         assert_eq!(0x02, status_bytes.get_u32()); // OK length
@@ -78,6 +102,8 @@ mod test {
 
         let handle_bytes = &mut Bytes::from(&handle);
 
+        assert_eq!(15, handle_bytes.get_u32());
+        assert_eq!(102, handle_bytes.get_u8());
         assert_eq!(0x01, handle_bytes.get_u32());
         assert_eq!(0x06, handle_bytes.get_u32()); // handle length
         assert_eq!(
@@ -95,6 +121,8 @@ mod test {
 
         let data_bytes = &mut Bytes::from(&data);
 
+        assert_eq!(11, data_bytes.get_u32());
+        assert_eq!(103, data_bytes.get_u8());
         assert_eq!(0x01, data_bytes.get_u32());
         assert_eq!(0x02, data_bytes.get_u32()); // data length
         assert_eq!(&[0x02, 0x03], &data_bytes.copy_to_bytes(2)[..]); // data
@@ -116,6 +144,8 @@ mod test {
 
         let name_bytes = &mut Bytes::from(&name);
 
+        assert_eq!(37, name_bytes.get_u32());
+        assert_eq!(104, name_bytes.get_u8());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x04, name_bytes.get_u32()); // file length
@@ -130,13 +160,15 @@ mod test {
         let file_attributes = get_file_attributes();
         let file_attributes_bytes = &mut Bytes::from(&file_attributes);
 
-        let attrs = attrs::Attrs {
+        let attrs = Response::Attrs(attrs::Attrs {
             id: 0x01,
             file_attributes,
-        };
+        });
 
         let attrs_bytes = &mut Bytes::from(&attrs);
 
+        assert_eq!(17, attrs_bytes.get_u32());
+        assert_eq!(105, attrs_bytes.get_u8());
         assert_eq!(0x01, attrs_bytes.get_u32());
         assert_eq!(file_attributes_bytes, &attrs_bytes[..]);
     }

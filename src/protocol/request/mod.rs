@@ -17,6 +17,8 @@ pub mod rename;
 pub mod symlink;
 pub mod write;
 
+const DATA_TYPE_LENGTH: u32 = 1;
+
 #[derive(Debug, PartialEq)]
 pub enum Request {
     Init(init::Init),
@@ -46,7 +48,7 @@ impl TryFrom<&mut Bytes> for Request {
     fn try_from(request_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let data_length = request_bytes.try_get_u32()?;
         let data_type = request_bytes.try_get_u8()?;
-        let data_payload = &mut request_bytes.try_get_bytes(data_length - 1)?;
+        let data_payload = &mut request_bytes.try_get_bytes(data_length - DATA_TYPE_LENGTH)?;
 
         let message = match data_type {
             1 => Request::Init(init::Init::try_from(data_payload)?),
