@@ -10,7 +10,7 @@ const UIDGID: u32 = 0x00000002;
 const PERMISSIONS: u32 = 0x00000004;
 const ACMODTIME: u32 = 0x00000008;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, Default, PartialEq)]
 pub struct FileAttributes {
     pub size: Option<u64>,
     pub uid: Option<u32>,
@@ -112,6 +112,22 @@ mod tests {
     use super::*;
 
     use bytes::Buf;
+
+    #[test]
+    fn test_file_attributes_provides_default_values() {
+        let file_attributes = FileAttributes {
+            ..Default::default()
+        };
+
+        assert_eq!(FileAttributes {
+            size: None,
+            uid: None,
+            gid: None,
+            permissions: None,
+            atime: None,
+            mtime: None,
+        }, file_attributes)
+    }
 
     #[test]
     fn test_from_file_attributes_creates_vector_with_set_fields() {

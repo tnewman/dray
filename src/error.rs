@@ -7,6 +7,7 @@ use std::fmt::Result;
 pub enum Error {
     BadMessage,
     Unimplemented,
+    ServerError,
 }
 
 impl Display for Error {

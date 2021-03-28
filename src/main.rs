@@ -10,7 +10,7 @@ fn main() {
     dotenv().ok();
 
     env_logger::Builder::new()
-        .filter_level(LevelFilter::Info)
+        .filter_level(LevelFilter::Debug)
         .init();
 
     info!("Starting Dray");

@@ -7,16 +7,17 @@ mod storage;
 mod try_buf;
 
 use crate::config::DrayConfig;
-use anyhow::Error;
+use anyhow::{Error, bail};
 use bytes::Bytes;
 use futures::{
     future::{ready, Ready},
     Future,
 };
 use log::{error, info};
-use protocol::response::{version::Version, Response};
+use protocol::request::Request;
 use sftp_session::SftpSession;
-use std::{pin::Pin, sync::Arc};
+use tokio::sync::RwLock;
+use std::{convert::TryFrom, pin::Pin, sync::Arc};
 use storage::{s3::S3ObjectStorage, ObjectStorage};
 use thrussh::{
     server::{run, Auth, Config, Handler, Server, Session},
@@ -30,7 +31,7 @@ use thrussh_keys::{
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,
     object_storage: Arc<dyn ObjectStorage>,
-    sftp_session: SftpSession,
+    sftp_session: RwLock<Option<SftpSession>>,
 }
 
 impl DraySshServer {
@@ -40,7 +41,7 @@ impl DraySshServer {
         DraySshServer {
             dray_config: Arc::from(dray_config),
             object_storage: object_storage.clone(),
-            sftp_session: SftpSession::new(object_storage.clone()),
+            sftp_session: RwLock::from(Option::None),
         }
     }
 
@@ -89,6 +90,12 @@ impl DraySshServer {
                     "Successfully authenticated {} with public key authentication",
                     user
                 );
+
+                {
+                    let mut sftp_session = self.sftp_session.write().await;
+                    *sftp_session = Some(SftpSession::new(self.object_storage.clone(), user));
+                }
+
                 Ok((self, Auth::Accept))
             }
             false => {
@@ -96,6 +103,23 @@ impl DraySshServer {
                 Ok((self, Auth::Reject))
             }
         }
+    }
+
+    async fn data(self, channel: ChannelId, request: Request, mut session: Session) -> Result<(DraySshServer, Session), Error> {
+        {
+            let sftp_session = &*self.sftp_session.read().await;
+            
+            let sftp_session = match sftp_session {
+                Some(sftp_session) => sftp_session,
+                None => bail!("Missing SFTP session!"),
+            };
+
+            let response = sftp_session.handle_request(request).await;
+
+            session.data(channel, CryptoVec::from(Bytes::from(&response).to_vec()));
+        }
+
+        Ok((self, session))
     }
 }
 
@@ -106,7 +130,7 @@ impl Server for DraySshServer {
         DraySshServer {
             dray_config: self.dray_config.clone(),
             object_storage: self.object_storage.clone(),
-            sftp_session: SftpSession::new(self.object_storage.clone()),
+            sftp_session: RwLock::from(Option::None),
         }
     }
 }
@@ -120,7 +144,7 @@ impl Handler for DraySshServer {
 
     type FutureBool = Ready<Result<(Self, Session, bool), anyhow::Error>>;
 
-    type FutureUnit = Ready<Result<(Self, Session), anyhow::Error>>;
+    type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), anyhow::Error>> + Send>>;
 
     fn auth_publickey(self, user: &str, public_key: &key::PublicKey) -> Self::FutureAuth {
         let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
@@ -141,15 +165,18 @@ impl Handler for DraySshServer {
 
         session.request_success();
 
-        ready(Ok((self, session)))
+        Box::pin(ready(Ok((self, session))))
     }
 
     fn data(self, channel: ChannelId, data: &[u8], mut session: Session) -> Self::FutureUnit {
-        let response = self.sftp_session.handle_request(data);
-
-        session.data(channel, CryptoVec::from(response));
-
-        ready(Ok((self, session)))
+        match Request::try_from(data) {
+            Ok(request) => Box::pin(self.data(channel, request, session)),
+            Err(_) => {
+                let response_bytes = Bytes::from(&SftpSession::build_invalid_request_message_response()).to_vec();
+                session.data(channel, CryptoVec::from(response_bytes));
+                Box::pin(ready(Ok((self, session))))
+            }
+        }
     }
 
     fn finished_bool(self, b: bool, session: Session) -> Self::FutureBool {
@@ -157,7 +184,7 @@ impl Handler for DraySshServer {
     }
 
     fn finished(self, session: Session) -> Self::FutureUnit {
-        ready(Ok((self, session)))
+        Box::pin(ready(Ok((self, session))))
     }
 
     fn finished_auth(self, auth: Auth) -> Self::FutureAuth {

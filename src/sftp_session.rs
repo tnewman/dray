@@ -1,9 +1,9 @@
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::{Arc};
 
-use bytes::Bytes;
 use log::debug;
 
 use crate::protocol::{
+    file_attributes::FileAttributes,
     request::{self, Request},
     response::{self, Response},
 };
@@ -11,25 +11,19 @@ use crate::storage::ObjectStorage;
 
 pub struct SftpSession {
     object_storage: Arc<dyn ObjectStorage>,
+    user: String,
 }
 
 impl SftpSession {
-    pub fn new(object_storage: Arc<dyn ObjectStorage>) -> Self {
-        SftpSession { object_storage }
+    pub fn new(object_storage: Arc<dyn ObjectStorage>, user: String) -> Self {
+        SftpSession {
+            object_storage,
+            user,
+        }
     }
 
-    pub fn handle_request(&self, request: &[u8]) -> Vec<u8> {
-        let request = Request::try_from(request);
-
-        let request = match request {
-            Ok(request) => request,
-            Err(_) => {
-                debug!("Received invalid request packet: {:?}", request);
-                return Bytes::from(&SftpSession::build_invalid_request_message_response()).to_vec();
-            }
-        };
-
-        debug!("Received request packet: {:?}", request);
+    pub async fn handle_request(&self, request: Request) -> Response {
+        debug!("Received request: {:?}", request);
 
         let response = match request {
             Request::Init(init_request) => self.handle_init_request(init_request),
@@ -53,8 +47,8 @@ impl SftpSession {
             Request::Symlink(symlink_request) => self.handle_symlink_request(symlink_request),
         };
 
-        let response: Bytes = (&response).into();
-        response.to_vec()
+        debug!("Sending response: {:?}", response);
+        response
     }
 
     fn handle_init_request(&self, _init_request: request::init::Init) -> Response {
@@ -123,7 +117,24 @@ impl SftpSession {
     }
 
     fn handle_realpath_request(&self, realpath_request: request::path::Path) -> Response {
-        SftpSession::build_not_supported_response(realpath_request.id)
+        if realpath_request.path != "." {
+            return SftpSession::build_not_supported_response(realpath_request.id)
+        }
+
+        let home = self.object_storage.get_home(&self.user);
+
+        Response::Name(response::name::Name {
+            id: realpath_request.id,
+            files: vec![
+                response::name::File {
+                    file_name: home.clone(),
+                    long_name: home,
+                    file_attributes: FileAttributes {
+                        ..Default::default()
+                    }
+                }
+            ]
+        })
     }
 
     fn handle_stat_request(&self, stat_request: request::path::Path) -> Response {
@@ -142,7 +153,7 @@ impl SftpSession {
         SftpSession::build_not_supported_response(symlink_request.id)
     }
 
-    fn build_invalid_request_message_response() -> Response {
+    pub fn build_invalid_request_message_response() -> Response {
         Response::Status(response::status::Status {
             id: 0,
             status_code: response::status::StatusCode::BadMessage,
