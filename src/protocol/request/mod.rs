@@ -5,7 +5,6 @@ use bytes::Bytes;
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
-pub mod close;
 pub mod handle;
 pub mod handle_attributes;
 pub mod init;

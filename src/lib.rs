@@ -1,6 +1,7 @@
 pub mod config;
 mod error;
 mod protocol;
+mod sftp_session;
 mod ssh_keys;
 mod storage;
 mod try_buf;
@@ -14,6 +15,7 @@ use futures::{
 };
 use log::{error, info};
 use protocol::response::{version::Version, Response};
+use sftp_session::SftpSession;
 use std::{pin::Pin, sync::Arc};
 use storage::{s3::S3ObjectStorage, ObjectStorage};
 use thrussh::{
@@ -25,19 +27,20 @@ use thrussh_keys::{
     PublicKeyBase64,
 };
 
-#[derive(Clone)]
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,
     object_storage: Arc<dyn ObjectStorage>,
+    sftp_session: SftpSession,
 }
 
 impl DraySshServer {
     pub fn new(dray_config: DrayConfig) -> DraySshServer {
-        let s3_object_storage = S3ObjectStorage::new(&dray_config.s3);
+        let object_storage = Arc::from(S3ObjectStorage::new(&dray_config.s3));
 
         DraySshServer {
             dray_config: Arc::from(dray_config),
-            object_storage: Arc::from(s3_object_storage),
+            object_storage: object_storage.clone(),
+            sftp_session: SftpSession::new(object_storage.clone()),
         }
     }
 
@@ -100,7 +103,11 @@ impl Server for DraySshServer {
     type Handler = Self;
 
     fn new(&mut self, _peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
-        self.clone()
+        DraySshServer {
+            dray_config: self.dray_config.clone(),
+            object_storage: self.object_storage.clone(),
+            sftp_session: SftpSession::new(self.object_storage.clone()),
+        }
     }
 }
 
@@ -137,8 +144,8 @@ impl Handler for DraySshServer {
         ready(Ok((self, session)))
     }
 
-    fn data(self, channel: ChannelId, _data: &[u8], mut session: Session) -> Self::FutureUnit {
-        let response = Bytes::from(&Response::Version(Version { version: 3 })).to_vec();
+    fn data(self, channel: ChannelId, data: &[u8], mut session: Session) -> Self::FutureUnit {
+        let response = self.sftp_session.handle_request(data);
 
         session.data(channel, CryptoVec::from(response));
 

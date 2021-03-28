@@ -17,7 +17,7 @@ the MVP roadmap has been implemented.
 - [x] Deserialize and Serialize SSH File Transfer Protocol Version 3 Draft 2
 - [x] Accept SSH connections
 - [x] Verify SSH keys against authorized keys stored in S3
-- [ ] SFTP subsystem initialization
+- [x] SFTP subsystem initialization
 - [ ] List directory (S3-Compatible Storage Only)
 - [ ] Create directory (S3-Compatible Storage Only)
 - [ ] Rename directory (S3-Compatible Storage Only)
