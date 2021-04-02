@@ -120,7 +120,7 @@ impl SftpSession {
         let path = if realpath_request.path == "." {
             self.object_storage.get_home(&self.user)
         } else {
-            normalize_path(&realpath_request.path)
+            realpath_request.to_normalized_path()
         };
 
         Response::Name(response::name::Name {
@@ -167,75 +167,5 @@ impl SftpSession {
             status_code: response::status::StatusCode::OperationUnsupported,
             error_message: String::from("Operation Unsupported!"),
         })
-    }
-}
-
-fn normalize_path(path: &str) -> String {
-    let mut normalized_components: Vec<&str> = vec![];
-    let mut components_to_skip: usize = 0;
-
-    for path_component in  path.rsplit("/") {
-        match path_component {
-            "" => {},
-            "." => {},
-            ".." => {
-                components_to_skip = components_to_skip + 1
-            },
-            _  => {
-                if components_to_skip > 0 {
-                    components_to_skip = components_to_skip - 1;
-                } else {
-                    normalized_components.push(path_component);
-                }
-            }
-        }
-    };
-    
-    if normalized_components.len() > 0 {
-        normalized_components.push("");
-        normalized_components.reverse();
-        normalized_components.join("/")
-    } else {
-        "/".to_owned()
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use super::*;
-
-    #[test]
-    fn test_normalize_path_skips_normalized_path() {
-        assert_eq!("/sample/path", &normalize_path("/sample/path"));
-    }
-
-    #[test]
-    fn test_normalize_path_converts_relative_path() {
-        assert_eq!("/sample/path", &normalize_path("sample/path"));
-    }
-
-    #[test]
-    fn test_normalize_path_strips_trailing_slash() {
-        assert_eq!("/sample/path", &normalize_path("/sample/path/"));
-    }
-
-    #[test]
-    fn test_normalize_path_handles_single_dot() {
-        assert_eq!("/sample/path", &normalize_path("/sample/./path"));
-    }
-
-    #[test]
-    fn test_normalize_path_pops_component_with_double_dot() {
-        assert_eq!("/path", &normalize_path("/sample/../path"));
-    }
-
-    #[test]
-    fn test_normalize_returns_root_with_no_components_remaining() {
-        assert_eq!("/", &normalize_path("/../.."));
-    }
-
-    #[test]
-    fn test_normalize_strips_extra_slashes() {
-        assert_eq!("/sample/path", &normalize_path("//////sample///////path////"));
     }
 }
