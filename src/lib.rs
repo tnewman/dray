@@ -13,7 +13,7 @@ use futures::{
     future::{ready, Ready},
     Future,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use protocol::request::Request;
 use sftp_session::SftpSession;
 use tokio::sync::RwLock;
@@ -153,17 +153,17 @@ impl Handler for DraySshServer {
 
     fn subsystem_request(
         self,
-        _channel: ChannelId,
+        channel: ChannelId,
         name: &str,
         mut session: Session,
     ) -> Self::FutureUnit {
         if "sftp" == name {
-            session.request_success();
+            debug!("starting sftp subsystem");
+            session.channel_success(channel);
         } else {
-            session.request_failure();
+            debug!("failed to start unsupported subsystem {}", name);
+            session.channel_failure(channel);
         }
-
-        session.request_success();
 
         Box::pin(ready(Ok((self, session))))
     }
