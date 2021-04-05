@@ -1,5 +1,3 @@
-use thrussh_keys::key::PublicKey;
-
 pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
     authorized_keys
         .lines()
@@ -8,22 +6,11 @@ pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
         .map(|line| {
             let mut pieces = line.split_whitespace();
 
-            let alg = match pieces.next() {
-                Some(alg) => alg.trim(),
-                None => return None,
-            };
-
-            let key = match pieces.next() {
-                Some(key) => key.trim(),
-                None => return None,
-            };
-
-            let key_decoded = match base64::decode(key) {
-                Ok(key_decoded) => key_decoded,
-                Err(_) => return None,
-            };
-
-            PublicKey::parse(alg.as_bytes(), key_decoded.as_slice()).ok()
+            match (pieces.next(), pieces.next()) {
+                (Some(_), Some(key)) => thrussh_keys::parse_public_key_base64(key).ok(),
+                (Some(key), None) => thrussh_keys::parse_public_key_base64(key).ok(),
+                _ => None,
+            }
         })
         .filter(|key| key.is_some())
         .map(|key| key.unwrap())
