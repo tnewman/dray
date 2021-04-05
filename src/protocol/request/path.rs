@@ -14,15 +14,13 @@ impl Path {
     pub fn to_normalized_path(&self) -> String {
         let mut normalized_components: Vec<&str> = vec![];
         let mut components_to_skip: usize = 0;
-    
-        for path_component in  self.path.rsplit("/") {
+
+        for path_component in self.path.rsplit("/") {
             match path_component {
-                "" => {},
-                "." => {},
-                ".." => {
-                    components_to_skip = components_to_skip + 1
-                },
-                _  => {
+                "" => {}
+                "." => {}
+                ".." => components_to_skip = components_to_skip + 1,
+                _ => {
                     if components_to_skip > 0 {
                         components_to_skip = components_to_skip - 1;
                     } else {
@@ -30,8 +28,8 @@ impl Path {
                     }
                 }
             }
-        };
-        
+        }
+
         if normalized_components.len() > 0 {
             normalized_components.push("");
             normalized_components.reverse();

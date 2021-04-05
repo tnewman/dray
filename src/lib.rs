@@ -7,7 +7,7 @@ mod storage;
 mod try_buf;
 
 use crate::config::DrayConfig;
-use anyhow::{Error, bail};
+use anyhow::{bail, Error};
 use bytes::Bytes;
 use futures::{
     future::{ready, Ready},
@@ -16,7 +16,6 @@ use futures::{
 use log::{debug, error, info};
 use protocol::request::Request;
 use sftp_session::SftpSession;
-use tokio::sync::RwLock;
 use std::{convert::TryFrom, pin::Pin, sync::Arc};
 use storage::{s3::S3ObjectStorage, ObjectStorage};
 use thrussh::{
@@ -24,9 +23,10 @@ use thrussh::{
     ChannelId, CryptoVec,
 };
 use thrussh_keys::{
-    key::{self, KeyPair},
+    key::{self, PublicKey},
     PublicKeyBase64,
 };
+use tokio::sync::RwLock;
 
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,
@@ -51,7 +51,7 @@ impl DraySshServer {
 
     pub async fn run_server(self) -> Result<(), Error> {
         let ssh_config = Config {
-            keys: self.dray_config.get_private_keys()?,
+            keys: self.dray_config.get_ssh_keys()?,
             ..Default::default()
         };
 
@@ -65,7 +65,7 @@ impl DraySshServer {
     async fn auth_publickey(
         self,
         user: String,
-        public_key: key::PublicKey,
+        public_key: PublicKey,
     ) -> Result<(DraySshServer, Auth), Error> {
         let authorized_keys = match self
             .object_storage
@@ -105,10 +105,15 @@ impl DraySshServer {
         }
     }
 
-    async fn data(self, channel: ChannelId, request: Request, mut session: Session) -> Result<(DraySshServer, Session), Error> {
+    async fn data(
+        self,
+        channel: ChannelId,
+        request: Request,
+        mut session: Session,
+    ) -> Result<(DraySshServer, Session), Error> {
         {
             let sftp_session = &*self.sftp_session.read().await;
-            
+
             let sftp_session = match sftp_session {
                 Some(sftp_session) => sftp_session,
                 None => bail!("Missing SFTP session!"),
@@ -146,7 +151,7 @@ impl Handler for DraySshServer {
 
     type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), anyhow::Error>> + Send>>;
 
-    fn auth_publickey(self, user: &str, public_key: &key::PublicKey) -> Self::FutureAuth {
+    fn auth_publickey(self, user: &str, public_key: &PublicKey) -> Self::FutureAuth {
         let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
         Box::pin(self.auth_publickey(user.to_owned(), public_key))
     }
@@ -172,7 +177,8 @@ impl Handler for DraySshServer {
         match Request::try_from(data) {
             Ok(request) => Box::pin(self.data(channel, request, session)),
             Err(_) => {
-                let response_bytes = Bytes::from(&SftpSession::build_invalid_request_message_response()).to_vec();
+                let response_bytes =
+                    Bytes::from(&SftpSession::build_invalid_request_message_response()).to_vec();
                 session.data(channel, CryptoVec::from(response_bytes));
                 Box::pin(ready(Ok((self, session))))
             }

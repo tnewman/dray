@@ -119,14 +119,17 @@ mod tests {
             ..Default::default()
         };
 
-        assert_eq!(FileAttributes {
-            size: None,
-            uid: None,
-            gid: None,
-            permissions: None,
-            atime: None,
-            mtime: None,
-        }, file_attributes)
+        assert_eq!(
+            FileAttributes {
+                size: None,
+                uid: None,
+                gid: None,
+                permissions: None,
+                atime: None,
+                mtime: None,
+            },
+            file_attributes
+        )
     }
 
     #[test]

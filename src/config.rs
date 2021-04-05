@@ -10,9 +10,7 @@ pub use crate::storage::s3::S3Config;
 pub struct DrayConfig {
     pub host: String,
 
-    pub ed25519_key_path: Option<String>,
-
-    pub rsa_key_path: Option<String>,
+    ssh_key_paths: String,
 
     #[serde(flatten)]
     pub s3: S3Config,
@@ -24,20 +22,75 @@ impl DrayConfig {
         Ok(dray_config)
     }
 
-    pub fn get_private_keys(&self) -> Result<Vec<key::KeyPair>> {
-        let mut private_keys = vec![];
+    pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>> {
+        let keys: Result<Vec<key::KeyPair>, _> = self
+            .ssh_key_paths
+            .split(",")
+            .map(|key_path| key_path.trim())
+            .map(|key_path| thrussh_keys::load_secret_key(Path::new(key_path), None))
+            .collect();
 
-        if let Some(rsa_key_path) = &self.rsa_key_path {
-            thrussh_keys::load_secret_key(Path::new(rsa_key_path), None)?;
-        };
-
-        if let Some(ed25519_key_path) = &self.ed25519_key_path {
-            private_keys.push(thrussh_keys::load_secret_key(Path::new(ed25519_key_path), None)?);
-        }
-
-        Ok(private_keys)
+        let keys = keys?;
+        Ok(keys)
     }
 }
 
 #[cfg(test)]
-mod test {}
+mod test {
+    use super::*;
+    use std::{env, fs::File, io::Write};
+
+    #[test]
+    fn test_get_ssh_keys_with_single_key() {
+        let config = create_config(create_temp_key());
+
+        assert_eq!(1, config.get_ssh_keys().unwrap().len())
+    }
+
+    #[test]
+    fn test_get_ssh_keys_with_multiple_keys() {
+        let temp_key = create_temp_key();
+        let config = create_config(vec![temp_key.clone(), temp_key].join(","));
+
+        assert_eq!(2, config.get_ssh_keys().unwrap().len())
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_ssh_keys_with_invalid_key() {
+        let config = create_config(String::from("invalid_key"));
+
+        config.get_ssh_keys().unwrap();
+    }
+
+    fn create_config(key_paths: String) -> DrayConfig {
+        DrayConfig {
+            host: String::from(""),
+            ssh_key_paths: key_paths,
+            s3: S3Config {
+                endpoint_name: None,
+                endpoint_region: String::from("us-east-1"),
+                bucket: String::from("bucket"),
+            },
+        }
+    }
+
+    fn create_temp_key() -> String {
+        let temp_file = env::temp_dir().join("id_ed25519");
+
+        File::create(temp_file.clone())
+            .unwrap()
+            .write_all(
+                b"-----BEGIN OPENSSH PRIVATE KEY-----
+b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
+QyNTUxOQAAACACJda1/GrWii+6Uk5xeVCK0QIHVr42/ih0X9qI+im4LAAAAKDjBAHe4wQB
+3gAAAAtzc2gtZWQyNTUxOQAAACACJda1/GrWii+6Uk5xeVCK0QIHVr42/ih0X9qI+im4LA
+AAAEBduesfcFRw+XEu4McoUjygPMccUj6bi+q85Eu3859n3gIl1rX8ataKL7pSTnF5UIrR
+AgdWvjb+KHRf2oj6KbgsAAAAGXRuZXdtYW5AdG9tLWxpbnV4LWRlc2t0b3ABAgME
+-----END OPENSSH PRIVATE KEY-----",
+            )
+            .unwrap();
+
+        temp_file.into_os_string().into_string().unwrap()
+    }
+}
