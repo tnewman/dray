@@ -51,7 +51,7 @@ impl DraySshServer {
 
     pub async fn run_server(self) -> Result<(), Error> {
         let ssh_config = Config {
-            keys: vec![KeyPair::generate_ed25519().unwrap()],
+            keys: self.dray_config.get_private_keys()?,
             ..Default::default()
         };
 
