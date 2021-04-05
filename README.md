@@ -9,6 +9,18 @@ Dray aims to tackle the undifferentiated heavy lifting of handling SFTP integrat
 ## What's With the Name
 A dray is a cart used to transport heavy cargo short distances. Dray transports files of any size to the storage backend.
 
+## Hacking
+### Prerequisites
+- [Install Rust](https://rustup.rs)
+- [Install Docker Compose](https://docs.docker.com/compose/install)
+- cd to the `dray` repository
+- Generate an SSH keypair in the `dray` directory (`ssh-keygen -t ed25519 -f .ssh/id_ed25519`)
+
+### Test, Build, and Run
+- Start Containers (`docker-compose up`)
+- Run Tests (`cargo test`)
+- Run Dray (`cargo run`)
+
 ## 🚧 Work in Progress 🚧
 This project is currently not in a usable state. The project will be considered usable when 
 the MVP roadmap has been implemented.
