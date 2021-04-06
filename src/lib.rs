@@ -40,7 +40,7 @@ impl DraySshServer {
 
         DraySshServer {
             dray_config: Arc::from(dray_config),
-            object_storage: object_storage.clone(),
+            object_storage,
             sftp_session: RwLock::from(Option::None),
         }
     }
@@ -149,6 +149,7 @@ impl Handler for DraySshServer {
 
     type FutureBool = Ready<Result<(Self, Session, bool), anyhow::Error>>;
 
+    #[allow(clippy::type_complexity)]
     type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), anyhow::Error>> + Send>>;
 
     fn auth_publickey(self, user: &str, public_key: &PublicKey) -> Self::FutureAuth {

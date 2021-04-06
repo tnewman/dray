@@ -12,7 +12,7 @@ pub struct Status {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum StatusCode {
     Ok = 0,
-    EOF = 1,
+    Eof = 1,
     NoSuchFile = 2,
     PermissionDenied = 3,
     Failure = 4,

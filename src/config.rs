@@ -25,7 +25,7 @@ impl DrayConfig {
     pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>> {
         let keys: Result<Vec<key::KeyPair>, _> = self
             .ssh_key_paths
-            .split(",")
+            .split(',')
             .map(|key_path| key_path.trim())
             .map(|key_path| thrussh_keys::load_secret_key(Path::new(key_path), None))
             .collect();
