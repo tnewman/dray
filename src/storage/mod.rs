@@ -2,6 +2,7 @@ pub mod s3;
 
 use anyhow::Result;
 use async_trait::async_trait;
+use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::protocol::response::name::File;
 
@@ -52,10 +53,10 @@ pub trait ObjectStorage: Send + Sync {
     async fn remove_prefix(&self, prefix: String);
 
     /// Creates a read stream for an object.
-    async fn open_object_read_stream(&self, key: String);
+    async fn open_object_read_stream(&self, key: String) -> Result<Box<dyn AsyncRead>>;
 
     /// Creates a write stream for an object.
-    async fn open_object_write_stream(&self, key: String);
+    async fn open_object_write_stream(&self, key: String) -> Result<Box<dyn AsyncWrite>>;
 
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);

@@ -5,10 +5,10 @@ use rusoto_s3::{
     CommonPrefix, GetObjectRequest, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3,
 };
 use serde::Deserialize;
-use tokio::io::AsyncReadExt;
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 use super::ObjectStorage;
-use crate::protocol::file_attributes::FileAttributes;
+use crate::{error::Error, protocol::file_attributes::FileAttributes};
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
 
@@ -114,11 +114,19 @@ impl ObjectStorage for S3ObjectStorage {
         todo!("TODO: Remove prefix {}", prefix)
     }
 
-    async fn open_object_read_stream(&self, key: String) {
-        todo!("TODO: Open object read stream {}", key)
+    async fn open_object_read_stream(&self, key: String) -> Result<Box<dyn AsyncRead>> {
+        let get_object_response = self.s3_client.get_object(GetObjectRequest {
+            bucket: self.bucket.clone(),
+            key,
+            ..Default::default()
+        });
+
+        let result = get_object_response.await?;
+        let body = result.body.ok_or(Error::ServerError)?;
+        Ok(Box::new(body.into_async_read()))
     }
 
-    async fn open_object_write_stream(&self, key: String) {
+    async fn open_object_write_stream(&self, key: String) -> Result<Box<dyn AsyncWrite>> {
         todo!("TODO: Open object write stream {}", key)
     }
 

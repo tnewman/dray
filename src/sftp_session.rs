@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use log::debug;
@@ -13,6 +14,13 @@ pub struct SftpSession {
     object_storage: Arc<dyn ObjectStorage>,
     user: String,
 }
+
+struct DirectoryHandle {
+    handle: String,
+    continuation_token: String,
+}
+
+
 
 impl SftpSession {
     pub fn new(object_storage: Arc<dyn ObjectStorage>, user: String) -> Self {
@@ -94,6 +102,8 @@ impl SftpSession {
     }
 
     fn handle_opendir_request(&self, opendir_request: request::path::Path) -> Response {
+        // TODO: Will need to modify the result to return an opaque continuation token in addition to the Vec of Files
+
         SftpSession::build_not_supported_response(opendir_request.id)
     }
 
