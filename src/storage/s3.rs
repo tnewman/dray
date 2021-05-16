@@ -8,9 +8,9 @@ use serde::Deserialize;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
 use super::ObjectStorage;
-use crate::{error::Error, protocol::file_attributes::FileAttributes};
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
+use crate::{error::Error, protocol::file_attributes::FileAttributes};
 
 #[derive(Clone)]
 pub struct S3ObjectStorage {
