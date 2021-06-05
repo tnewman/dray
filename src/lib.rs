@@ -1,5 +1,6 @@
 pub mod config;
 mod error;
+mod handle;
 mod protocol;
 mod sftp_session;
 mod ssh_keys;

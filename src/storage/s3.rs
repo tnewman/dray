@@ -1,3 +1,5 @@
+use std::pin::Pin;
+
 use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
@@ -114,7 +116,7 @@ impl ObjectStorage for S3ObjectStorage {
         todo!("TODO: Remove prefix {}", prefix)
     }
 
-    async fn open_object_read_stream(&self, key: String) -> Result<Box<dyn AsyncRead>> {
+    async fn open_object_read_stream(&self, key: String) -> Result<Pin<Box<dyn AsyncRead>>> {
         let get_object_response = self.s3_client.get_object(GetObjectRequest {
             bucket: self.bucket.clone(),
             key,
@@ -123,10 +125,10 @@ impl ObjectStorage for S3ObjectStorage {
 
         let result = get_object_response.await?;
         let body = result.body.ok_or(Error::ServerError)?;
-        Ok(Box::new(body.into_async_read()))
+        Ok(Pin::from(Box::new(body.into_async_read())))
     }
 
-    async fn open_object_write_stream(&self, key: String) -> Result<Box<dyn AsyncWrite>> {
+    async fn open_object_write_stream(&self, key: String) -> Result<Pin<Box<dyn AsyncWrite>>> {
         todo!("TODO: Open object write stream {}", key)
     }
 

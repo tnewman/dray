@@ -20,6 +20,7 @@ serde = "1.0"
 thrussh = "0.32"
 thrussh-keys = "0.20"
 tokio = { version = "1.2", features = ["full"] }
+uuid = { version = "0.8", features = ["v4"], default-features = false }
 
 # S3 Dependencies
 rusoto_core = "0.46"
