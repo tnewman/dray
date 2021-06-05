@@ -78,9 +78,10 @@ mod test {
     fn create_temp_key() -> String {
         let temp_file = env::temp_dir().join("id_ed25519");
 
-        File::create(temp_file.clone())
-            .unwrap()
-            .write_all(
+        let mut file = File::create(temp_file.clone())
+            .unwrap();
+
+        file.write_all(
                 b"-----BEGIN OPENSSH PRIVATE KEY-----
 b3BlbnNzaC1rZXktdjEAAAAABG5vbmUAAAAEbm9uZQAAAAAAAAABAAAAMwAAAAtzc2gtZW
 QyNTUxOQAAACACJda1/GrWii+6Uk5xeVCK0QIHVr42/ih0X9qI+im4LAAAAKDjBAHe4wQB
@@ -90,6 +91,8 @@ AgdWvjb+KHRf2oj6KbgsAAAAGXRuZXdtYW5AdG9tLWxpbnV4LWRlc2t0b3ABAgME
 -----END OPENSSH PRIVATE KEY-----",
             )
             .unwrap();
+        
+        file.sync_all().unwrap();
 
         temp_file.into_os_string().into_string().unwrap()
     }
