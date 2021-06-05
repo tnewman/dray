@@ -30,7 +30,7 @@ impl Path {
             }
         }
 
-        if normalized_components.is_empty() {
+        if !normalized_components.is_empty() {
             normalized_components.push("");
             normalized_components.reverse();
             normalized_components.join("/")
