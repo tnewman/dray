@@ -263,6 +263,13 @@ mod test {
         assert!(handle_manager.get_write_handle("missing_handle").is_none());
     }
 
+    #[test]
+    fn test_handle_manager_remove_missing_handle() {
+        let mut handle_manager = HandleManager::new();
+
+        handle_manager.remove_handle("missing_handle");
+    }
+
     #[tokio::test]
     async fn test_new_read_handle_creates_read_handle() {
         let (client, mut server) = tokio::io::duplex(1);
