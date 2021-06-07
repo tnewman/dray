@@ -43,7 +43,7 @@ pub trait ObjectStorage: Send + Sync {
         prefix: String,
         continuation_token: Option<String>,
         max_results: Option<i64>,
-    ) -> Result<Vec<File>>;
+    ) -> Result<ListPrefixResult>;
 
     /// Creates a prefix.
     async fn create_prefix(&self, prefix: String);
@@ -65,4 +65,14 @@ pub trait ObjectStorage: Send + Sync {
 
     /// Removes an object.
     async fn remove_object(&self, key: String);
+}
+
+/// A list of objects under a prefix along with a continuation token to retrieve
+/// the next objects if the current result is incomplete.
+pub struct ListPrefixResult {
+    /// A list of objects under a prefix and continuation token.
+    objects: Vec<File>,
+
+    /// The continuation token to retrieve the next list of objects under the prefix.
+    continuation_token: Option<String>,
 }

@@ -9,6 +9,7 @@ use rusoto_s3::{
 use serde::Deserialize;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 
+use super::ListPrefixResult;
 use super::ObjectStorage;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
@@ -88,7 +89,7 @@ impl ObjectStorage for S3ObjectStorage {
         prefix: String,
         continuation_token: Option<String>,
         max_results: Option<i64>,
-    ) -> Result<Vec<File>> {
+    ) -> Result<ListPrefixResult> {
         let objects = self
             .s3_client
             .list_objects_v2(ListObjectsV2Request {
@@ -101,7 +102,7 @@ impl ObjectStorage for S3ObjectStorage {
             })
             .await?;
 
-        Ok(map_list_objects_to_files(objects))
+        Ok(map_list_objects_to_list_prefix_result(objects))
     }
 
     async fn create_prefix(&self, prefix: String) {
@@ -145,7 +146,7 @@ fn get_home(user: &str) -> String {
     format!("/home/{}", user)
 }
 
-fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
+fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> ListPrefixResult {
     let files = list_objects.contents.unwrap_or_default();
 
     let directories = list_objects.common_prefixes.unwrap_or_default();
@@ -154,7 +155,10 @@ fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
 
     let mapped_dirs = directories.iter().map(|prefix| map_prefix_to_file(prefix));
 
-    mapped_dirs.chain(mapped_files).collect()
+    ListPrefixResult {
+        objects: mapped_dirs.chain(mapped_files).collect(),
+        continuation_token: list_objects.continuation_token,
+    }
 }
 
 fn map_object_to_file(object: &Object) -> File {
@@ -227,12 +231,13 @@ mod test {
                 size: Some(1),
                 ..Default::default()
             }]),
+            continuation_token: Some(String::from("token")),
             ..Default::default()
         };
 
-        let result = map_list_objects_to_files(list_objects);
+        let result = map_list_objects_to_list_prefix_result(list_objects);
 
-        assert_eq!(2, result.len());
+        assert_eq!(2, result.objects.len());
         assert_eq!(
             File {
                 file_name: "/users/test/subfolder".to_owned(),
@@ -246,7 +251,7 @@ mod test {
                     mtime: None,
                 }
             },
-            result[0]
+            result.objects[0]
         );
         assert_eq!(
             File {
@@ -261,8 +266,9 @@ mod test {
                     mtime: None,
                 }
             },
-            result[1]
+            result.objects[1]
         );
+        assert_eq!(String::from("token"), result.continuation_token.unwrap());
     }
 
     #[test]
@@ -271,7 +277,10 @@ mod test {
             ..Default::default()
         };
 
-        assert_eq!(0, map_list_objects_to_files(list_objects).len());
+        let result = map_list_objects_to_list_prefix_result(list_objects);
+
+        assert_eq!(0, result.objects.len());
+        assert!(result.continuation_token.is_none());
     }
 
     #[test]
