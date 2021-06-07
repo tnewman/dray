@@ -2,15 +2,19 @@ use std::sync::Arc;
 
 use log::debug;
 
-use crate::protocol::{
-    file_attributes::FileAttributes,
-    request::{self, Request},
-    response::{self, Response},
-};
 use crate::storage::ObjectStorage;
+use crate::{
+    handle::HandleManager,
+    protocol::{
+        file_attributes::FileAttributes,
+        request::{self, Request},
+        response::{self, Response},
+    },
+};
 
 pub struct SftpSession {
     object_storage: Arc<dyn ObjectStorage>,
+    handle_manager: HandleManager,
     user: String,
 }
 
@@ -18,6 +22,7 @@ impl SftpSession {
     pub fn new(object_storage: Arc<dyn ObjectStorage>, user: String) -> Self {
         SftpSession {
             object_storage,
+            handle_manager: HandleManager::new(),
             user,
         }
     }

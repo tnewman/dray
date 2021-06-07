@@ -1,5 +1,3 @@
-use std::pin::Pin;
-
 use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
@@ -7,7 +5,7 @@ use rusoto_s3::{
     CommonPrefix, GetObjectRequest, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3,
 };
 use serde::Deserialize;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
+use tokio::io::AsyncReadExt;
 
 use super::ListPrefixResult;
 use super::ObjectStorage;
@@ -117,20 +115,34 @@ impl ObjectStorage for S3ObjectStorage {
         todo!("TODO: Remove prefix {}", prefix)
     }
 
-    async fn open_object_read_stream(&self, key: String) -> Result<Pin<Box<dyn AsyncRead>>> {
+    async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>> {
         let get_object_response = self.s3_client.get_object(GetObjectRequest {
             bucket: self.bucket.clone(),
             key,
+            range: Option::Some(get_range(offset, len)),
             ..Default::default()
         });
 
         let result = get_object_response.await?;
+
         let body = result.body.ok_or(Error::ServerError)?;
-        Ok(Pin::from(Box::new(body.into_async_read())))
+        let mut data = Vec::new();
+        body.into_async_read().read_to_end(&mut data).await?;
+
+        Ok(data)
     }
 
-    async fn open_object_write_stream(&self, key: String) -> Result<Pin<Box<dyn AsyncWrite>>> {
-        todo!("TODO: Open object write stream {}", key)
+    async fn create_multipart_upload(&self, key: String) -> Result<String> {
+        todo!("TODO: Create multipart upload {}", key);
+    }
+
+    async fn write_object_part(&self, multipart_upload_id: String, offset: u64, data: Vec<u8>) {
+        todo!(
+            "TODO: Write object part {} {} {}",
+            multipart_upload_id,
+            offset,
+            data.len()
+        );
     }
 
     async fn rename_object(&self, current: String, new: String) {
@@ -144,6 +156,10 @@ impl ObjectStorage for S3ObjectStorage {
 
 fn get_home(user: &str) -> String {
     format!("/home/{}", user)
+}
+
+fn get_range(offset: u64, len: u32) -> String {
+    format!("bytes={}-{}", offset, len)
 }
 
 fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> ListPrefixResult {
@@ -212,6 +228,11 @@ mod test {
     #[test]
     fn test_get_home_returns_users_home_directory() {
         assert_eq!("/home/test", get_home("test"));
+    }
+
+    #[test]
+    fn test_get_range_returns_range_string() {
+        assert_eq!("bytes=0-1024", get_range(0, 1024));
     }
 
     #[test]

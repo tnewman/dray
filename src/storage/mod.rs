@@ -1,10 +1,7 @@
 pub mod s3;
 
-use std::pin::Pin;
-
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::io::{AsyncRead, AsyncWrite};
 
 use crate::protocol::response::name::File;
 
@@ -55,10 +52,13 @@ pub trait ObjectStorage: Send + Sync {
     async fn remove_prefix(&self, prefix: String);
 
     /// Creates a read stream for an object.
-    async fn open_object_read_stream(&self, key: String) -> Result<Pin<Box<dyn AsyncRead>>>;
+    async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>>;
 
-    /// Creates a write stream for an object.
-    async fn open_object_write_stream(&self, key: String) -> Result<Pin<Box<dyn AsyncWrite>>>;
+    /// Creates a multipart upload for an object.
+    async fn create_multipart_upload(&self, key: String) -> Result<String>;
+
+    /// Writes a part to an existing multipart upload for an object.
+    async fn write_object_part(&self, multipart_upload_id: String, offset: u64, data: Vec<u8>);
 
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);
