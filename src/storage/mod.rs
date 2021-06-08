@@ -51,6 +51,9 @@ pub trait ObjectStorage: Send + Sync {
     /// Removes a prefix.
     async fn remove_prefix(&self, prefix: String);
 
+    /// Checks if an object exists.
+    async fn object_exists(&self, key: String) -> Result<bool>;
+
     /// Creates a read stream for an object.
     async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>>;
 
@@ -59,6 +62,9 @@ pub trait ObjectStorage: Send + Sync {
 
     /// Writes a part to an existing multipart upload for an object.
     async fn write_object_part(&self, multipart_upload_id: String, offset: u64, data: Vec<u8>);
+
+    /// Completes a multipart upload for an object.
+    async fn complete_multipart_upload(&self, multipart_upload_id: String) -> Result<()>;
 
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);
@@ -71,8 +77,8 @@ pub trait ObjectStorage: Send + Sync {
 /// the next objects if the current result is incomplete.
 pub struct ListPrefixResult {
     /// A list of objects under a prefix and continuation token.
-    objects: Vec<File>,
+    pub objects: Vec<File>,
 
     /// The continuation token to retrieve the next list of objects under the prefix.
-    continuation_token: Option<String>,
+    pub continuation_token: Option<String>,
 }

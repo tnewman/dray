@@ -16,8 +16,8 @@ impl HandleManager {
         }
     }
 
-    pub fn create_dir_handle(&mut self, continuation_token: Option<String>) -> String {
-        let dir_handle = DirHandle::new(continuation_token);
+    pub fn create_dir_handle(&mut self, prefix: String, continuation_token: Option<String>) -> String {
+        let dir_handle = DirHandle::new(prefix, continuation_token);
         let handle_id = dir_handle.get_handle_id_string();
 
         self.dir_handles
@@ -75,15 +75,21 @@ trait Handle {
 
 pub struct DirHandle {
     id: String,
+    prefix: String,
     continuation_token: Option<String>,
 }
 
 impl DirHandle {
-    pub fn new(continuation_token: Option<String>) -> DirHandle {
+    pub fn new(prefix: String, continuation_token: Option<String>) -> DirHandle {
         DirHandle {
             id: generate_handle_id(),
+            prefix,
             continuation_token,
         }
+    }
+
+    pub fn get_prefix(&self) -> &str {
+        &self.prefix
     }
 
     pub fn get_continuation_token(&self) -> Option<&str> {
@@ -160,10 +166,11 @@ mod test {
     fn test_handle_manager_dir_handle_create_get() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_dir_handle(Option::Some(String::from("token")));
+        let handle_id = handle_manager.create_dir_handle(String::from("prefix"), Option::Some(String::from("token")));
         let handle = handle_manager.get_dir_handle(&handle_id).unwrap();
 
         assert_eq!(handle_id, handle.get_handle_id_string());
+        assert_eq!("prefix", handle.get_prefix());
         assert_eq!("token", handle.get_continuation_token().unwrap());
     }
 
@@ -171,7 +178,7 @@ mod test {
     fn test_handle_manager_dir_handle_delete() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_dir_handle(Option::Some(String::from("token")));
+        let handle_id = handle_manager.create_dir_handle(String::from("prefix"),Option::Some(String::from("token")));
         assert!(handle_manager.get_dir_handle(&handle_id).is_some());
 
         handle_manager.remove_handle(&handle_id);
