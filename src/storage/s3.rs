@@ -90,10 +90,7 @@ impl ObjectStorage for S3ObjectStorage {
         continuation_token: Option<String>,
         max_results: Option<i64>,
     ) -> Result<ListPrefixResult> {
-        let prefix = match "".eq(&prefix) {
-            true => String::from("/"),
-            false => format!("{}/", prefix[1..prefix.len()].to_string()),
-        };
+        let prefix = get_s3_prefix(prefix);
         
         let objects = self
             .s3_client
@@ -202,6 +199,14 @@ fn get_range(offset: u64, len: u32) -> String {
     format!("bytes={}-{}", offset, len)
 }
 
+fn get_s3_prefix(prefix: String) -> String {
+    let prefix = match "".eq(&prefix) {
+        true => String::from("/"),
+        false => format!("{}/", prefix[1..prefix.len()].to_string()),
+    };
+    prefix
+}
+
 fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> ListPrefixResult {
     let files = list_objects.contents.unwrap_or_default();
 
@@ -282,6 +287,16 @@ mod test {
     #[test]
     fn test_get_default_endpoint_region() {
         assert_eq!("custom", get_default_endpoint_region());
+    }
+
+    #[test]
+    fn test_get_s3_prefix_converts_unix_absolute_directory() {
+        assert_eq!(String::from("test/"), get_s3_prefix(String::from("/test")))
+    }
+
+    #[test]
+    fn test_get_s3_prefix_converts_blank_directory() {
+        assert_eq!(String::from("/"), get_s3_prefix(String::from("")))
     }
 
     #[test]
