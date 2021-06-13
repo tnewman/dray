@@ -94,7 +94,7 @@ impl ObjectStorage for S3ObjectStorage {
             .s3_client
             .list_objects_v2(ListObjectsV2Request {
                 bucket: self.bucket.clone(),
-                prefix: Some(prefix),
+                prefix: Some(format!("{}/", prefix)),
                 continuation_token,
                 max_keys: max_results,
                 delimiter: Some("/".to_owned()),
@@ -213,8 +213,8 @@ fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> 
 }
 
 fn map_object_to_file(object: &Object) -> File {
-    let file_name = match object.key {
-        Some(ref key) => String::from(key),
+    let file_name = match &object.key {
+        Some(key) => format!("/{}", key),
         None => "".to_owned(),
     };
 
@@ -234,7 +234,7 @@ fn map_object_to_file(object: &Object) -> File {
 
 fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
     let prefix = match prefix.prefix {
-        Some(ref prefix) => String::from(prefix),
+        Some(ref prefix) => format!("/{}", prefix),
         None => "".to_owned(),
     };
 
@@ -279,11 +279,11 @@ mod test {
     fn test_map_list_objects_to_files() {
         let list_objects = ListObjectsV2Output {
             common_prefixes: Some(vec![CommonPrefix {
-                prefix: Some("/users/test/subfolder".to_owned()),
+                prefix: Some("users/test/subfolder".to_owned()),
                 ..Default::default()
             }]),
             contents: Some(vec![Object {
-                key: Some("/users/test/file.txt".to_owned()),
+                key: Some("users/test/file.txt".to_owned()),
                 size: Some(1),
                 ..Default::default()
             }]),
