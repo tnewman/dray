@@ -1,12 +1,12 @@
 use anyhow::Result;
 use async_trait::async_trait;
-use std::error::Error as StdError;
 use rusoto_core::Region;
-use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3,
 };
+use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
+use std::error::Error as StdError;
 use tokio::io::AsyncReadExt;
 
 use super::ListPrefixResult;
@@ -118,12 +118,15 @@ impl ObjectStorage for S3ObjectStorage {
     }
 
     async fn object_exists(&self, key: String) -> Result<bool> {
-        let head_object_response = self.s3_client.head_object(HeadObjectRequest {
-            bucket: self.bucket.clone(),
-            key,
-            ..Default::default()
-        }).await;
-        
+        let head_object_response = self
+            .s3_client
+            .head_object(HeadObjectRequest {
+                bucket: self.bucket.clone(),
+                key,
+                ..Default::default()
+            })
+            .await;
+
         match head_object_response {
             Ok(_) => Ok(true),
             Err(error) => match error {
@@ -131,11 +134,15 @@ impl ObjectStorage for S3ObjectStorage {
                     if 404 == http_response.status.as_u16() {
                         Ok(false)
                     } else {
-                        Err(anyhow::Error::from(rusoto_core::RusotoError::<HeadObjectError>::Unknown(http_response)))
+                        Err(anyhow::Error::from(rusoto_core::RusotoError::<
+                            HeadObjectError,
+                        >::Unknown(
+                            http_response
+                        )))
                     }
-                },
+                }
                 _ => Err(anyhow::Error::from(error)),
-            }
+            },
         }
     }
 

@@ -16,8 +16,14 @@ impl HandleManager {
         }
     }
 
-    pub fn create_dir_handle(&mut self, prefix: String, continuation_token: Option<String>) -> String {
-        let dir_handle = DirHandle::new(prefix, continuation_token);
+    pub fn create_dir_handle(
+        &mut self,
+        id: Option<String>,
+        prefix: String,
+        continuation_token: Option<String>,
+        eof: bool,
+    ) -> String {
+        let dir_handle = DirHandle::new(id, prefix, continuation_token, eof);
         let handle_id = dir_handle.get_handle_id_string();
 
         self.dir_handles
@@ -65,7 +71,7 @@ impl HandleManager {
     }
 }
 
-trait Handle {
+pub trait Handle {
     fn get_handle_id(&self) -> &str;
 
     fn get_handle_id_string(&self) -> String {
@@ -77,14 +83,21 @@ pub struct DirHandle {
     id: String,
     prefix: String,
     continuation_token: Option<String>,
+    eof: bool,
 }
 
 impl DirHandle {
-    pub fn new(prefix: String, continuation_token: Option<String>) -> DirHandle {
+    pub fn new(
+        id: Option<String>,
+        prefix: String,
+        continuation_token: Option<String>,
+        eof: bool,
+    ) -> DirHandle {
         DirHandle {
-            id: generate_handle_id(),
+            id: id.unwrap_or_else(generate_handle_id),
             prefix,
             continuation_token,
+            eof,
         }
     }
 
@@ -97,6 +110,10 @@ impl DirHandle {
             Some(token) => Option::Some(token),
             None => None,
         }
+    }
+
+    pub fn is_eof(&self) -> bool {
+        self.eof
     }
 }
 
@@ -166,19 +183,46 @@ mod test {
     fn test_handle_manager_dir_handle_create_get() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_dir_handle(String::from("prefix"), Option::Some(String::from("token")));
+        let handle_id = handle_manager.create_dir_handle(
+            Option::None,
+            String::from("prefix"),
+            Option::Some(String::from("token")),
+            true,
+        );
         let handle = handle_manager.get_dir_handle(&handle_id).unwrap();
 
         assert_eq!(handle_id, handle.get_handle_id_string());
         assert_eq!("prefix", handle.get_prefix());
         assert_eq!("token", handle.get_continuation_token().unwrap());
+        assert_eq!(true, handle.is_eof());
+    }
+
+    #[test]
+    fn test_handle_manager_dir_handle_create_preserves_provided_handle_id() {
+        let mut handle_manager = HandleManager::new();
+
+        let handle_id = handle_manager.create_dir_handle(
+            Option::Some(String::from("handle")),
+            String::from("prefix"),
+            Option::Some(String::from("token")),
+            true,
+        );
+        let handle = handle_manager.get_dir_handle(&handle_id).unwrap();
+
+        assert_eq!(handle_id, handle.get_handle_id_string());
+        assert_eq!(handle_id, String::from("handle"));
     }
 
     #[test]
     fn test_handle_manager_dir_handle_delete() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_dir_handle(String::from("prefix"),Option::Some(String::from("token")));
+        let handle_id = handle_manager.create_dir_handle(
+            Option::None,
+            String::from("prefix"),
+            Option::Some(String::from("token")),
+            true,
+        );
         assert!(handle_manager.get_dir_handle(&handle_id).is_some());
 
         handle_manager.remove_handle(&handle_id);

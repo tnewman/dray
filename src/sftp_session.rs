@@ -1,5 +1,6 @@
 use crate::storage::ObjectStorage;
 use crate::{
+    handle::Handle,
     handle::HandleManager,
     protocol::{
         file_attributes::FileAttributes,
@@ -8,8 +9,8 @@ use crate::{
     },
 };
 use anyhow::Result;
-use log::info;
 use log::error;
+use log::info;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -89,7 +90,7 @@ impl SftpSession {
                     error_message: String::from("File not found."),
                 }));
             }
-            
+
             self.handle_manager
                 .lock()
                 .await
@@ -113,13 +114,19 @@ impl SftpSession {
 
         Ok(Response::Handle(response::handle::Handle {
             id: open_request.id,
-            handle: handle,
+            handle,
         }))
     }
 
-    async fn handle_close_request(&self, close_request: request::handle::Handle) -> Result<Response> {
-        self.handle_manager.lock().await.remove_handle(&close_request.handle);
-        
+    async fn handle_close_request(
+        &self,
+        close_request: request::handle::Handle,
+    ) -> Result<Response> {
+        self.handle_manager
+            .lock()
+            .await
+            .remove_handle(&close_request.handle);
+
         Ok(Response::Status(response::status::Status {
             id: close_request.id,
             status_code: response::status::StatusCode::Ok,
@@ -165,7 +172,12 @@ impl SftpSession {
         &self,
         opendir_request: request::path::Path,
     ) -> Result<Response> {
-        let handle = self.handle_manager.lock().await.create_dir_handle(opendir_request.path, None);
+        let handle = self.handle_manager.lock().await.create_dir_handle(
+            None,
+            opendir_request.path,
+            None,
+            false,
+        );
 
         Ok(Response::Handle(response::handle::Handle {
             id: opendir_request.id,
@@ -173,10 +185,23 @@ impl SftpSession {
         }))
     }
 
-    async fn handle_readdir_request(&self, readdir_request: request::handle::Handle) -> Result<Response> {
-        let (prefix, continuation_token) = {
-            match self.handle_manager.lock().await.get_dir_handle(&readdir_request.handle) {
-                Some(handle) => (handle.get_prefix().to_string(), handle.get_continuation_token().map(|str| str.to_string())),
+    async fn handle_readdir_request(
+        &self,
+        readdir_request: request::handle::Handle,
+    ) -> Result<Response> {
+        let (handle_id, prefix, continuation_token, eof) = {
+            match self
+                .handle_manager
+                .lock()
+                .await
+                .get_dir_handle(&readdir_request.handle)
+            {
+                Some(handle) => (
+                    handle.get_handle_id().to_string(),
+                    handle.get_prefix().to_string(),
+                    handle.get_continuation_token().map(|str| str.to_string()),
+                    handle.is_eof(),
+                ),
                 None => {
                     return Ok(Response::Status(response::status::Status {
                         id: readdir_request.id,
@@ -187,16 +212,32 @@ impl SftpSession {
             }
         };
 
-        let files = self.object_storage.list_prefix(prefix.clone(), continuation_token, Option::None).await?;
-
-        {
-            self.handle_manager.lock().await.create_dir_handle(prefix, files.continuation_token);
+        if eof {
+            return Ok(Response::Status(response::status::Status {
+                id: readdir_request.id,
+                status_code: response::status::StatusCode::Eof,
+                error_message: String::from("No more files available to list."),
+            }));
         }
-        
-        todo!("Fail");
 
-        // TODO: Need to add a new readdir response that allows an array of file names and file attributes
-        // TODO: Prefix Results should include permissions bit for directory
+        let result = self
+            .object_storage
+            .list_prefix(prefix.clone(), continuation_token, Option::None)
+            .await?;
+
+        let eof = result.continuation_token.is_none();
+
+        self.handle_manager.lock().await.create_dir_handle(
+            Some(handle_id),
+            prefix,
+            result.continuation_token,
+            eof,
+        );
+
+        Ok(Response::Name(response::name::Name {
+            id: readdir_request.id,
+            files: result.objects,
+        }))
     }
 
     fn handle_remove_request(&self, remove_request: request::path::Path) -> Result<Response> {
