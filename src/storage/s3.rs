@@ -223,14 +223,17 @@ fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> 
 }
 
 fn map_object_to_file(object: &Object) -> File {
-    let file_name = match &object.key {
-        Some(key) => format!("/{}", key),
-        None => "".to_owned(),
+    let key = match &object.key {
+        Some(key) => key,
+        None => "",
     };
 
+    let mut key_pieces = key.rsplit('/');
+    let file_name = key_pieces.next().unwrap_or("");
+
     File {
-        file_name: file_name.clone(),
-        long_name: file_name,
+        file_name: file_name.to_string(),
+        long_name: file_name.to_string(),
         file_attributes: FileAttributes {
             size: object.size.map(|size| size as u64),
             uid: None,
@@ -252,9 +255,12 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
         None => "".to_owned(),
     };
 
+    let mut prefix_pieces = prefix.rsplit('/');
+    let file_name = prefix_pieces.next().unwrap_or("");
+
     File {
-        file_name: prefix.clone(),
-        long_name: prefix,
+        file_name: file_name.to_string(),
+        long_name: file_name.to_string(),
         file_attributes: FileAttributes {
             size: None,
             uid: None,
@@ -320,8 +326,8 @@ mod test {
         assert_eq!(2, result.objects.len());
         assert_eq!(
             File {
-                file_name: "/users/test/subfolder".to_owned(),
-                long_name: "/users/test/subfolder".to_owned(),
+                file_name: "subfolder".to_owned(),
+                long_name: "subfolder".to_owned(),
                 file_attributes: FileAttributes {
                     size: None,
                     gid: None,
@@ -335,8 +341,8 @@ mod test {
         );
         assert_eq!(
             File {
-                file_name: "/users/test/file.txt".to_owned(),
-                long_name: "/users/test/file.txt".to_owned(),
+                file_name: "file.txt".to_owned(),
+                long_name: "file.txt".to_owned(),
                 file_attributes: FileAttributes {
                     size: Some(1),
                     gid: None,
