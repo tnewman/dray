@@ -2,7 +2,8 @@ use anyhow::Result;
 use async_trait::async_trait;
 use rusoto_core::Region;
 use rusoto_s3::{
-    CommonPrefix, GetObjectRequest, ListObjectsV2Output, ListObjectsV2Request, Object, S3Client, S3,
+    CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
+    Object, S3Client, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
@@ -91,7 +92,7 @@ impl ObjectStorage for S3ObjectStorage {
         max_results: Option<i64>,
     ) -> Result<ListPrefixResult> {
         let prefix = get_s3_prefix(prefix);
-        
+
         let objects = self
             .s3_client
             .list_objects_v2(ListObjectsV2Request {
@@ -146,6 +147,19 @@ impl ObjectStorage for S3ObjectStorage {
                 _ => Err(anyhow::Error::from(error)),
             },
         }
+    }
+
+    async fn get_object_metadata(&self, key: String) -> Result<File> {
+        let head_object = self
+            .s3_client
+            .head_object(HeadObjectRequest {
+                bucket: self.bucket.clone(),
+                key: key.clone(),
+                ..Default::default()
+            })
+            .await?;
+
+        Ok(map_head_object_to_file(&key, &head_object))
     }
 
     async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>> {
@@ -238,7 +252,7 @@ fn map_object_to_file(object: &Object) -> File {
             size: object.size.map(|size| size as u64),
             uid: None,
             gid: None,
-            permissions: Some(0o700),
+            permissions: Some(0o100777),
             atime: None,
             mtime: None,
         },
@@ -251,7 +265,7 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
             let mut prefix = prefix.to_string();
             prefix.pop(); // strip trailing /
             format!("/{}", prefix)
-        },
+        }
         None => "".to_owned(),
     };
 
@@ -265,7 +279,25 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
             size: None,
             uid: None,
             gid: None,
-            permissions: Some(0o700),
+            permissions: Some(0o40777),
+            atime: None,
+            mtime: None,
+        },
+    }
+}
+
+fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
+    let mut key_pieces = key.rsplit('/');
+    let file_name = key_pieces.next().unwrap_or("");
+
+    File {
+        file_name: file_name.to_string(),
+        long_name: file_name.to_string(),
+        file_attributes: FileAttributes {
+            size: None,
+            uid: None,
+            gid: None,
+            permissions: Some(0o100777),
             atime: None,
             mtime: None,
         },
@@ -332,7 +364,7 @@ mod test {
                     size: None,
                     gid: None,
                     uid: None,
-                    permissions: Some(0o700),
+                    permissions: Some(0o40777),
                     atime: None,
                     mtime: None,
                 }
@@ -347,7 +379,7 @@ mod test {
                     size: Some(1),
                     gid: None,
                     uid: None,
-                    permissions: Some(0o700),
+                    permissions: Some(0o100777),
                     atime: None,
                     mtime: None,
                 }
@@ -383,7 +415,7 @@ mod test {
                     size: None,
                     gid: None,
                     uid: None,
-                    permissions: Some(0o700),
+                    permissions: Some(0o100777),
                     atime: None,
                     mtime: None,
                 }
@@ -404,12 +436,35 @@ mod test {
                     size: None,
                     gid: None,
                     uid: None,
-                    permissions: Some(0o700),
+                    permissions: Some(0o40777),
                     atime: None,
                     mtime: None,
                 }
             },
             map_prefix_to_file(&prefix)
+        );
+    }
+
+    #[test]
+    fn test_map_head_object_to_file() {
+        let head_object = HeadObjectOutput {
+            ..Default::default()
+        };
+
+        assert_eq!(
+            File {
+                file_name: "file".to_owned(),
+                long_name: "file".to_owned(),
+                file_attributes: FileAttributes {
+                    size: None,
+                    gid: None,
+                    uid: None,
+                    permissions: Some(0o100777),
+                    atime: None,
+                    mtime: None,
+                }
+            },
+            map_head_object_to_file("file", &head_object)
         );
     }
 }

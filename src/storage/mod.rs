@@ -54,6 +54,9 @@ pub trait ObjectStorage: Send + Sync {
     /// Checks if an object exists.
     async fn object_exists(&self, key: String) -> Result<bool>;
 
+    /// Retrieves an object's metadata.
+    async fn get_object_metadata(&self, key: String) -> Result<File>;
+
     /// Creates a read stream for an object.
     async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>>;
 

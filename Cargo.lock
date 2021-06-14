@@ -265,6 +265,7 @@ dependencies = [
  "env_logger",
  "envy",
  "futures",
+ "hex",
  "log",
  "rusoto_core",
  "rusoto_s3",

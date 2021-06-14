@@ -6,6 +6,9 @@ pub mod status;
 pub mod version;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use log::debug;
+use log::log_enabled;
+use log::Level::Debug;
 use std::convert::TryFrom;
 
 const DATA_TYPE_LENGTH: u32 = 1;
@@ -47,7 +50,13 @@ impl From<&Response> for Bytes {
         response_bytes.put_u8(data_type);
         response_bytes.put_slice(&data_payload);
 
-        response_bytes.freeze()
+        let response_bytes = response_bytes.freeze();
+
+        if log_enabled!(Debug) {
+            debug!("Response bytes: {}", hex::encode(&response_bytes));
+        }
+
+        response_bytes
     }
 }
 

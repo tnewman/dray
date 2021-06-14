@@ -48,7 +48,7 @@ impl SftpSession {
             Request::Mkdir(mkdir_request) => self.handle_mkdir_request(mkdir_request),
             Request::Rmdir(rmdir_request) => self.handle_rmdir_request(rmdir_request),
             Request::Realpath(realpath_request) => self.handle_realpath_request(realpath_request),
-            Request::Stat(stat_request) => self.handle_stat_request(stat_request),
+            Request::Stat(stat_request) => self.handle_stat_request(stat_request).await,
             Request::Rename(rename_request) => self.handle_rename_request(rename_request),
             Request::Readlink(readlink_request) => self.handle_readlink_request(readlink_request),
             Request::Symlink(symlink_request) => self.handle_symlink_request(symlink_request),
@@ -268,14 +268,43 @@ impl SftpSession {
                 file_name: path.clone(),
                 long_name: path,
                 file_attributes: FileAttributes {
-                    ..Default::default()
+                    permissions: Some(0o40777),
+                    size: None,
+                    uid: None,
+                    gid: None,
+                    atime: None,
+                    mtime: None,
                 },
             }],
         }))
     }
 
-    fn handle_stat_request(&self, stat_request: request::path::Path) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(stat_request.id))
+    async fn handle_stat_request(&self, stat_request: request::path::Path) -> Result<Response> {
+        let file_attributes = match self
+            .object_storage
+            .object_exists(stat_request.path.clone())
+            .await?
+        {
+            true => {
+                self.object_storage
+                    .get_object_metadata(stat_request.path)
+                    .await?
+                    .file_attributes
+            }
+            false => FileAttributes {
+                permissions: Some(0o40777),
+                size: None,
+                uid: None,
+                gid: None,
+                atime: None,
+                mtime: None,
+            },
+        };
+
+        Ok(Response::Attrs(response::attrs::Attrs {
+            id: stat_request.id,
+            file_attributes,
+        }))
     }
 
     fn handle_rename_request(&self, rename_request: request::rename::Rename) -> Result<Response> {

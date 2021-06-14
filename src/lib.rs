@@ -14,7 +14,9 @@ use futures::{
     future::{ready, Ready},
     Future,
 };
-use log::{debug, error, info};
+use hex;
+use log::{debug, error, info, log_enabled, Level::Debug};
+
 use protocol::request::Request;
 use sftp_session::SftpSession;
 use std::{convert::TryFrom, pin::Pin, sync::Arc};
@@ -121,8 +123,8 @@ impl DraySshServer {
             };
 
             let response = sftp_session.handle_request(request).await;
-
-            session.data(channel, CryptoVec::from(Bytes::from(&response).to_vec()));
+            let response_bytes = Bytes::from(&response).to_vec();
+            session.data(channel, CryptoVec::from(response_bytes));
         }
 
         Ok((self, session))
