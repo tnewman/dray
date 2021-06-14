@@ -238,7 +238,7 @@ fn map_object_to_file(object: &Object) -> File {
             size: object.size.map(|size| size as u64),
             uid: None,
             gid: None,
-            permissions: Some(700),
+            permissions: Some(0o700),
             atime: None,
             mtime: None,
         },
@@ -265,7 +265,7 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
             size: None,
             uid: None,
             gid: None,
-            permissions: Some(700),
+            permissions: Some(0o700),
             atime: None,
             mtime: None,
         },
@@ -332,7 +332,7 @@ mod test {
                     size: None,
                     gid: None,
                     uid: None,
-                    permissions: Some(700),
+                    permissions: Some(0o700),
                     atime: None,
                     mtime: None,
                 }
@@ -347,7 +347,7 @@ mod test {
                     size: Some(1),
                     gid: None,
                     uid: None,
-                    permissions: Some(700),
+                    permissions: Some(0o700),
                     atime: None,
                     mtime: None,
                 }
@@ -383,7 +383,7 @@ mod test {
                     size: None,
                     gid: None,
                     uid: None,
-                    permissions: Some(700),
+                    permissions: Some(0o700),
                     atime: None,
                     mtime: None,
                 }
@@ -404,7 +404,7 @@ mod test {
                     size: None,
                     gid: None,
                     uid: None,
-                    permissions: Some(700),
+                    permissions: Some(0o700),
                     atime: None,
                     mtime: None,
                 }
