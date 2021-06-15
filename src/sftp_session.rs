@@ -266,7 +266,6 @@ impl SftpSession {
             id: realpath_request.id,
             files: vec![response::name::File {
                 file_name: path.clone(),
-                long_name: path,
                 file_attributes: FileAttributes {
                     permissions: Some(0o40777),
                     size: None,

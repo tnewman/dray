@@ -147,21 +147,22 @@ mod test {
             id: 0x01,
             files: vec![name::File {
                 file_name: String::from("file"),
-                long_name: String::from("long"),
                 file_attributes: file_attributes,
             }],
         });
 
         let name_bytes = &mut Bytes::from(&name);
 
-        assert_eq!(37, name_bytes.get_u32());
+        assert_eq!(74, name_bytes.get_u32());
         assert_eq!(104, name_bytes.get_u8());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x04, name_bytes.get_u32()); // file length
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &name_bytes.copy_to_bytes(4)[..]); // file
-        assert_eq!(0x04, name_bytes.get_u32()); // long length
-        assert_eq!(&[0x6C, 0x6F, 0x6E, 0x67], &name_bytes.copy_to_bytes(4)[..]); // long
+
+        let long = "---------- 0 nobody nobody 0 Jan  1  1970";
+        assert_eq!(long.len() as u32, name_bytes.get_u32()); // long length
+        assert_eq!(long.as_bytes(), &name_bytes.copy_to_bytes(long.len())[..]); // long
         assert_eq!(file_attributes_bytes, &name_bytes[..]);
     }
 

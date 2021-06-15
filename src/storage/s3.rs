@@ -7,7 +7,6 @@ use rusoto_s3::{
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
-use std::error::Error as StdError;
 use tokio::io::AsyncReadExt;
 
 use super::ListPrefixResult;
@@ -247,7 +246,6 @@ fn map_object_to_file(object: &Object) -> File {
 
     File {
         file_name: file_name.to_string(),
-        long_name: file_name.to_string(),
         file_attributes: FileAttributes {
             size: object.size.map(|size| size as u64),
             uid: None,
@@ -274,7 +272,6 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
 
     File {
         file_name: file_name.to_string(),
-        long_name: file_name.to_string(),
         file_attributes: FileAttributes {
             size: None,
             uid: None,
@@ -292,7 +289,6 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
 
     File {
         file_name: file_name.to_string(),
-        long_name: file_name.to_string(),
         file_attributes: FileAttributes {
             size: None,
             uid: None,
@@ -359,7 +355,6 @@ mod test {
         assert_eq!(
             File {
                 file_name: "subfolder".to_owned(),
-                long_name: "subfolder".to_owned(),
                 file_attributes: FileAttributes {
                     size: None,
                     gid: None,
@@ -374,7 +369,6 @@ mod test {
         assert_eq!(
             File {
                 file_name: "file.txt".to_owned(),
-                long_name: "file.txt".to_owned(),
                 file_attributes: FileAttributes {
                     size: Some(1),
                     gid: None,
@@ -410,7 +404,6 @@ mod test {
         assert_eq!(
             File {
                 file_name: "".to_owned(),
-                long_name: "".to_owned(),
                 file_attributes: FileAttributes {
                     size: None,
                     gid: None,
@@ -431,7 +424,6 @@ mod test {
         assert_eq!(
             File {
                 file_name: "".to_owned(),
-                long_name: "".to_owned(),
                 file_attributes: FileAttributes {
                     size: None,
                     gid: None,
@@ -454,7 +446,6 @@ mod test {
         assert_eq!(
             File {
                 file_name: "file".to_owned(),
-                long_name: "file".to_owned(),
                 file_attributes: FileAttributes {
                     size: None,
                     gid: None,
