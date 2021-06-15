@@ -302,7 +302,12 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
 }
 
 fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
-    rfc3339.map(|last_modified| last_modified.parse::<DateTime<Utc>>().unwrap_or_else(|_e| Utc.timestamp(0, 0)).timestamp() as u32)
+    rfc3339.map(|last_modified| {
+        last_modified
+            .parse::<DateTime<Utc>>()
+            .unwrap_or_else(|_e| Utc.timestamp(0, 0))
+            .timestamp() as u32
+    })
 }
 
 fn get_default_endpoint_region() -> String {
@@ -467,17 +472,22 @@ mod test {
 
     #[test]
     fn test_map_rfc3339_to_epoch_maps_valid_date() {
-        assert_eq!(Some(1417176009 as u32), map_rfc3339_to_epoch(Some(String::from("2014-11-28T12:00:09Z")).as_ref()));
+        assert_eq!(
+            Some(1417176009 as u32),
+            map_rfc3339_to_epoch(Some(String::from("2014-11-28T12:00:09Z")).as_ref())
+        );
     }
 
     #[test]
     fn test_map_rfc3339_to_epoch_maps_none_to_unix_epoch() {
         assert_eq!(None, map_rfc3339_to_epoch(None));
-
     }
 
     #[test]
     fn test_map_rfc3339_to_epoch_maps_invalid_date_to_unix_epoch() {
-        assert_eq!(Some(0 as u32), map_rfc3339_to_epoch(Some(String::from("invalid")).as_ref()));
+        assert_eq!(
+            Some(0 as u32),
+            map_rfc3339_to_epoch(Some(String::from("invalid")).as_ref())
+        );
     }
 }

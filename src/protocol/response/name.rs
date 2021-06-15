@@ -41,11 +41,15 @@ impl File {
         let uid = self.file_attributes.uid.unwrap_or(0);
         let gid = self.file_attributes.gid.unwrap_or(0);
 
-        let datetime = NaiveDateTime::from_timestamp(self.file_attributes.mtime.unwrap_or(0) as i64, 0);
+        let datetime =
+            NaiveDateTime::from_timestamp(self.file_attributes.mtime.unwrap_or(0) as i64, 0);
         let datetime: DateTime<Utc> = DateTime::from_utc(datetime, Utc);
         let datetime = datetime.format("%b %d %Y %H:%M");
 
-        format!("{} 0 {} {} {} {} {}", permissions, uid, gid, size, datetime, self.file_name)
+        format!(
+            "{} 0 {} {} {} {} {}",
+            permissions, uid, gid, size, datetime, self.file_name
+        )
     }
 
     fn decode_permissions(&self) -> String {
@@ -55,7 +59,11 @@ impl File {
         let group = File::decode_permission((permissions >> 3) & 0x7);
         let other = File::decode_permission(permissions & 0x7);
 
-        let directory = if (permissions >> 14) & 0x1 == 0x01 { "d" } else { "-" };
+        let directory = if (permissions >> 14) & 0x1 == 0x01 {
+            "d"
+        } else {
+            "-"
+        };
 
         format!("{}{}{}{}", directory, owner, group, other)
     }
@@ -68,7 +76,7 @@ impl File {
         let read = if read == 0x1 { "r" } else { "-" };
         let write = if write == 0x01 { "w" } else { "-" };
         let execute = if execute == 0x01 { "x" } else { "-" };
-        
+
         format!("{}{}{}", read, write, execute)
     }
 }
@@ -103,10 +111,13 @@ mod test {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("---------- 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "---------- 0 0 0 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -116,10 +127,13 @@ mod test {
             file_attributes: FileAttributes {
                 permissions: Some(0o700),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("-rwx------ 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "-rwx------ 0 0 0 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -129,10 +143,13 @@ mod test {
             file_attributes: FileAttributes {
                 permissions: Some(0o070),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("----rwx--- 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "----rwx--- 0 0 0 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -142,10 +159,13 @@ mod test {
             file_attributes: FileAttributes {
                 permissions: Some(0o007),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("-------rwx 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "-------rwx 0 0 0 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -155,10 +175,13 @@ mod test {
             file_attributes: FileAttributes {
                 permissions: Some(0o500),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("-r-x------ 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "-r-x------ 0 0 0 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -168,10 +191,13 @@ mod test {
             file_attributes: FileAttributes {
                 permissions: Some(0o40777),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("drwxrwxrwx 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "drwxrwxrwx 0 0 0 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -181,10 +207,13 @@ mod test {
             file_attributes: FileAttributes {
                 size: Some(1000),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("---------- 0 0 0 1000 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "---------- 0 0 0 1000 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -195,10 +224,13 @@ mod test {
                 uid: Some(1000),
                 gid: Some(2000),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("---------- 0 1000 2000 0 Jan 01 1970 00:00 file", file.get_long_name());
+        assert_eq!(
+            "---------- 0 1000 2000 0 Jan 01 1970 00:00 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -208,10 +240,13 @@ mod test {
             file_attributes: FileAttributes {
                 mtime: Some(1000000000),
                 ..Default::default()
-            }
+            },
         };
 
-        assert_eq!("---------- 0 0 0 0 Sep 09 2001 01:46 file", file.get_long_name());
+        assert_eq!(
+            "---------- 0 0 0 0 Sep 09 2001 01:46 file",
+            file.get_long_name()
+        );
     }
 
     #[test]
@@ -229,7 +264,10 @@ mod test {
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &file_bytes.copy_to_bytes(4)[..]);
         let long_name = "---------- 0 0 0 0 Jan 01 1970 00:00 file";
         assert_eq!(long_name.len() as u32, file_bytes.get_u32());
-        assert_eq!(long_name.as_bytes(), &file_bytes.copy_to_bytes(long_name.len())[..]);
+        assert_eq!(
+            long_name.as_bytes(),
+            &file_bytes.copy_to_bytes(long_name.len())[..]
+        );
         assert_eq!(true, file_bytes.has_remaining()); // has file attributes
     }
 }
