@@ -33,7 +33,33 @@ pub struct File {
 
 impl File {
     pub fn get_long_name(&self) -> String {
-        String::from("---------- 0 nobody nobody 0 Jan  1  1970")
+        let permissions = self.decode_permissions();
+
+        format!("{} 0 nobody nobody 0 Jan  1  1970", permissions)
+    }
+
+    fn decode_permissions(&self) -> String {
+        let permissions = self.file_attributes.permissions.unwrap_or(0);
+
+        let owner = File::decode_permission((permissions >> 6) & 0x7);
+        let group = File::decode_permission((permissions >> 3) & 0x7);
+        let other = File::decode_permission(permissions & 0x7);
+
+        let directory = if (permissions >> 14) & 0x1 == 0x01 { "d" } else { "-" };
+
+        format!("{}{}{}{}", directory, owner, group, other)
+    }
+
+    fn decode_permission(permission: u32) -> String {
+        let read = (permission >> 2) & 0x1;
+        let write = (permission >> 1) & 0x1;
+        let execute = permission & 0x1;
+
+        let read = if read == 0x1 { "r" } else { "-" };
+        let write = if write == 0x01 { "w" } else { "-" };
+        let execute = if execute == 0x01 { "x" } else { "-" };
+        
+        format!("{}{}{}", read, write, execute)
     }
 }
 
@@ -80,27 +106,87 @@ mod test {
 
     #[test]
     fn test_get_long_name_creates_long_name_with_700_file() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                size: None,
+                uid: None,
+                gid: None,
+                atime: None,
+                mtime: None,
+                permissions: Some(0o700),
+            }
+        };
 
+        assert_eq!("-rwx------ 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
     }
 
     #[test]
     fn test_get_long_name_creates_long_name_with_070_file() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                size: None,
+                uid: None,
+                gid: None,
+                atime: None,
+                mtime: None,
+                permissions: Some(0o070),
+            }
+        };
 
+        assert_eq!("----rwx--- 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
     }
 
     #[test]
     fn test_get_long_name_creates_long_name_with_007_file() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                size: None,
+                uid: None,
+                gid: None,
+                atime: None,
+                mtime: None,
+                permissions: Some(0o007),
+            }
+        };
 
+        assert_eq!("-------rwx 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
     }
 
     #[test]
     fn test_get_long_name_creates_long_name_with_500_file() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                size: None,
+                uid: None,
+                gid: None,
+                atime: None,
+                mtime: None,
+                permissions: Some(0o500),
+            }
+        };
 
+        assert_eq!("-r-x------ 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
     }
 
     #[test]
     fn test_get_long_name_creates_long_name_with_700_directory() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                size: None,
+                uid: None,
+                gid: None,
+                atime: None,
+                mtime: None,
+                permissions: Some(0o40777),
+            }
+        };
 
+        assert_eq!("drwxrwxrwx 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
     }
 
     #[test]
