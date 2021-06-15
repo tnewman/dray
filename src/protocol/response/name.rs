@@ -1,6 +1,9 @@
 use crate::protocol::file_attributes::FileAttributes;
 
 use bytes::{BufMut, Bytes, BytesMut};
+use chrono::DateTime;
+use chrono::NaiveDateTime;
+use chrono::Utc;
 use std::convert::From;
 use std::convert::TryInto;
 
@@ -38,7 +41,11 @@ impl File {
         let uid = self.file_attributes.uid.unwrap_or(0);
         let gid = self.file_attributes.gid.unwrap_or(0);
 
-        format!("{} 0 {} {} {} Jan  1  1970 {}", permissions, uid, gid, size, self.file_name)
+        let datetime = NaiveDateTime::from_timestamp(self.file_attributes.mtime.unwrap_or(0) as i64, 0);
+        let datetime: DateTime<Utc> = DateTime::from_utc(datetime, Utc);
+        let datetime = datetime.format("%b %d %Y %H:%M");
+
+        format!("{} 0 {} {} {} {} {}", permissions, uid, gid, size, datetime, self.file_name)
     }
 
     fn decode_permissions(&self) -> String {
@@ -99,7 +106,7 @@ mod test {
             }
         };
 
-        assert_eq!("---------- 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("---------- 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -112,7 +119,7 @@ mod test {
             }
         };
 
-        assert_eq!("-rwx------ 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("-rwx------ 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -125,7 +132,7 @@ mod test {
             }
         };
 
-        assert_eq!("----rwx--- 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("----rwx--- 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -138,7 +145,7 @@ mod test {
             }
         };
 
-        assert_eq!("-------rwx 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("-------rwx 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -151,7 +158,7 @@ mod test {
             }
         };
 
-        assert_eq!("-r-x------ 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("-r-x------ 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -164,7 +171,7 @@ mod test {
             }
         };
 
-        assert_eq!("drwxrwxrwx 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("drwxrwxrwx 0 0 0 0 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -177,7 +184,7 @@ mod test {
             }
         };
 
-        assert_eq!("---------- 0 0 0 1000 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("---------- 0 0 0 1000 Jan 01 1970 00:00 file", file.get_long_name());
     }
 
     #[test]
@@ -191,7 +198,20 @@ mod test {
             }
         };
 
-        assert_eq!("---------- 0 1000 2000 0 Jan  1  1970 file", file.get_long_name());
+        assert_eq!("---------- 0 1000 2000 0 Jan 01 1970 00:00 file", file.get_long_name());
+    }
+
+    #[test]
+    fn test_get_long_name_creates_long_name_with_mtime() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                mtime: Some(1000000000),
+                ..Default::default()
+            }
+        };
+
+        assert_eq!("---------- 0 0 0 0 Sep 09 2001 01:46 file", file.get_long_name());
     }
 
     #[test]
@@ -207,7 +227,7 @@ mod test {
 
         assert_eq!(0x04, file_bytes.get_u32());
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &file_bytes.copy_to_bytes(4)[..]);
-        let long_name = "---------- 0 0 0 0 Jan  1  1970 file";
+        let long_name = "---------- 0 0 0 0 Jan 01 1970 00:00 file";
         assert_eq!(long_name.len() as u32, file_bytes.get_u32());
         assert_eq!(long_name.as_bytes(), &file_bytes.copy_to_bytes(long_name.len())[..]);
         assert_eq!(true, file_bytes.has_remaining()); // has file attributes
