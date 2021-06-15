@@ -153,14 +153,14 @@ mod test {
 
         let name_bytes = &mut Bytes::from(&name);
 
-        assert_eq!(74, name_bytes.get_u32());
+        assert_eq!(69, name_bytes.get_u32());
         assert_eq!(104, name_bytes.get_u8());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x04, name_bytes.get_u32()); // file length
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &name_bytes.copy_to_bytes(4)[..]); // file
 
-        let long = "---------- 0 nobody nobody 0 Jan  1  1970";
+        let long = "---------- 0 2 3 0 Jan  1  1970 file";
         assert_eq!(long.len() as u32, name_bytes.get_u32()); // long length
         assert_eq!(long.as_bytes(), &name_bytes.copy_to_bytes(long.len())[..]); // long
         assert_eq!(file_attributes_bytes, &name_bytes[..]);

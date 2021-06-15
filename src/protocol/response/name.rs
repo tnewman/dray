@@ -34,8 +34,11 @@ pub struct File {
 impl File {
     pub fn get_long_name(&self) -> String {
         let permissions = self.decode_permissions();
+        let size = self.file_attributes.size.unwrap_or(0);
+        let uid = self.file_attributes.uid.unwrap_or(0);
+        let gid = self.file_attributes.gid.unwrap_or(0);
 
-        format!("{} 0 nobody nobody 0 Jan  1  1970", permissions)
+        format!("{} 0 {} {} {} Jan  1  1970 {}", permissions, uid, gid, size, self.file_name)
     }
 
     fn decode_permissions(&self) -> String {
@@ -96,7 +99,7 @@ mod test {
             }
         };
 
-        assert_eq!("---------- 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
+        assert_eq!("---------- 0 0 0 0 Jan  1  1970 file", file.get_long_name());
     }
 
     #[test]
@@ -109,7 +112,7 @@ mod test {
             }
         };
 
-        assert_eq!("-rwx------ 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
+        assert_eq!("-rwx------ 0 0 0 0 Jan  1  1970 file", file.get_long_name());
     }
 
     #[test]
@@ -122,7 +125,7 @@ mod test {
             }
         };
 
-        assert_eq!("----rwx--- 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
+        assert_eq!("----rwx--- 0 0 0 0 Jan  1  1970 file", file.get_long_name());
     }
 
     #[test]
@@ -135,7 +138,7 @@ mod test {
             }
         };
 
-        assert_eq!("-------rwx 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
+        assert_eq!("-------rwx 0 0 0 0 Jan  1  1970 file", file.get_long_name());
     }
 
     #[test]
@@ -148,11 +151,11 @@ mod test {
             }
         };
 
-        assert_eq!("-r-x------ 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
+        assert_eq!("-r-x------ 0 0 0 0 Jan  1  1970 file", file.get_long_name());
     }
 
     #[test]
-    fn test_get_long_name_creates_long_name_with_700_directory() {
+    fn test_get_long_name_creates_long_name_with_777_directory() {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
@@ -161,7 +164,34 @@ mod test {
             }
         };
 
-        assert_eq!("drwxrwxrwx 0 nobody nobody 0 Jan  1  1970", file.get_long_name());
+        assert_eq!("drwxrwxrwx 0 0 0 0 Jan  1  1970 file", file.get_long_name());
+    }
+
+    #[test]
+    fn test_get_long_name_creates_long_name_with_filesize() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                size: Some(1000),
+                ..Default::default()
+            }
+        };
+
+        assert_eq!("---------- 0 0 0 1000 Jan  1  1970 file", file.get_long_name());
+    }
+
+    #[test]
+    fn test_get_long_name_creates_long_name_with_uid_gid() {
+        let file = File {
+            file_name: String::from("file"),
+            file_attributes: FileAttributes {
+                uid: Some(1000),
+                gid: Some(2000),
+                ..Default::default()
+            }
+        };
+
+        assert_eq!("---------- 0 1000 2000 0 Jan  1  1970 file", file.get_long_name());
     }
 
     #[test]
@@ -177,7 +207,7 @@ mod test {
 
         assert_eq!(0x04, file_bytes.get_u32());
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &file_bytes.copy_to_bytes(4)[..]);
-        let long_name = "---------- 0 nobody nobody 0 Jan  1  1970";
+        let long_name = "---------- 0 0 0 0 Jan  1  1970 file";
         assert_eq!(long_name.len() as u32, file_bytes.get_u32());
         assert_eq!(long_name.as_bytes(), &file_bytes.copy_to_bytes(long_name.len())[..]);
         assert_eq!(true, file_bytes.has_remaining()); // has file attributes
