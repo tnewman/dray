@@ -92,12 +92,7 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
-                permissions: None,
+                ..Default::default()
             }
         };
 
@@ -109,12 +104,8 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
                 permissions: Some(0o700),
+                ..Default::default()
             }
         };
 
@@ -126,12 +117,8 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
                 permissions: Some(0o070),
+                ..Default::default()
             }
         };
 
@@ -143,12 +130,8 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
                 permissions: Some(0o007),
+                ..Default::default()
             }
         };
 
@@ -160,12 +143,8 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
                 permissions: Some(0o500),
+                ..Default::default()
             }
         };
 
@@ -177,12 +156,8 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
                 permissions: Some(0o40777),
+                ..Default::default()
             }
         };
 
@@ -194,12 +169,7 @@ mod test {
         let file = File {
             file_name: String::from("file"),
             file_attributes: FileAttributes {
-                size: None,
-                uid: None,
-                gid: None,
-                permissions: None,
-                atime: None,
-                mtime: None,
+                ..Default::default()
             },
         };
 
