@@ -35,11 +35,11 @@ impl TryFrom<&mut Bytes> for Write {
 impl Debug for Write {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Write")
-        .field("id", &self.id)
-        .field("handle", &self.handle)
-        .field("offset", &self.offset)
-        .field("len", &self.data.len())
-        .finish()
+            .field("id", &self.id)
+            .field("handle", &self.handle)
+            .field("offset", &self.offset)
+            .field("len", &self.data.len())
+            .finish()
     }
 }
 
@@ -172,6 +172,9 @@ mod tests {
             data: Bytes::from(vec![0x01, 0x02, 0x03]),
         };
 
-        assert_eq!("Write { id: 1, handle: \"handle\", offset: 2, len: 3 }", format!("{:?}", write));
+        assert_eq!(
+            "Write { id: 1, handle: \"handle\", offset: 2, len: 3 }",
+            format!("{:?}", write)
+        );
     }
 }

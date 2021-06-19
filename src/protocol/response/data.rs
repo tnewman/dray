@@ -23,10 +23,10 @@ impl From<&Data> for Bytes {
 
 impl Debug for Data {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-         f.debug_struct("Data")
-          .field("id", &self.id)
-          .field("len", &self.data.len())
-          .finish()
+        f.debug_struct("Data")
+            .field("id", &self.id)
+            .field("len", &self.data.len())
+            .finish()
     }
 }
 

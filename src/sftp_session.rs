@@ -96,10 +96,10 @@ impl SftpSession {
                 .get_object_metadata(open_request.filename.clone())
                 .await?;
 
-            self.handle_manager
-                .lock()
-                .await
-                .create_read_handle(open_request.filename, object_metadata.file_attributes.size.unwrap_or(0))
+            self.handle_manager.lock().await.create_read_handle(
+                open_request.filename,
+                object_metadata.file_attributes.size.unwrap_or(0),
+            )
         } else if open_request.open_options.write {
             let upload_id = self
                 .object_storage
@@ -288,8 +288,10 @@ impl SftpSession {
         &self,
         mkdir_request: request::path_attributes::PathAttributes,
     ) -> Result<Response> {
-        self.object_storage.create_prefix(mkdir_request.path).await?;
-        
+        self.object_storage
+            .create_prefix(mkdir_request.path)
+            .await?;
+
         Ok(Response::Status(response::status::Status {
             id: mkdir_request.id,
             status_code: response::status::StatusCode::Ok,

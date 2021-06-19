@@ -111,8 +111,8 @@ impl ObjectStorage for S3ObjectStorage {
 
     async fn create_prefix(&self, prefix: String) -> Result<()> {
         /*
-            S3 does not support creating empty prefixes. The prefix is created when the 
-            first object is added to it. This operation is a NO-OP to allow GUI-based 
+            S3 does not support creating empty prefixes. The prefix is created when the
+            first object is added to it. This operation is a NO-OP to allow GUI-based
             SFTP clients to make it appear that a directory has been created.
         */
         Ok(())
