@@ -43,7 +43,7 @@ pub trait ObjectStorage: Send + Sync {
     ) -> Result<ListPrefixResult>;
 
     /// Creates a prefix.
-    async fn create_prefix(&self, prefix: String);
+    async fn create_prefix(&self, prefix: String) -> Result<()>;
 
     /// Renames a prefix.
     async fn rename_prefix(&self, current: String, new: String);

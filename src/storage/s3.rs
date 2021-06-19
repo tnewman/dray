@@ -109,8 +109,13 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(map_list_objects_to_list_prefix_result(objects))
     }
 
-    async fn create_prefix(&self, prefix: String) {
-        todo!("TODO: Create prefix {}", prefix)
+    async fn create_prefix(&self, prefix: String) -> Result<()> {
+        /*
+            S3 does not support creating empty prefixes. The prefix is created when the 
+            first object is added to it. This operation is a NO-OP to allow GUI-based 
+            SFTP clients to make it appear that a directory has been created.
+        */
+        Ok(())
     }
 
     async fn rename_prefix(&self, current: String, new: String) {

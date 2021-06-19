@@ -45,7 +45,7 @@ impl SftpSession {
             Request::Opendir(opendir_request) => self.handle_opendir_request(opendir_request).await,
             Request::Readdir(readdir_request) => self.handle_readdir_request(readdir_request).await,
             Request::Remove(remove_request) => self.handle_remove_request(remove_request),
-            Request::Mkdir(mkdir_request) => self.handle_mkdir_request(mkdir_request),
+            Request::Mkdir(mkdir_request) => self.handle_mkdir_request(mkdir_request).await,
             Request::Rmdir(rmdir_request) => self.handle_rmdir_request(rmdir_request),
             Request::Realpath(realpath_request) => self.handle_realpath_request(realpath_request),
             Request::Stat(stat_request) => self.handle_stat_request(stat_request).await,
@@ -284,11 +284,17 @@ impl SftpSession {
         Ok(SftpSession::build_not_supported_response(remove_request.id))
     }
 
-    fn handle_mkdir_request(
+    async fn handle_mkdir_request(
         &self,
         mkdir_request: request::path_attributes::PathAttributes,
     ) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(mkdir_request.id))
+        self.object_storage.create_prefix(mkdir_request.path).await?;
+        
+        Ok(Response::Status(response::status::Status {
+            id: mkdir_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from("Successfully created directory."),
+        }))
     }
 
     fn handle_rmdir_request(&self, rmdir_request: request::path::Path) -> Result<Response> {
