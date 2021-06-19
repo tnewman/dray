@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
+use log::info;
 use rusoto_core::Region;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
@@ -125,14 +126,17 @@ impl ObjectStorage for S3ObjectStorage {
             .s3_client
             .head_object(HeadObjectRequest {
                 bucket: self.bucket.clone(),
-                key,
+                key: get_s3_key(key),
                 ..Default::default()
             })
             .await;
 
         match head_object_response {
-            Ok(_) => Ok(true),
-            Err(error) => match error {
+            Ok(_) => {
+                Ok(true)
+            },
+            Err(error) => {                
+                match error {
                 rusoto_core::RusotoError::Unknown(http_response) => {
                     if 404 == http_response.status.as_u16() {
                         Ok(false)
@@ -145,7 +149,8 @@ impl ObjectStorage for S3ObjectStorage {
                     }
                 }
                 _ => Err(anyhow::Error::from(error)),
-            },
+            }
+        },
         }
     }
 
@@ -165,7 +170,7 @@ impl ObjectStorage for S3ObjectStorage {
     async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>> {
         let get_object_response = self.s3_client.get_object(GetObjectRequest {
             bucket: self.bucket.clone(),
-            key,
+            key: get_s3_key(key),
             range: Option::Some(get_range(offset, len)),
             ..Default::default()
         });
@@ -211,6 +216,11 @@ fn get_home(user: &str) -> String {
 
 fn get_range(offset: u64, len: u32) -> String {
     format!("bytes={}-{}", offset, len)
+}
+
+fn get_s3_key(key: String) -> String {
+    let key = key[1..key.len()].to_string();
+    key
 }
 
 fn get_s3_prefix(prefix: String) -> String {
@@ -291,7 +301,7 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
     File {
         file_name: file_name.to_string(),
         file_attributes: FileAttributes {
-            size: None,
+            size: head_object.content_length.map(|content_length| content_length as u64),
             uid: None,
             gid: None,
             permissions: Some(0o100777),
@@ -331,6 +341,11 @@ mod test {
     #[test]
     fn test_get_default_endpoint_region() {
         assert_eq!("custom", get_default_endpoint_region());
+    }
+
+    #[test]
+    fn test_get_s3_key_converts_unix_absolute_directory() {
+        assert_eq!(String::from("test/file1.txt"), get_s3_key(String::from("/test/file1.txt")))
     }
 
     #[test]

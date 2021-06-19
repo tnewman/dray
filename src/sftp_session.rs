@@ -36,7 +36,7 @@ impl SftpSession {
             Request::Init(init_request) => self.handle_init_request(init_request),
             Request::Open(open_request) => self.handle_open_request(open_request).await,
             Request::Close(close_request) => self.handle_close_request(close_request).await,
-            Request::Read(read_request) => self.handle_read_request(read_request),
+            Request::Read(read_request) => self.handle_read_request(read_request).await,
             Request::Write(write_request) => self.handle_write_request(write_request),
             Request::Lstat(lstat_request) => self.handle_lstat_request(lstat_request),
             Request::Fstat(fstat_request) => self.handle_fstat_request(fstat_request),
@@ -78,7 +78,7 @@ impl SftpSession {
 
     async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
         let handle = if open_request.open_options.read {
-            let object_exists = !self
+            let object_exists = self
                 .object_storage
                 .object_exists(open_request.filename.clone())
                 .await?;
@@ -134,8 +134,40 @@ impl SftpSession {
         }))
     }
 
-    fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(read_request.id))
+    async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
+        let mut handle_manager = self.handle_manager
+            .lock()
+            .await;
+        
+        let read_handle = handle_manager
+            .get_read_handle(&read_request.handle);
+        
+        let read_handle = match read_handle {
+            Some(read_handle) => read_handle,
+            None => return Ok(Response::Status(response::status::Status {
+                id: read_request.id,
+                status_code: response::status::StatusCode::Failure,
+                error_message: String::from("Invalid handle."),
+            }))
+        };
+
+        let metadata = self.object_storage.get_object_metadata(read_handle.get_key().to_string()).await?;
+
+        if read_request.offset >= metadata.file_attributes.size.unwrap_or(0) {
+            return Ok(Response::Status(response::status::Status {
+                id: read_request.id,
+                status_code: response::status::StatusCode::Eof,
+                error_message: String::from("End of file reached."),
+            }));
+        }
+
+        let data = self.object_storage.read_object(read_handle.get_key().to_string(), read_request.offset, read_request.len)
+            .await?;
+
+        Ok(Response::Data(response::data::Data {
+            id: read_request.id,
+            data: data,
+        }))
     }
 
     fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {
