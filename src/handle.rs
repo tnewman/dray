@@ -32,8 +32,8 @@ impl HandleManager {
         handle_id
     }
 
-    pub fn create_read_handle(&mut self, key: String) -> String {
-        let read_handle = ReadHandle::new(key);
+    pub fn create_read_handle(&mut self, key: String, len: u64) -> String {
+        let read_handle = ReadHandle::new(key, len);
         let handle_id = read_handle.get_handle_id_string();
 
         self.read_handles
@@ -126,18 +126,24 @@ impl Handle for DirHandle {
 pub struct ReadHandle {
     id: String,
     key: String,
+    len: u64,
 }
 
 impl ReadHandle {
-    pub fn new(key: String) -> ReadHandle {
+    pub fn new(key: String, len: u64) -> ReadHandle {
         ReadHandle {
             id: generate_handle_id(),
             key,
+            len,
         }
     }
 
     pub fn get_key(&self) -> &str {
         &self.key
+    }
+
+    pub fn len(&self) -> u64 {
+        self.len
     }
 }
 
@@ -239,19 +245,20 @@ mod test {
     #[test]
     fn test_handle_manager_read_handle_create_get() {
         let mut handle_manager = HandleManager::new();
-        let handle_id = handle_manager.create_read_handle(String::from("key"));
+        let handle_id = handle_manager.create_read_handle(String::from("key"), 1);
 
         let handle = handle_manager.get_read_handle(&handle_id).unwrap();
 
         assert_eq!(handle_id, handle.get_handle_id_string());
         assert_eq!("key", handle.get_key());
+        assert_eq!(1, handle.len());
     }
 
     #[test]
     fn test_handle_manager_read_handle_delete() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_read_handle(String::from("key"));
+        let handle_id = handle_manager.create_read_handle(String::from("key"), 1);
         assert!(handle_manager.get_read_handle(&handle_id).is_some());
 
         handle_manager.remove_handle(&handle_id);

@@ -91,10 +91,15 @@ impl SftpSession {
                 }));
             }
 
+            let object_metadata = self
+                .object_storage
+                .get_object_metadata(open_request.filename.clone())
+                .await?;
+
             self.handle_manager
                 .lock()
                 .await
-                .create_read_handle(open_request.filename)
+                .create_read_handle(open_request.filename, object_metadata.file_attributes.size.unwrap_or(0))
         } else if open_request.open_options.write {
             let upload_id = self
                 .object_storage
@@ -150,12 +155,7 @@ impl SftpSession {
             }
         };
 
-        let metadata = self
-            .object_storage
-            .get_object_metadata(read_handle.get_key().to_string())
-            .await?;
-
-        if read_request.offset >= metadata.file_attributes.size.unwrap_or(0) {
+        if read_request.offset >= read_handle.len() {
             return Ok(Response::Status(response::status::Status {
                 id: read_request.id,
                 status_code: response::status::StatusCode::Eof,
