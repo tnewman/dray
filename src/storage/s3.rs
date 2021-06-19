@@ -211,7 +211,7 @@ fn get_home(user: &str) -> String {
 }
 
 fn get_range(offset: u64, len: u32) -> String {
-    format!("bytes={}-{}", offset, len)
+    format!("bytes={}-{}", offset, offset + len as u64 - 1)
 }
 
 fn get_s3_key(key: String) -> String {
@@ -333,7 +333,12 @@ mod test {
 
     #[test]
     fn test_get_range_returns_range_string() {
-        assert_eq!("bytes=0-1024", get_range(0, 1024));
+        assert_eq!("bytes=0-1023", get_range(0, 1024));
+    }
+
+    #[test]
+    fn test_get_range_returns_range_string_with_offset() {
+        assert_eq!("bytes=1024-2023", get_range(1024, 1000));
     }
 
     #[test]
