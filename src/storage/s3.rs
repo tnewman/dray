@@ -132,11 +132,8 @@ impl ObjectStorage for S3ObjectStorage {
             .await;
 
         match head_object_response {
-            Ok(_) => {
-                Ok(true)
-            },
-            Err(error) => {                
-                match error {
+            Ok(_) => Ok(true),
+            Err(error) => match error {
                 rusoto_core::RusotoError::Unknown(http_response) => {
                     if 404 == http_response.status.as_u16() {
                         Ok(false)
@@ -149,8 +146,7 @@ impl ObjectStorage for S3ObjectStorage {
                     }
                 }
                 _ => Err(anyhow::Error::from(error)),
-            }
-        },
+            },
         }
     }
 
@@ -301,7 +297,9 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
     File {
         file_name: file_name.to_string(),
         file_attributes: FileAttributes {
-            size: head_object.content_length.map(|content_length| content_length as u64),
+            size: head_object
+                .content_length
+                .map(|content_length| content_length as u64),
             uid: None,
             gid: None,
             permissions: Some(0o100777),
@@ -345,7 +343,10 @@ mod test {
 
     #[test]
     fn test_get_s3_key_converts_unix_absolute_directory() {
-        assert_eq!(String::from("test/file1.txt"), get_s3_key(String::from("/test/file1.txt")))
+        assert_eq!(
+            String::from("test/file1.txt"),
+            get_s3_key(String::from("/test/file1.txt"))
+        )
     }
 
     #[test]

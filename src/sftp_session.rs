@@ -135,23 +135,25 @@ impl SftpSession {
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        let mut handle_manager = self.handle_manager
-            .lock()
-            .await;
-        
-        let read_handle = handle_manager
-            .get_read_handle(&read_request.handle);
-        
+        let mut handle_manager = self.handle_manager.lock().await;
+
+        let read_handle = handle_manager.get_read_handle(&read_request.handle);
+
         let read_handle = match read_handle {
             Some(read_handle) => read_handle,
-            None => return Ok(Response::Status(response::status::Status {
-                id: read_request.id,
-                status_code: response::status::StatusCode::Failure,
-                error_message: String::from("Invalid handle."),
-            }))
+            None => {
+                return Ok(Response::Status(response::status::Status {
+                    id: read_request.id,
+                    status_code: response::status::StatusCode::Failure,
+                    error_message: String::from("Invalid handle."),
+                }))
+            }
         };
 
-        let metadata = self.object_storage.get_object_metadata(read_handle.get_key().to_string()).await?;
+        let metadata = self
+            .object_storage
+            .get_object_metadata(read_handle.get_key().to_string())
+            .await?;
 
         if read_request.offset >= metadata.file_attributes.size.unwrap_or(0) {
             return Ok(Response::Status(response::status::Status {
@@ -161,7 +163,13 @@ impl SftpSession {
             }));
         }
 
-        let data = self.object_storage.read_object(read_handle.get_key().to_string(), read_request.offset, read_request.len)
+        let data = self
+            .object_storage
+            .read_object(
+                read_handle.get_key().to_string(),
+                read_request.offset,
+                read_request.len,
+            )
             .await?;
 
         Ok(Response::Data(response::data::Data {
