@@ -77,50 +77,7 @@ impl SftpSession {
     }
 
     async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
-        let handle = if open_request.open_options.read {
-            let object_exists = self
-                .object_storage
-                .object_exists(open_request.filename.clone())
-                .await?;
-
-            if !object_exists {
-                return Ok(Response::Status(response::status::Status {
-                    id: open_request.id,
-                    status_code: response::status::StatusCode::NoSuchFile,
-                    error_message: String::from("File not found."),
-                }));
-            }
-
-            let object_metadata = self
-                .object_storage
-                .get_object_metadata(open_request.filename.clone())
-                .await?;
-
-            self.handle_manager.lock().await.create_read_handle(
-                open_request.filename,
-                object_metadata.file_attributes.size.unwrap_or(0),
-            )
-        } else if open_request.open_options.write {
-            let upload_id = self
-                .object_storage
-                .create_multipart_upload(open_request.filename)
-                .await?;
-            self.handle_manager
-                .lock()
-                .await
-                .create_write_handle(upload_id)
-        } else {
-            return Ok(Response::Status(response::status::Status {
-                id: open_request.id,
-                status_code: response::status::StatusCode::OperationUnsupported,
-                error_message: String::from("Received unsupported open request"),
-            }));
-        };
-
-        Ok(Response::Handle(response::handle::Handle {
-            id: open_request.id,
-            handle,
-        }))
+        Ok(SftpSession::build_not_supported_response(open_request.id))
     }
 
     async fn handle_close_request(
@@ -140,42 +97,7 @@ impl SftpSession {
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        let key = {
-            let mut handle_manager = self.handle_manager.lock().await;
-
-            let read_handle = handle_manager.get_read_handle(&read_request.handle);
-
-            let read_handle = match read_handle {
-                Some(read_handle) => read_handle,
-                None => {
-                    return Ok(Response::Status(response::status::Status {
-                        id: read_request.id,
-                        status_code: response::status::StatusCode::Failure,
-                        error_message: String::from("Invalid handle."),
-                    }))
-                }
-            };
-
-            if read_request.offset >= read_handle.len() {
-                return Ok(Response::Status(response::status::Status {
-                    id: read_request.id,
-                    status_code: response::status::StatusCode::Eof,
-                    error_message: String::from("End of file reached."),
-                }));
-            }
-
-            read_handle.get_key().to_string()
-        };
-
-        let data = self
-            .object_storage
-            .read_object(key, read_request.offset, read_request.len)
-            .await?;
-
-        Ok(Response::Data(response::data::Data {
-            id: read_request.id,
-            data: data,
-        }))
+        Ok(SftpSession::build_not_supported_response(read_request.id))
     }
 
     fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {

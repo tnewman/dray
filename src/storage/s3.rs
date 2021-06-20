@@ -1,21 +1,22 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
-use log::info;
 use rusoto_core::Region;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
-    Object, S3Client, StreamingBody, UploadPartRequest, S3,
+    Object, S3Client, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
-use tokio::io::AsyncReadExt;
+use std::sync::Arc;
+use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::sync::Mutex;
 
 use super::ListPrefixResult;
 use super::ObjectStorage;
+use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
-use crate::{error::Error, protocol::file_attributes::FileAttributes};
 
 #[derive(Clone)]
 pub struct S3ObjectStorage {
@@ -168,21 +169,25 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(map_head_object_to_file(&key, &head_object))
     }
 
-    async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>> {
-        let get_object_response = self.s3_client.get_object(GetObjectRequest {
-            bucket: self.bucket.clone(),
-            key: get_s3_key(key),
-            range: Option::Some(get_range(offset, len)),
-            ..Default::default()
-        });
+    async fn read_object(
+        &self,
+        key: String,
+        offset: u64,
+        len: u32,
+    ) -> Result<Arc<Mutex<dyn AsyncRead + Send + Sync>>> {
+        let async_read = self
+            .s3_client
+            .get_object(GetObjectRequest {
+                bucket: self.bucket.clone(),
+                key: key.clone(),
+                ..Default::default()
+            })
+            .await?
+            .body
+            .unwrap()
+            .into_async_read();
 
-        let result = get_object_response.await?;
-
-        let body = result.body.ok_or(Error::ServerError)?;
-        let mut data = Vec::new();
-        body.into_async_read().read_to_end(&mut data).await?;
-
-        Ok(data)
+        Ok(Arc::new(Mutex::new(async_read)))
     }
 
     async fn create_multipart_upload(&self, key: String) -> Result<String> {

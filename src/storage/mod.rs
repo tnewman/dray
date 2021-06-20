@@ -1,7 +1,10 @@
 pub mod s3;
 
+use std::sync::Arc;
+
 use anyhow::Result;
 use async_trait::async_trait;
+use tokio::{io::AsyncRead, sync::Mutex};
 
 use crate::protocol::response::name::File;
 
@@ -58,7 +61,12 @@ pub trait ObjectStorage: Send + Sync {
     async fn get_object_metadata(&self, key: String) -> Result<File>;
 
     /// Creates a read stream for an object.
-    async fn read_object(&self, key: String, offset: u64, len: u32) -> Result<Vec<u8>>;
+    async fn read_object(
+        &self,
+        key: String,
+        offset: u64,
+        len: u32,
+    ) -> Result<Arc<Mutex<dyn AsyncRead + Send + Sync>>>;
 
     /// Creates a multipart upload for an object.
     async fn create_multipart_upload(&self, key: String) -> Result<String>;

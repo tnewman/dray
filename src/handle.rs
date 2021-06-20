@@ -1,9 +1,13 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, pin::Pin, sync::Arc};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::Mutex,
+};
 use uuid::Uuid;
 
 pub struct HandleManager {
-    read_handles: HashMap<String, ReadHandle>,
-    write_handles: HashMap<String, WriteHandle>,
+    read_handles: HashMap<String, Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>>,
+    write_handles: HashMap<String, Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>>,
     dir_handles: HashMap<String, DirHandle>,
 }
 
@@ -32,22 +36,24 @@ impl HandleManager {
         handle_id
     }
 
-    pub fn create_read_handle(&mut self, key: String, len: u64) -> String {
-        let read_handle = ReadHandle::new(key, len);
-        let handle_id = read_handle.get_handle_id_string();
+    pub fn create_read_handle(
+        &mut self,
+        read_stream: Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>,
+    ) -> String {
+        let handle_id = generate_handle_id();
 
-        self.read_handles
-            .insert(read_handle.get_handle_id().to_string(), read_handle);
+        self.read_handles.insert(handle_id.clone(), read_stream);
 
         handle_id
     }
 
-    pub fn create_write_handle(&mut self, multipart_upload_id: String) -> String {
-        let write_handle = WriteHandle::new(multipart_upload_id);
-        let handle_id = write_handle.get_handle_id_string();
+    pub fn create_write_handle(
+        &mut self,
+        write_stream: Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>,
+    ) -> String {
+        let handle_id = generate_handle_id();
 
-        self.write_handles
-            .insert(write_handle.get_handle_id().to_string(), write_handle);
+        self.write_handles.insert(handle_id.clone(), write_stream);
 
         handle_id
     }
@@ -56,12 +62,22 @@ impl HandleManager {
         self.dir_handles.get_mut(handle_id)
     }
 
-    pub fn get_read_handle(&mut self, handle_id: &str) -> Option<&mut ReadHandle> {
-        self.read_handles.get_mut(handle_id)
+    pub fn get_read_handle(
+        &mut self,
+        handle_id: &str,
+    ) -> Option<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>> {
+        self.read_handles
+            .get(handle_id)
+            .map(|read_handle| read_handle.clone())
     }
 
-    pub fn get_write_handle(&mut self, handle_id: &str) -> Option<&mut WriteHandle> {
-        self.write_handles.get_mut(handle_id)
+    pub fn get_write_handle(
+        &mut self,
+        handle_id: &str,
+    ) -> Option<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>> {
+        self.write_handles
+            .get(handle_id)
+            .map(|write_handle| write_handle.clone())
     }
 
     pub fn remove_handle(&mut self, handle: &str) {
@@ -123,60 +139,6 @@ impl Handle for DirHandle {
     }
 }
 
-pub struct ReadHandle {
-    id: String,
-    key: String,
-    len: u64,
-}
-
-impl ReadHandle {
-    pub fn new(key: String, len: u64) -> ReadHandle {
-        ReadHandle {
-            id: generate_handle_id(),
-            key,
-            len,
-        }
-    }
-
-    pub fn get_key(&self) -> &str {
-        &self.key
-    }
-
-    pub fn len(&self) -> u64 {
-        self.len
-    }
-}
-
-impl Handle for ReadHandle {
-    fn get_handle_id(&self) -> &str {
-        &self.id
-    }
-}
-
-pub struct WriteHandle {
-    id: String,
-    multipart_upload_id: String,
-}
-
-impl WriteHandle {
-    pub fn new(multipart_upload_id: String) -> WriteHandle {
-        WriteHandle {
-            id: generate_handle_id(),
-            multipart_upload_id,
-        }
-    }
-
-    pub fn get_multipart_upload_id(&self) -> &str {
-        &self.multipart_upload_id
-    }
-}
-
-impl Handle for WriteHandle {
-    fn get_handle_id(&self) -> &str {
-        &self.id
-    }
-}
-
 fn generate_handle_id() -> String {
     Uuid::new_v4().to_string()
 }
@@ -184,6 +146,9 @@ fn generate_handle_id() -> String {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use std::io::Cursor;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
     #[test]
     fn test_handle_manager_dir_handle_create_get() {
@@ -242,23 +207,29 @@ mod test {
         assert!(handle_manager.get_dir_handle("missing_handle").is_none());
     }
 
-    #[test]
-    fn test_handle_manager_read_handle_create_get() {
+    #[tokio::test]
+    async fn test_handle_manager_read_handle_create_get() {
         let mut handle_manager = HandleManager::new();
-        let handle_id = handle_manager.create_read_handle(String::from("key"), 1);
+
+        let read_stream = Cursor::new(vec![0x01, 0x02]);
+        let handle_id =
+            handle_manager.create_read_handle(Arc::new(Mutex::new(Box::pin(read_stream))));
 
         let handle = handle_manager.get_read_handle(&handle_id).unwrap();
 
-        assert_eq!(handle_id, handle.get_handle_id_string());
-        assert_eq!("key", handle.get_key());
-        assert_eq!(1, handle.len());
+        let mut buffer = vec![];
+        handle.lock().await.read_to_end(&mut buffer).await.unwrap();
+
+        assert_eq!(vec![0x01, 0x02], buffer);
     }
 
     #[test]
     fn test_handle_manager_read_handle_delete() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_read_handle(String::from("key"), 1);
+        let read_stream = Cursor::new(vec![0x01, 0x02]);
+        let handle_id =
+            handle_manager.create_read_handle(Arc::new(Mutex::new(Box::pin(read_stream))));
         assert!(handle_manager.get_read_handle(&handle_id).is_some());
 
         handle_manager.remove_handle(&handle_id);
@@ -272,22 +243,30 @@ mod test {
         assert!(handle_manager.get_read_handle("missing_handle").is_none());
     }
 
-    #[test]
-    fn test_handle_manager_write_handle_create_get() {
+    #[tokio::test]
+    async fn test_handle_manager_write_handle_create_get() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_write_handle(String::from("upload_id"));
+        let mut write_stream = Cursor::new(vec![0x01, 0x02]);
+        let handle_id = handle_manager
+            .create_write_handle(Arc::new(Mutex::new(Box::pin(write_stream.clone()))));
         let handle = handle_manager.get_write_handle(&handle_id).unwrap();
 
-        assert_eq!(handle_id, handle.get_handle_id_string());
-        assert_eq!("upload_id", handle.get_multipart_upload_id());
+        handle.lock().await.write_u8(0x01).await.unwrap();
+        handle.lock().await.write_u8(0x02).await.unwrap();
+
+        let mut buffer = vec![];
+        write_stream.read_to_end(&mut buffer).await.unwrap();
+        assert_eq!(vec![0x01, 0x02], buffer);
     }
 
     #[test]
     fn test_handle_manager_write_handle_delete() {
         let mut handle_manager = HandleManager::new();
 
-        let handle_id = handle_manager.create_write_handle(String::from("upload_id"));
+        let write_stream = Cursor::new(vec![0x01, 0x02]);
+        let handle_id =
+            handle_manager.create_write_handle(Arc::new(Mutex::new(Box::pin(write_stream))));
         assert!(handle_manager.get_write_handle(&handle_id).is_some());
 
         handle_manager.remove_handle(&handle_id);
