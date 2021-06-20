@@ -1,10 +1,10 @@
 pub mod s3;
 
-use std::sync::Arc;
+use std::{pin::Pin, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::{io::AsyncRead, sync::Mutex};
+use tokio::{io::{AsyncRead, AsyncWrite}, sync::Mutex};
 
 use crate::protocol::response::name::File;
 
@@ -61,26 +61,10 @@ pub trait ObjectStorage: Send + Sync {
     async fn get_object_metadata(&self, key: String) -> Result<File>;
 
     /// Creates a read stream for an object.
-    async fn read_object(
-        &self,
-        key: String,
-        offset: u64,
-        len: u32,
-    ) -> Result<Arc<Mutex<dyn AsyncRead + Send + Sync>>>;
+    async fn read_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>>;
 
-    /// Creates a multipart upload for an object.
-    async fn create_multipart_upload(&self, key: String) -> Result<String>;
-
-    /// Writes a part to an existing multipart upload for an object.
-    async fn write_object_part(
-        &self,
-        multipart_upload_id: String,
-        offset: u64,
-        data: Vec<u8>,
-    ) -> Result<()>;
-
-    /// Completes a multipart upload for an object.
-    async fn complete_multipart_upload(&self, multipart_upload_id: String) -> Result<()>;
+    /// Creates a write stream for an object.
+    async fn write_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>>;
 
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);

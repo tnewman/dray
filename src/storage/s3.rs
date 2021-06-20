@@ -8,8 +8,9 @@ use rusoto_s3::{
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
+use std::pin::Pin;
 use std::sync::Arc;
-use tokio::io::{AsyncRead, AsyncReadExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::sync::Mutex;
 
 use super::ListPrefixResult;
@@ -110,7 +111,7 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(map_list_objects_to_list_prefix_result(objects))
     }
 
-    async fn create_prefix(&self, prefix: String) -> Result<()> {
+    async fn create_prefix(&self, _prefix: String) -> Result<()> {
         /*
             S3 does not support creating empty prefixes. The prefix is created when the
             first object is added to it. This operation is a NO-OP to allow GUI-based
@@ -169,42 +170,14 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(map_head_object_to_file(&key, &head_object))
     }
 
-    async fn read_object(
-        &self,
-        key: String,
-        offset: u64,
-        len: u32,
-    ) -> Result<Arc<Mutex<dyn AsyncRead + Send + Sync>>> {
-        let async_read = self
-            .s3_client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key: key.clone(),
-                ..Default::default()
-            })
-            .await?
-            .body
-            .unwrap()
-            .into_async_read();
-
-        Ok(Arc::new(Mutex::new(async_read)))
+    /// Creates a read stream for an object.
+    async fn read_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>> {
+        todo!("TODO: Read object {}", key)
     }
 
-    async fn create_multipart_upload(&self, key: String) -> Result<String> {
-        todo!("TODO: Create multipart upload {}", key);
-    }
-
-    async fn write_object_part(
-        &self,
-        multipart_upload_id: String,
-        _offset: u64,
-        data: Vec<u8>,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    async fn complete_multipart_upload(&self, multipart_upload_id: String) -> Result<()> {
-        todo!("TODO: Complete multipart upload {}", multipart_upload_id);
+    /// Creates a write stream for an object.
+    async fn write_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>> {
+        todo!("TODO: Write object {}", key)
     }
 
     async fn rename_object(&self, current: String, new: String) {
