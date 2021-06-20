@@ -5,7 +5,7 @@ use log::info;
 use rusoto_core::Region;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
-    Object, S3Client, S3,
+    Object, S3Client, StreamingBody, UploadPartRequest, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
@@ -189,13 +189,13 @@ impl ObjectStorage for S3ObjectStorage {
         todo!("TODO: Create multipart upload {}", key);
     }
 
-    async fn write_object_part(&self, multipart_upload_id: String, offset: u64, data: Vec<u8>) {
-        todo!(
-            "TODO: Write object part {} {} {}",
-            multipart_upload_id,
-            offset,
-            data.len()
-        );
+    async fn write_object_part(
+        &self,
+        multipart_upload_id: String,
+        _offset: u64,
+        data: Vec<u8>,
+    ) -> Result<()> {
+        Ok(())
     }
 
     async fn complete_multipart_upload(&self, multipart_upload_id: String) -> Result<()> {

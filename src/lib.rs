@@ -14,8 +14,8 @@ use futures::{
     future::{ready, Ready},
     Future,
 };
-use hex;
-use log::{debug, error, info, log_enabled, Level::Debug};
+
+use log::{debug, error, info};
 
 use protocol::request::Request;
 use sftp_session::SftpSession;

@@ -64,7 +64,12 @@ pub trait ObjectStorage: Send + Sync {
     async fn create_multipart_upload(&self, key: String) -> Result<String>;
 
     /// Writes a part to an existing multipart upload for an object.
-    async fn write_object_part(&self, multipart_upload_id: String, offset: u64, data: Vec<u8>);
+    async fn write_object_part(
+        &self,
+        multipart_upload_id: String,
+        offset: u64,
+        data: Vec<u8>,
+    ) -> Result<()>;
 
     /// Completes a multipart upload for an object.
     async fn complete_multipart_upload(&self, multipart_upload_id: String) -> Result<()>;

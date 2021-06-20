@@ -140,36 +140,36 @@ impl SftpSession {
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        let mut handle_manager = self.handle_manager.lock().await;
+        let key = {
+            let mut handle_manager = self.handle_manager.lock().await;
 
-        let read_handle = handle_manager.get_read_handle(&read_request.handle);
+            let read_handle = handle_manager.get_read_handle(&read_request.handle);
 
-        let read_handle = match read_handle {
-            Some(read_handle) => read_handle,
-            None => {
+            let read_handle = match read_handle {
+                Some(read_handle) => read_handle,
+                None => {
+                    return Ok(Response::Status(response::status::Status {
+                        id: read_request.id,
+                        status_code: response::status::StatusCode::Failure,
+                        error_message: String::from("Invalid handle."),
+                    }))
+                }
+            };
+
+            if read_request.offset >= read_handle.len() {
                 return Ok(Response::Status(response::status::Status {
                     id: read_request.id,
-                    status_code: response::status::StatusCode::Failure,
-                    error_message: String::from("Invalid handle."),
-                }))
+                    status_code: response::status::StatusCode::Eof,
+                    error_message: String::from("End of file reached."),
+                }));
             }
-        };
 
-        if read_request.offset >= read_handle.len() {
-            return Ok(Response::Status(response::status::Status {
-                id: read_request.id,
-                status_code: response::status::StatusCode::Eof,
-                error_message: String::from("End of file reached."),
-            }));
-        }
+            read_handle.get_key().to_string()
+        };
 
         let data = self
             .object_storage
-            .read_object(
-                read_handle.get_key().to_string(),
-                read_request.offset,
-                read_request.len,
-            )
+            .read_object(key, read_request.offset, read_request.len)
             .await?;
 
         Ok(Response::Data(response::data::Data {
