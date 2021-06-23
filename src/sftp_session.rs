@@ -11,8 +11,8 @@ use crate::{
 use anyhow::Result;
 use log::error;
 use log::info;
-use tokio::io::AsyncReadExt;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::sync::Mutex;
 
 pub struct SftpSession {
@@ -38,7 +38,7 @@ impl SftpSession {
             Request::Open(open_request) => self.handle_open_request(open_request).await,
             Request::Close(close_request) => self.handle_close_request(close_request).await,
             Request::Read(read_request) => self.handle_read_request(read_request).await,
-            Request::Write(write_request) => self.handle_write_request(write_request),
+            Request::Write(write_request) => self.handle_write_request(write_request).await,
             Request::Lstat(lstat_request) => self.handle_lstat_request(lstat_request),
             Request::Fstat(fstat_request) => self.handle_fstat_request(fstat_request),
             Request::Setstat(setstat_request) => self.handle_setstat_request(setstat_request),
@@ -79,11 +79,23 @@ impl SftpSession {
 
     async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
         let handle = if open_request.open_options.create {
-            let write_stream = self.object_storage.write_object(open_request.filename).await?;
-            self.handle_manager.lock().await.create_write_handle(write_stream)
+            let write_stream = self
+                .object_storage
+                .write_object(open_request.filename)
+                .await?;
+            self.handle_manager
+                .lock()
+                .await
+                .create_write_handle(write_stream)
         } else if open_request.open_options.read {
-            let read_stream = self.object_storage.read_object(open_request.filename).await?;
-            self.handle_manager.lock().await.create_read_handle(read_stream)
+            let read_stream = self
+                .object_storage
+                .read_object(open_request.filename)
+                .await?;
+            self.handle_manager
+                .lock()
+                .await
+                .create_read_handle(read_stream)
         } else {
             return Ok(Response::Status(response::status::Status {
                 id: open_request.id,
@@ -116,22 +128,31 @@ impl SftpSession {
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
         let read_handle = {
-            self.handle_manager.lock().await.get_read_handle(&read_request.handle)
+            self.handle_manager
+                .lock()
+                .await
+                .get_read_handle(&read_request.handle)
         };
-        
 
         let read_handle = match read_handle {
             Some(read_handle) => read_handle,
-            None => {return Ok(Response::Status(response::status::Status {
-                id: read_request.id,
-                status_code: response::status::StatusCode::Failure,
-                error_message: String::from("Invalid handle."),
-            }))
-            },
+            None => {
+                return Ok(Response::Status(response::status::Status {
+                    id: read_request.id,
+                    status_code: response::status::StatusCode::Failure,
+                    error_message: String::from("Invalid handle."),
+                }))
+            }
         };
 
         let mut buffer = Vec::with_capacity(read_request.len as usize);
-        read_handle.lock().await.as_mut().take(read_request.len as u64).read_to_end(&mut buffer).await?;
+        read_handle
+            .lock()
+            .await
+            .as_mut()
+            .take(read_request.len as u64)
+            .read_to_end(&mut buffer)
+            .await?;
 
         Ok(Response::Data(response::data::Data {
             id: read_request.id,
@@ -139,8 +160,39 @@ impl SftpSession {
         }))
     }
 
-    fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(write_request.id))
+    async fn handle_write_request(
+        &self,
+        mut write_request: request::write::Write,
+    ) -> Result<Response> {
+        let write_handle = {
+            self.handle_manager
+                .lock()
+                .await
+                .get_write_handle(&write_request.handle)
+        };
+
+        let write_handle = match write_handle {
+            Some(write_handle) => write_handle,
+            None => {
+                return Ok(Response::Status(response::status::Status {
+                    id: write_request.id,
+                    status_code: response::status::StatusCode::Failure,
+                    error_message: String::from("Invalid handle."),
+                }))
+            }
+        };
+
+        write_handle
+            .lock()
+            .await
+            .write_all_buf(&mut write_request.data)
+            .await?;
+
+        Ok(Response::Status(response::status::Status {
+            id: write_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from("Successfully wrote data to file."),
+        }))
     }
 
     fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response> {

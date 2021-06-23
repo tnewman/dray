@@ -4,7 +4,10 @@ use std::{pin::Pin, sync::Arc};
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::{io::{AsyncRead, AsyncWrite}, sync::Mutex};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::Mutex,
+};
 
 use crate::protocol::response::name::File;
 
@@ -61,10 +64,16 @@ pub trait ObjectStorage: Send + Sync {
     async fn get_object_metadata(&self, key: String) -> Result<File>;
 
     /// Creates a read stream for an object.
-    async fn read_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>>;
+    async fn read_object(
+        &self,
+        key: String,
+    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>>;
 
     /// Creates a write stream for an object.
-    async fn write_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>>;
+    async fn write_object(
+        &self,
+        key: String,
+    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>>;
 
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);

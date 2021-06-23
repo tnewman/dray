@@ -1,10 +1,17 @@
-use anyhow::{Result};
+use super::ListPrefixResult;
+use super::ObjectStorage;
+use crate::error::Error;
+use crate::protocol::file_attributes::FileAttributes;
+use crate::protocol::response::name::File;
+use crate::ssh_keys;
+use anyhow::Result;
 use async_trait::async_trait;
+use bytes::BytesMut;
 use chrono::{DateTime, TimeZone, Utc};
-use rusoto_core::Region;
+use rusoto_core::{ByteStream, Region};
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
-    Object, S3Client, S3,
+    Object, PutObjectRequest, S3Client, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
@@ -12,13 +19,6 @@ use std::pin::Pin;
 use std::sync::Arc;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
 use tokio::sync::Mutex;
-
-use super::ListPrefixResult;
-use super::ObjectStorage;
-use crate::error::Error;
-use crate::protocol::file_attributes::FileAttributes;
-use crate::protocol::response::name::File;
-use crate::ssh_keys;
 
 #[derive(Clone)]
 pub struct S3ObjectStorage {
@@ -172,20 +172,33 @@ impl ObjectStorage for S3ObjectStorage {
     }
 
     /// Creates a read stream for an object.
-    async fn read_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>> {
-        let read_response = self.s3_client.get_object(GetObjectRequest {
-            bucket: self.bucket.clone(),
-            key,
-            ..Default::default()
-        }).await?;
+    async fn read_object(
+        &self,
+        key: String,
+    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>> {
+        let read_response = self
+            .s3_client
+            .get_object(GetObjectRequest {
+                bucket: self.bucket.clone(),
+                key,
+                ..Default::default()
+            })
+            .await?;
 
-        let read_stream = read_response.body.ok_or(Error::ServerError)?.into_async_read();
+        let read_stream = read_response
+            .body
+            .ok_or(Error::ServerError)?
+            .into_async_read();
         Ok(Arc::new(Mutex::new(Box::pin(read_stream))))
     }
 
     /// Creates a write stream for an object.
-    async fn write_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>> {
-        todo!("TODO: Write object {}", key)
+    async fn write_object(
+        &self,
+        key: String,
+    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>> {
+        // Writing needs to be reworked to support buffering chunks in memory and writing a single chunk at a time as a multipart upload
+        todo!("add multipart support")
     }
 
     async fn rename_object(&self, current: String, new: String) {
