@@ -6,12 +6,12 @@ use crate::protocol::response::name::File;
 use crate::ssh_keys;
 use anyhow::Result;
 use async_trait::async_trait;
-use bytes::BytesMut;
+
 use chrono::{DateTime, TimeZone, Utc};
-use rusoto_core::{ByteStream, Region};
+use rusoto_core::Region;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
-    Object, PutObjectRequest, S3Client, S3,
+    Object, S3Client, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
