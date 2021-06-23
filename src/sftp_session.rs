@@ -11,6 +11,7 @@ use crate::{
 use anyhow::Result;
 use log::error;
 use log::info;
+use tokio::io::AsyncReadExt;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -77,7 +78,24 @@ impl SftpSession {
     }
 
     async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(open_request.id))
+        let handle = if open_request.open_options.create {
+            let write_stream = self.object_storage.write_object(open_request.filename).await?;
+            self.handle_manager.lock().await.create_write_handle(write_stream)
+        } else if open_request.open_options.read {
+            let read_stream = self.object_storage.read_object(open_request.filename).await?;
+            self.handle_manager.lock().await.create_read_handle(read_stream)
+        } else {
+            return Ok(Response::Status(response::status::Status {
+                id: open_request.id,
+                status_code: response::status::StatusCode::Failure,
+                error_message: String::from("Unsupported file open mode."),
+            }));
+        };
+
+        Ok(Response::Handle(response::handle::Handle {
+            id: open_request.id,
+            handle,
+        }))
     }
 
     async fn handle_close_request(
@@ -97,7 +115,28 @@ impl SftpSession {
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(read_request.id))
+        let read_handle = {
+            self.handle_manager.lock().await.get_read_handle(&read_request.handle)
+        };
+        
+
+        let read_handle = match read_handle {
+            Some(read_handle) => read_handle,
+            None => {return Ok(Response::Status(response::status::Status {
+                id: read_request.id,
+                status_code: response::status::StatusCode::Failure,
+                error_message: String::from("Invalid handle."),
+            }))
+            },
+        };
+
+        let mut buffer = Vec::with_capacity(read_request.len as usize);
+        read_handle.lock().await.as_mut().take(read_request.len as u64).read_to_end(&mut buffer).await?;
+
+        Ok(Response::Data(response::data::Data {
+            id: read_request.id,
+            data: buffer.to_vec(),
+        }))
     }
 
     fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {

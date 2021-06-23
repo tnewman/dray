@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{Result};
 use async_trait::async_trait;
 use chrono::{DateTime, TimeZone, Utc};
 use rusoto_core::Region;
@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 
 use super::ListPrefixResult;
 use super::ObjectStorage;
+use crate::error::Error;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
@@ -172,7 +173,14 @@ impl ObjectStorage for S3ObjectStorage {
 
     /// Creates a read stream for an object.
     async fn read_object(&self, key: String) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>> {
-        todo!("TODO: Read object {}", key)
+        let read_response = self.s3_client.get_object(GetObjectRequest {
+            bucket: self.bucket.clone(),
+            key,
+            ..Default::default()
+        }).await?;
+
+        let read_stream = read_response.body.ok_or(Error::ServerError)?.into_async_read();
+        Ok(Arc::new(Mutex::new(Box::pin(read_stream))))
     }
 
     /// Creates a write stream for an object.
