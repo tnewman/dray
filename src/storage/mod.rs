@@ -1,15 +1,22 @@
+mod handle;
 pub mod s3;
 
-use std::{pin::Pin, sync::Arc};
+use std::sync::Arc;
 
 use anyhow::Result;
 use async_trait::async_trait;
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::Mutex,
-};
+use bytes::Bytes;
 
 use crate::protocol::response::name::File;
+
+/// Builds an instance of an Object Storage backend, such as AWS S3.
+///
+/// A new instance of Object Storage is created for each SSH session,
+/// so data that is shared bewtween SSH sessions should be injected
+/// by the factory.
+pub trait ObjectStorageFactory: Send + Sync {
+    fn create_object_storage(&self) -> Arc<dyn ObjectStorage>;
+}
 
 /// An implementation of an Object Storage backend, such as AWS S3.
 ///
@@ -63,23 +70,26 @@ pub trait ObjectStorage: Send + Sync {
     /// Retrieves an object's metadata.
     async fn get_object_metadata(&self, key: String) -> Result<File>;
 
-    /// Creates a read stream for an object.
-    async fn read_object(
-        &self,
-        key: String,
-    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>>;
+    /// Creates a read handle for an object.
+    async fn open_read_handle(&self, key: String) -> Result<String>;
 
-    /// Creates a write stream for an object.
-    async fn write_object(
-        &self,
-        key: String,
-    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>>;
+    /// Writes data to an object associated with a given handle.
+    async fn write_data(&self, handle: &str, data: Bytes) -> Result<()>;
+
+    /// Creates a write handle for an object.
+    async fn open_write_handle(&self, key: String) -> Result<String>;
+
+    /// Reads data from an object associated with a given handle.
+    async fn read_data(&self, handle: &str) -> Result<Vec<u8>>;
 
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);
 
     /// Removes an object.
     async fn remove_object(&self, key: String);
+
+    // Closes a handle.
+    async fn close_handle(&self, handle: &str) -> Result<()>;
 }
 
 /// A list of objects under a prefix along with a continuation token to retrieve

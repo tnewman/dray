@@ -1,23 +1,16 @@
-use crate::storage::ObjectStorage;
-use crate::{
-    handle::Handle,
-    handle::HandleManager,
-    protocol::{
-        file_attributes::FileAttributes,
-        request::{self, Request},
-        response::{self, Response},
-    },
+use crate::protocol::{
+    file_attributes::FileAttributes,
+    request::{self, Request},
+    response::{self, Response},
 };
+use crate::storage::ObjectStorage;
 use anyhow::Result;
 use log::error;
 use log::info;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
-use tokio::sync::Mutex;
 
 pub struct SftpSession {
     object_storage: Arc<dyn ObjectStorage>,
-    handle_manager: Arc<Mutex<HandleManager>>,
     user: String,
 }
 
@@ -25,7 +18,6 @@ impl SftpSession {
     pub fn new(object_storage: Arc<dyn ObjectStorage>, user: String) -> Self {
         SftpSession {
             object_storage,
-            handle_manager: Arc::new(Mutex::new(HandleManager::new())),
             user,
         }
     }
@@ -78,121 +70,25 @@ impl SftpSession {
     }
 
     async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
-        let handle = if open_request.open_options.create {
-            let write_stream = self
-                .object_storage
-                .write_object(open_request.filename)
-                .await?;
-            self.handle_manager
-                .lock()
-                .await
-                .create_write_handle(write_stream)
-        } else if open_request.open_options.read {
-            let read_stream = self
-                .object_storage
-                .read_object(open_request.filename)
-                .await?;
-            self.handle_manager
-                .lock()
-                .await
-                .create_read_handle(read_stream)
-        } else {
-            return Ok(Response::Status(response::status::Status {
-                id: open_request.id,
-                status_code: response::status::StatusCode::Failure,
-                error_message: String::from("Unsupported file open mode."),
-            }));
-        };
-
-        Ok(Response::Handle(response::handle::Handle {
-            id: open_request.id,
-            handle,
-        }))
+        Ok(SftpSession::build_not_supported_response(open_request.id))
     }
 
     async fn handle_close_request(
         &self,
         close_request: request::handle::Handle,
     ) -> Result<Response> {
-        self.handle_manager
-            .lock()
-            .await
-            .remove_handle(&close_request.handle);
-
-        Ok(Response::Status(response::status::Status {
-            id: close_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("Successfully closed handle."),
-        }))
+        Ok(SftpSession::build_not_supported_response(close_request.id))
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        let read_handle = {
-            self.handle_manager
-                .lock()
-                .await
-                .get_read_handle(&read_request.handle)
-        };
-
-        let read_handle = match read_handle {
-            Some(read_handle) => read_handle,
-            None => {
-                return Ok(Response::Status(response::status::Status {
-                    id: read_request.id,
-                    status_code: response::status::StatusCode::Failure,
-                    error_message: String::from("Invalid handle."),
-                }))
-            }
-        };
-
-        let mut buffer = Vec::with_capacity(read_request.len as usize);
-        read_handle
-            .lock()
-            .await
-            .as_mut()
-            .take(read_request.len as u64)
-            .read_to_end(&mut buffer)
-            .await?;
-
-        Ok(Response::Data(response::data::Data {
-            id: read_request.id,
-            data: buffer.to_vec(),
-        }))
+        Ok(SftpSession::build_not_supported_response(read_request.id))
     }
 
     async fn handle_write_request(
         &self,
         mut write_request: request::write::Write,
     ) -> Result<Response> {
-        let write_handle = {
-            self.handle_manager
-                .lock()
-                .await
-                .get_write_handle(&write_request.handle)
-        };
-
-        let write_handle = match write_handle {
-            Some(write_handle) => write_handle,
-            None => {
-                return Ok(Response::Status(response::status::Status {
-                    id: write_request.id,
-                    status_code: response::status::StatusCode::Failure,
-                    error_message: String::from("Invalid handle."),
-                }))
-            }
-        };
-
-        write_handle
-            .lock()
-            .await
-            .write_all_buf(&mut write_request.data)
-            .await?;
-
-        Ok(Response::Status(response::status::Status {
-            id: write_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("Successfully wrote data to file."),
-        }))
+        Ok(SftpSession::build_not_supported_response(write_request.id))
     }
 
     fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response> {
@@ -225,72 +121,18 @@ impl SftpSession {
         &self,
         opendir_request: request::path::Path,
     ) -> Result<Response> {
-        let handle = self.handle_manager.lock().await.create_dir_handle(
-            None,
-            opendir_request.path,
-            None,
-            false,
-        );
-
-        Ok(Response::Handle(response::handle::Handle {
-            id: opendir_request.id,
-            handle,
-        }))
+        Ok(SftpSession::build_not_supported_response(
+            opendir_request.id,
+        ))
     }
 
     async fn handle_readdir_request(
         &self,
         readdir_request: request::handle::Handle,
     ) -> Result<Response> {
-        let (handle_id, prefix, continuation_token, eof) = {
-            match self
-                .handle_manager
-                .lock()
-                .await
-                .get_dir_handle(&readdir_request.handle)
-            {
-                Some(handle) => (
-                    handle.get_handle_id().to_string(),
-                    handle.get_prefix().to_string(),
-                    handle.get_continuation_token().map(|str| str.to_string()),
-                    handle.is_eof(),
-                ),
-                None => {
-                    return Ok(Response::Status(response::status::Status {
-                        id: readdir_request.id,
-                        status_code: response::status::StatusCode::BadMessage,
-                        error_message: String::from("File not found."),
-                    }));
-                }
-            }
-        };
-
-        if eof {
-            return Ok(Response::Status(response::status::Status {
-                id: readdir_request.id,
-                status_code: response::status::StatusCode::Eof,
-                error_message: String::from("No more files available to list."),
-            }));
-        }
-
-        let result = self
-            .object_storage
-            .list_prefix(prefix.clone(), continuation_token, Option::None)
-            .await?;
-
-        let eof = result.continuation_token.is_none();
-
-        self.handle_manager.lock().await.create_dir_handle(
-            Some(handle_id),
-            prefix,
-            result.continuation_token,
-            eof,
-        );
-
-        Ok(Response::Name(response::name::Name {
-            id: readdir_request.id,
-            files: result.objects,
-        }))
+        Ok(SftpSession::build_not_supported_response(
+            readdir_request.id,
+        ))
     }
 
     fn handle_remove_request(&self, remove_request: request::path::Path) -> Result<Response> {

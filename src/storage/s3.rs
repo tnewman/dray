@@ -1,6 +1,8 @@
+use std::sync::Arc;
+
 use super::ListPrefixResult;
 use super::ObjectStorage;
-use crate::error::Error;
+use super::ObjectStorageFactory;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
@@ -15,16 +17,7 @@ use rusoto_s3::{
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
-use std::pin::Pin;
-use std::sync::Arc;
-use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite};
-use tokio::sync::Mutex;
-
-#[derive(Clone)]
-pub struct S3ObjectStorage {
-    s3_client: S3Client,
-    bucket: String,
-}
+use tokio::io::AsyncReadExt;
 
 #[derive(Deserialize, Debug)]
 pub struct S3Config {
@@ -38,8 +31,13 @@ pub struct S3Config {
     pub bucket: String,
 }
 
-impl S3ObjectStorage {
-    pub fn new(s3_config: &S3Config) -> S3ObjectStorage {
+pub struct S3ObjectStorageFactory {
+    s3_client: S3Client,
+    bucket: String,
+}
+
+impl S3ObjectStorageFactory {
+    pub fn new(s3_config: &S3Config) -> S3ObjectStorageFactory {
         let region = match &s3_config.endpoint_name {
             Some(endpoint_name) => Region::Custom {
                 name: s3_config.endpoint_region.clone(),
@@ -48,10 +46,32 @@ impl S3ObjectStorage {
             None => Region::default(),
         };
 
-        S3ObjectStorage {
+        S3ObjectStorageFactory {
             s3_client: S3Client::new(region),
             bucket: s3_config.bucket.clone(),
         }
+    }
+}
+
+#[async_trait]
+impl ObjectStorageFactory for S3ObjectStorageFactory {
+    fn create_object_storage(&self) -> Arc<dyn ObjectStorage> {
+        Arc::new(S3ObjectStorage::new(
+            self.s3_client.clone(),
+            self.bucket.clone(),
+        ))
+    }
+}
+
+#[derive(Clone)]
+pub struct S3ObjectStorage {
+    s3_client: S3Client,
+    bucket: String,
+}
+
+impl S3ObjectStorage {
+    pub fn new(s3_client: S3Client, bucket: String) -> S3ObjectStorage {
+        S3ObjectStorage { s3_client, bucket }
     }
 }
 
@@ -171,34 +191,24 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(map_head_object_to_file(&key, &head_object))
     }
 
-    /// Creates a read stream for an object.
-    async fn read_object(
-        &self,
-        key: String,
-    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncRead + Send + Sync>>>>> {
-        let read_response = self
-            .s3_client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key,
-                ..Default::default()
-            })
-            .await?;
-
-        let read_stream = read_response
-            .body
-            .ok_or(Error::ServerError)?
-            .into_async_read();
-        Ok(Arc::new(Mutex::new(Box::pin(read_stream))))
+    async fn open_read_handle(&self, key: String) -> Result<String> {
+        todo!()
     }
 
-    /// Creates a write stream for an object.
-    async fn write_object(
-        &self,
-        key: String,
-    ) -> Result<Arc<Mutex<Pin<Box<dyn AsyncWrite + Send + Sync>>>>> {
-        // Writing needs to be reworked to support buffering chunks in memory and writing a single chunk at a time as a multipart upload
-        todo!("add multipart support")
+    async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
+        todo!()
+    }
+
+    async fn open_write_handle(&self, key: String) -> Result<String> {
+        todo!()
+    }
+
+    async fn read_data(&self, handle: &str) -> Result<Vec<u8>> {
+        todo!()
+    }
+
+    async fn close_handle(&self, handle: &str) -> Result<()> {
+        todo!()
     }
 
     async fn rename_object(&self, current: String, new: String) {
