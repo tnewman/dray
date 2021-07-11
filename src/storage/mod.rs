@@ -41,38 +41,38 @@ pub trait Storage: Send + Sync {
     /// to prevent clients from determining whether or not a user exists.
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>>;
 
+    // Opens a directory handle for a prefix.
+    async fn open_dir_handle(&self, dir_name: String) -> Result<String>;
+
     /// Creates a directory.
-    async fn create_dir(&self, prefix: String) -> Result<()>;
+    async fn create_dir(&self, dir_name: String) -> Result<()>;
+
+    // Reads a file listing from the prefix associated with a given handle.
+    async fn read_dir(&self, handle: &str) -> Result<Vec<File>>;
 
     /// Renames a directory.
     async fn rename_dir(&self, current: String, new: String);
 
     /// Removes a directory.
-    async fn remove_dir(&self, prefix: String);
+    async fn remove_dir(&self, dir_name: String);
 
     /// Checks if a file exists.
-    async fn file_exists(&self, key: String) -> Result<bool>;
+    async fn file_exists(&self, file_name: String) -> Result<bool>;
 
     /// Retrieves an file's metadata.
-    async fn get_file_metadata(&self, key: String) -> Result<File>;
+    async fn get_file_metadata(&self, file_name: String) -> Result<File>;
 
     /// Creates a read handle for a file.
-    async fn open_read_handle(&self, key: String) -> Result<String>;
+    async fn open_read_handle(&self, file_name: String) -> Result<String>;
 
     /// Reads data from a file associated with a given handle.
     async fn read_data(&self, handle: &str) -> Result<Vec<u8>>;
 
     /// Creates a write handle for a file.
-    async fn open_write_handle(&self, key: String) -> Result<String>;
+    async fn open_write_handle(&self, file_name: String) -> Result<String>;
 
     /// Writes data to a file associated with a given handle.
     async fn write_data(&self, handle: &str, data: Bytes) -> Result<()>;
-
-    // Opens a directory handle for a prefix.
-    async fn open_dir_handle(&self, prefix: String) -> Result<String>;
-
-    // Reads a file listing from the prefix associated with a given handle.
-    async fn read_dir(&self, handle: &str) -> Result<Vec<File>>;
 
     /// Renames a file.
     async fn rename_file(&self, current: String, new: String);

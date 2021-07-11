@@ -119,6 +119,37 @@ impl Storage for S3Storage {
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
 
+    async fn read_dir(&self, handle: &str) -> Result<Vec<File>> {
+        let dir_handle = match self.handle_manager.get_dir_handle(&handle).await {
+            Some(dir_handle) => dir_handle,
+            None => return Err(anyhow::anyhow!("Missing directory handle.")),
+        };
+
+        let mut dir_handle = dir_handle.lock().await;
+
+        if dir_handle.is_eof {
+            return Ok(Vec::new());
+        }
+
+        let prefix = get_s3_prefix(dir_handle.prefix.clone());
+
+        let objects = self
+            .s3_client
+            .list_objects_v2(ListObjectsV2Request {
+                bucket: self.bucket.clone(),
+                prefix: Some(prefix),
+                continuation_token: dir_handle.continuation_token.clone(),
+                delimiter: Some("/".to_owned()),
+                ..Default::default()
+            })
+            .await?;
+
+        dir_handle.continuation_token = objects.next_continuation_token.clone();
+        dir_handle.is_eof = objects.next_continuation_token.is_none();
+
+        Ok(map_list_objects_to_files(objects))
+    }
+
     async fn create_dir(&self, _prefix: String) -> Result<()> {
         /*
             S3 does not support creating empty prefixes. The prefix is created when the
@@ -186,11 +217,11 @@ impl Storage for S3Storage {
         todo!()
     }
 
-    async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
+    async fn open_write_handle(&self, key: String) -> Result<String> {
         todo!()
     }
 
-    async fn open_write_handle(&self, key: String) -> Result<String> {
+    async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
         todo!()
     }
 
@@ -203,37 +234,6 @@ impl Storage for S3Storage {
                 is_eof: false,
             })
             .await)
-    }
-
-    async fn read_dir(&self, handle: &str) -> Result<Vec<File>> {
-        let dir_handle = match self.handle_manager.get_dir_handle(&handle).await {
-            Some(dir_handle) => dir_handle,
-            None => return Err(anyhow::anyhow!("Missing directory handle.")),
-        };
-
-        let mut dir_handle = dir_handle.lock().await;
-
-        if dir_handle.is_eof {
-            return Ok(Vec::new());
-        }
-
-        let prefix = get_s3_prefix(dir_handle.prefix.clone());
-
-        let objects = self
-            .s3_client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(prefix),
-                continuation_token: dir_handle.continuation_token.clone(),
-                delimiter: Some("/".to_owned()),
-                ..Default::default()
-            })
-            .await?;
-
-        dir_handle.continuation_token = objects.next_continuation_token.clone();
-        dir_handle.is_eof = objects.next_continuation_token.is_none();
-
-        Ok(map_list_objects_to_files(objects))
     }
 
     async fn close_handle(&self, handle: &str) -> Result<()> {
