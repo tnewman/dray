@@ -3,19 +3,19 @@ use crate::protocol::{
     request::{self, Request},
     response::{self, Response},
 };
-use crate::storage::ObjectStorage;
+use crate::storage::Storage;
 use anyhow::Result;
 use log::error;
 use log::info;
 use std::sync::Arc;
 
 pub struct SftpSession {
-    object_storage: Arc<dyn ObjectStorage>,
+    object_storage: Arc<dyn Storage>,
     user: String,
 }
 
 impl SftpSession {
-    pub fn new(object_storage: Arc<dyn ObjectStorage>, user: String) -> Self {
+    pub fn new(object_storage: Arc<dyn Storage>, user: String) -> Self {
         SftpSession {
             object_storage,
             user,
@@ -171,7 +171,7 @@ impl SftpSession {
         mkdir_request: request::path_attributes::PathAttributes,
     ) -> Result<Response> {
         self.object_storage
-            .create_prefix(mkdir_request.path)
+            .create_dir(mkdir_request.path)
             .await?;
 
         Ok(Response::Status(response::status::Status {
@@ -211,12 +211,12 @@ impl SftpSession {
     async fn handle_stat_request(&self, stat_request: request::path::Path) -> Result<Response> {
         let file_attributes = match self
             .object_storage
-            .object_exists(stat_request.path.clone())
+            .file_exists(stat_request.path.clone())
             .await?
         {
             true => {
                 self.object_storage
-                    .get_object_metadata(stat_request.path)
+                    .get_file_metadata(stat_request.path)
                     .await?
                     .file_attributes
             }

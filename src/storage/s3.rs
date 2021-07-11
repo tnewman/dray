@@ -2,8 +2,8 @@ use std::pin::Pin;
 use std::sync::Arc;
 
 use super::handle::HandleManager;
-use super::ObjectStorage;
-use super::ObjectStorageFactory;
+use super::Storage;
+use super::StorageFactory;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
@@ -21,7 +21,6 @@ use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
-use tokio::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
 pub struct S3Config {
@@ -35,13 +34,13 @@ pub struct S3Config {
     pub bucket: String,
 }
 
-pub struct S3ObjectStorageFactory {
+pub struct S3StorageFactory {
     s3_client: S3Client,
     bucket: String,
 }
 
-impl S3ObjectStorageFactory {
-    pub fn new(s3_config: &S3Config) -> S3ObjectStorageFactory {
+impl S3StorageFactory {
+    pub fn new(s3_config: &S3Config) -> S3StorageFactory {
         let region = match &s3_config.endpoint_name {
             Some(endpoint_name) => Region::Custom {
                 name: s3_config.endpoint_region.clone(),
@@ -50,7 +49,7 @@ impl S3ObjectStorageFactory {
             None => Region::default(),
         };
 
-        S3ObjectStorageFactory {
+        S3StorageFactory {
             s3_client: S3Client::new(region),
             bucket: s3_config.bucket.clone(),
         }
@@ -58,24 +57,21 @@ impl S3ObjectStorageFactory {
 }
 
 #[async_trait]
-impl ObjectStorageFactory for S3ObjectStorageFactory {
-    fn create_object_storage(&self) -> Arc<dyn ObjectStorage> {
-        Arc::new(S3ObjectStorage::new(
-            self.s3_client.clone(),
-            self.bucket.clone(),
-        ))
+impl StorageFactory for S3StorageFactory {
+    fn create_storage(&self) -> Arc<dyn Storage> {
+        Arc::new(S3Storage::new(self.s3_client.clone(), self.bucket.clone()))
     }
 }
 
-pub struct S3ObjectStorage {
+pub struct S3Storage {
     s3_client: S3Client,
     bucket: String,
     handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send + Sync>>, String, DirHandle>,
 }
 
-impl S3ObjectStorage {
-    pub fn new(s3_client: S3Client, bucket: String) -> S3ObjectStorage {
-        S3ObjectStorage {
+impl S3Storage {
+    pub fn new(s3_client: S3Client, bucket: String) -> S3Storage {
+        S3Storage {
             s3_client,
             bucket,
             handle_manager: HandleManager::new(),
@@ -84,7 +80,7 @@ impl S3ObjectStorage {
 }
 
 #[async_trait]
-impl ObjectStorage for S3ObjectStorage {
+impl Storage for S3Storage {
     fn get_home(&self, user: &str) -> String {
         get_home(user)
     }
@@ -123,7 +119,7 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
 
-    async fn create_prefix(&self, _prefix: String) -> Result<()> {
+    async fn create_dir(&self, _prefix: String) -> Result<()> {
         /*
             S3 does not support creating empty prefixes. The prefix is created when the
             first object is added to it. This operation is a NO-OP to allow GUI-based
@@ -132,15 +128,15 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(())
     }
 
-    async fn rename_prefix(&self, current: String, new: String) {
+    async fn rename_dir(&self, current: String, new: String) {
         todo!("TODO: Rename prefix {} to {}", current, new)
     }
 
-    async fn remove_prefix(&self, prefix: String) {
+    async fn remove_dir(&self, prefix: String) {
         todo!("TODO: Remove prefix {}", prefix)
     }
 
-    async fn object_exists(&self, key: String) -> Result<bool> {
+    async fn file_exists(&self, key: String) -> Result<bool> {
         let head_object_response = self
             .s3_client
             .head_object(HeadObjectRequest {
@@ -169,7 +165,7 @@ impl ObjectStorage for S3ObjectStorage {
         }
     }
 
-    async fn get_object_metadata(&self, key: String) -> Result<File> {
+    async fn get_file_metadata(&self, key: String) -> Result<File> {
         let head_object = self
             .s3_client
             .head_object(HeadObjectRequest {
@@ -245,11 +241,11 @@ impl ObjectStorage for S3ObjectStorage {
         Ok(())
     }
 
-    async fn rename_object(&self, current: String, new: String) {
+    async fn rename_file(&self, current: String, new: String) {
         todo!("TODO: Rename object {} to {}", current, new)
     }
 
-    async fn remove_object(&self, key: String) {
+    async fn remove_file(&self, key: String) {
         todo!("TODO: Remove object {}", key)
     }
 }

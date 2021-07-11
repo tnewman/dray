@@ -18,8 +18,8 @@ use log::{debug, error, info};
 
 use protocol::request::Request;
 use sftp_session::SftpSession;
+use storage::{Storage, StorageFactory, s3::S3StorageFactory};
 use std::{convert::TryFrom, pin::Pin, sync::Arc};
-use storage::{s3::S3ObjectStorageFactory, ObjectStorage, ObjectStorageFactory};
 use thrussh::{
     server::{run, Auth, Config, Handler, Server, Session},
     ChannelId, CryptoVec,
@@ -32,15 +32,15 @@ use tokio::sync::RwLock;
 
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,
-    object_storage_factory: Arc<dyn ObjectStorageFactory>,
-    object_storage: Arc<dyn ObjectStorage>,
+    object_storage_factory: Arc<dyn StorageFactory>,
+    object_storage: Arc<dyn Storage>,
     sftp_session: RwLock<Option<SftpSession>>,
 }
 
 impl DraySshServer {
     pub fn new(dray_config: DrayConfig) -> DraySshServer {
-        let object_storage_factory = Arc::from(S3ObjectStorageFactory::new(&dray_config.s3));
-        let object_storage = object_storage_factory.create_object_storage();
+        let object_storage_factory = Arc::from(S3StorageFactory::new(&dray_config.s3));
+        let object_storage = object_storage_factory.create_storage();
 
         DraySshServer {
             dray_config: Arc::from(dray_config),
@@ -140,7 +140,7 @@ impl Server for DraySshServer {
         DraySshServer {
             dray_config: self.dray_config.clone(),
             object_storage_factory: self.object_storage_factory.clone(),
-            object_storage: self.object_storage_factory.create_object_storage(),
+            object_storage: self.object_storage_factory.create_storage(),
             sftp_session: RwLock::from(Option::None),
         }
     }
