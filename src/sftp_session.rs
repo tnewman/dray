@@ -77,7 +77,9 @@ impl SftpSession {
         &self,
         close_request: request::handle::Handle,
     ) -> Result<Response> {
-        self.object_storage.close_handle(&close_request.handle).await?;
+        self.object_storage
+            .close_handle(&close_request.handle)
+            .await?;
 
         Ok(Response::Status(response::status::Status {
             id: close_request.id,
@@ -127,7 +129,10 @@ impl SftpSession {
         &self,
         opendir_request: request::path::Path,
     ) -> Result<Response> {
-        let handle = self.object_storage.open_dir_handle(opendir_request.path).await?;
+        let handle = self
+            .object_storage
+            .open_dir_handle(opendir_request.path)
+            .await?;
 
         Ok(Response::Handle(response::handle::Handle {
             id: opendir_request.id,
@@ -139,8 +144,11 @@ impl SftpSession {
         &self,
         readdir_request: request::handle::Handle,
     ) -> Result<Response> {
-        let files = self.object_storage.read_dir(&readdir_request.handle).await?;
-        
+        let files = self
+            .object_storage
+            .read_dir(&readdir_request.handle)
+            .await?;
+
         match files.is_empty() {
             true => Ok(Response::Status(response::status::Status {
                 id: readdir_request.id,
