@@ -294,8 +294,7 @@ fn get_home(user: &str) -> String {
 }
 
 fn get_s3_key(key: String) -> String {
-    let key = key[1..key.len()].to_string();
-    key
+    key[1..key.len()].to_string()
 }
 
 fn get_s3_prefix(dir_name: String) -> String {

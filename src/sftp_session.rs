@@ -127,10 +127,7 @@ impl SftpSession {
         }
     }
 
-    async fn handle_write_request(
-        &self,
-        mut write_request: request::write::Write,
-    ) -> Result<Response> {
+    async fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {
         Ok(SftpSession::build_not_supported_response(write_request.id))
     }
 
@@ -228,7 +225,7 @@ impl SftpSession {
         Ok(Response::Name(response::name::Name {
             id: realpath_request.id,
             files: vec![response::name::File {
-                file_name: path.clone(),
+                file_name: path,
                 file_attributes: FileAttributes {
                     permissions: Some(0o40777),
                     size: None,

@@ -51,27 +51,15 @@ impl<ReadHandle, WriteHandle, DirHandle> HandleManager<ReadHandle, WriteHandle, 
     }
 
     pub async fn get_dir_handle(&self, handle_id: &str) -> Option<Arc<Mutex<DirHandle>>> {
-        self.dir_handles
-            .read()
-            .await
-            .get(handle_id)
-            .map(|dir_handle| dir_handle.clone())
+        self.dir_handles.read().await.get(handle_id).cloned()
     }
 
     pub async fn get_read_handle(&self, handle_id: &str) -> Option<Arc<Mutex<ReadHandle>>> {
-        self.read_handles
-            .read()
-            .await
-            .get(handle_id)
-            .map(|read_handle| read_handle.clone())
+        self.read_handles.read().await.get(handle_id).cloned()
     }
 
     pub async fn get_write_handle(&self, handle_id: &str) -> Option<Arc<Mutex<WriteHandle>>> {
-        self.write_handles
-            .write()
-            .await
-            .get(handle_id)
-            .map(|write_handle| write_handle.clone())
+        self.write_handles.write().await.get(handle_id).cloned()
     }
 
     pub async fn remove_handle(&self, handle: &str) {

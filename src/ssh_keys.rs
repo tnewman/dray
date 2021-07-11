@@ -12,8 +12,7 @@ pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
                 _ => None,
             }
         })
-        .filter(|key| key.is_some())
-        .map(|key| key.unwrap())
+        .flatten()
         .map(|key| key.fingerprint())
         .collect()
 }
