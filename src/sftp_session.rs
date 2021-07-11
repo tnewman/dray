@@ -108,7 +108,10 @@ impl SftpSession {
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        let data = self.object_storage.read_data(&read_request.handle, read_request.len).await?;
+        let data = self
+            .object_storage
+            .read_data(&read_request.handle, read_request.len)
+            .await?;
 
         if data.is_empty() {
             Ok(Response::Status(response::status::Status {
