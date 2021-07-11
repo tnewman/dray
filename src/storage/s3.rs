@@ -1,7 +1,7 @@
+use std::pin::Pin;
 use std::sync::Arc;
 
 use super::handle::HandleManager;
-use super::ListPrefixResult;
 use super::ObjectStorage;
 use super::ObjectStorageFactory;
 use crate::protocol::file_attributes::FileAttributes;
@@ -12,13 +12,16 @@ use async_trait::async_trait;
 
 use chrono::{DateTime, TimeZone, Utc};
 use rusoto_core::Region;
+use rusoto_s3::HeadBucketRequest;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
     Object, S3Client, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
+use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
+use tokio::sync::Mutex;
 
 #[derive(Deserialize, Debug)]
 pub struct S3Config {
@@ -67,7 +70,7 @@ impl ObjectStorageFactory for S3ObjectStorageFactory {
 pub struct S3ObjectStorage {
     s3_client: S3Client,
     bucket: String,
-    handle_manager: HandleManager<String, String, String>,
+    handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send + Sync>>, String, DirHandle>,
 }
 
 impl S3ObjectStorage {
@@ -87,7 +90,13 @@ impl ObjectStorage for S3ObjectStorage {
     }
 
     async fn health_check(&self) -> Result<()> {
-        self.list_prefix(String::from(""), None, None).await?;
+        self.s3_client
+            .head_bucket(HeadBucketRequest {
+                bucket: self.bucket.clone(),
+                ..Default::default()
+            })
+            .await?;
+
         Ok(())
     }
 
@@ -112,29 +121,6 @@ impl ObjectStorage for S3ObjectStorage {
         body.into_async_read().read_to_string(&mut buffer).await?;
 
         Ok(ssh_keys::parse_authorized_keys(&buffer))
-    }
-
-    async fn list_prefix(
-        &self,
-        prefix: String,
-        continuation_token: Option<String>,
-        max_results: Option<i64>,
-    ) -> Result<ListPrefixResult> {
-        let prefix = get_s3_prefix(prefix);
-
-        let objects = self
-            .s3_client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(prefix),
-                continuation_token,
-                max_keys: max_results,
-                delimiter: Some("/".to_owned()),
-                ..Default::default()
-            })
-            .await?;
-
-        Ok(map_list_objects_to_list_prefix_result(objects))
     }
 
     async fn create_prefix(&self, _prefix: String) -> Result<()> {
@@ -212,8 +198,51 @@ impl ObjectStorage for S3ObjectStorage {
         todo!()
     }
 
+    async fn open_dir_handle(&self, prefix: String) -> Result<String> {
+        Ok(self
+            .handle_manager
+            .create_dir_handle(DirHandle {
+                prefix,
+                continuation_token: None,
+                is_eof: false,
+            })
+            .await)
+    }
+
+    async fn read_dir(&self, handle: &str) -> Result<Vec<File>> {
+        let dir_handle = match self.handle_manager.get_dir_handle(&handle).await {
+            Some(dir_handle) => dir_handle,
+            None => return Err(anyhow::anyhow!("Missing directory handle.")),
+        };
+
+        let mut dir_handle = dir_handle.lock().await;
+
+        if dir_handle.is_eof {
+            return Ok(Vec::new());
+        }
+
+        let prefix = get_s3_prefix(dir_handle.prefix.clone());
+
+        let objects = self
+            .s3_client
+            .list_objects_v2(ListObjectsV2Request {
+                bucket: self.bucket.clone(),
+                prefix: Some(prefix),
+                continuation_token: dir_handle.continuation_token.clone(),
+                delimiter: Some("/".to_owned()),
+                ..Default::default()
+            })
+            .await?;
+
+        dir_handle.continuation_token = objects.next_continuation_token.clone();
+        dir_handle.is_eof = objects.next_continuation_token.is_none();
+
+        Ok(map_list_objects_to_files(objects))
+    }
+
     async fn close_handle(&self, handle: &str) -> Result<()> {
-        todo!()
+        self.handle_manager.remove_handle(handle).await;
+        Ok(())
     }
 
     async fn rename_object(&self, current: String, new: String) {
@@ -225,12 +254,14 @@ impl ObjectStorage for S3ObjectStorage {
     }
 }
 
-fn get_home(user: &str) -> String {
-    format!("/home/{}", user)
+pub struct DirHandle {
+    prefix: String,
+    continuation_token: Option<String>,
+    is_eof: bool,
 }
 
-fn get_range(offset: u64, len: u32) -> String {
-    format!("bytes={}-{}", offset, offset + len as u64 - 1)
+fn get_home(user: &str) -> String {
+    format!("/home/{}", user)
 }
 
 fn get_s3_key(key: String) -> String {
@@ -246,7 +277,7 @@ fn get_s3_prefix(prefix: String) -> String {
     prefix
 }
 
-fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> ListPrefixResult {
+fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
     let files = list_objects.contents.unwrap_or_default();
 
     let directories = list_objects.common_prefixes.unwrap_or_default();
@@ -255,10 +286,7 @@ fn map_list_objects_to_list_prefix_result(list_objects: ListObjectsV2Output) -> 
 
     let mapped_dirs = directories.iter().map(|prefix| map_prefix_to_file(prefix));
 
-    ListPrefixResult {
-        objects: mapped_dirs.chain(mapped_files).collect(),
-        continuation_token: list_objects.continuation_token,
-    }
+    mapped_dirs.chain(mapped_files).collect()
 }
 
 fn map_object_to_file(object: &Object) -> File {
@@ -351,16 +379,6 @@ mod test {
     }
 
     #[test]
-    fn test_get_range_returns_range_string() {
-        assert_eq!("bytes=0-1023", get_range(0, 1024));
-    }
-
-    #[test]
-    fn test_get_range_returns_range_string_with_offset() {
-        assert_eq!("bytes=1024-2023", get_range(1024, 1000));
-    }
-
-    #[test]
     fn test_get_default_endpoint_region() {
         assert_eq!("custom", get_default_endpoint_region());
     }
@@ -400,9 +418,9 @@ mod test {
             ..Default::default()
         };
 
-        let result = map_list_objects_to_list_prefix_result(list_objects);
+        let result = map_list_objects_to_files(list_objects);
 
-        assert_eq!(2, result.objects.len());
+        assert_eq!(2, result.len());
         assert_eq!(
             File {
                 file_name: "subfolder".to_owned(),
@@ -415,7 +433,7 @@ mod test {
                     mtime: None,
                 }
             },
-            result.objects[0]
+            result[0]
         );
         assert_eq!(
             File {
@@ -429,9 +447,8 @@ mod test {
                     mtime: Some(1417176009),
                 }
             },
-            result.objects[1]
+            result[1]
         );
-        assert_eq!(String::from("token"), result.continuation_token.unwrap());
     }
 
     #[test]
@@ -440,10 +457,9 @@ mod test {
             ..Default::default()
         };
 
-        let result = map_list_objects_to_list_prefix_result(list_objects);
+        let result = map_list_objects_to_files(list_objects);
 
-        assert_eq!(0, result.objects.len());
-        assert!(result.continuation_token.is_none());
+        assert_eq!(0, result.len());
     }
 
     #[test]

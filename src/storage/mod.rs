@@ -46,15 +46,6 @@ pub trait ObjectStorage: Send + Sync {
     /// to prevent clients from determining whether or not a user exists.
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>>;
 
-    /// Lists objects under a prefix. The list will start at `continuation_token` if
-    /// provided and return up the smaller of `max_results` or the backend max limit.
-    async fn list_prefix(
-        &self,
-        prefix: String,
-        continuation_token: Option<String>,
-        max_results: Option<i64>,
-    ) -> Result<ListPrefixResult>;
-
     /// Creates a prefix.
     async fn create_prefix(&self, prefix: String) -> Result<()>;
 
@@ -82,6 +73,12 @@ pub trait ObjectStorage: Send + Sync {
     /// Reads data from an object associated with a given handle.
     async fn read_data(&self, handle: &str) -> Result<Vec<u8>>;
 
+    // Opens a directory handle for a prefix.
+    async fn open_dir_handle(&self, prefix: String) -> Result<String>;
+
+    // Reads a file listing from the prefix associated with a given handle.
+    async fn read_dir(&self, handle: &str) -> Result<Vec<File>>;
+
     /// Renames an object.
     async fn rename_object(&self, current: String, new: String);
 
@@ -90,14 +87,4 @@ pub trait ObjectStorage: Send + Sync {
 
     // Closes a handle.
     async fn close_handle(&self, handle: &str) -> Result<()>;
-}
-
-/// A list of objects under a prefix along with a continuation token to retrieve
-/// the next objects if the current result is incomplete.
-pub struct ListPrefixResult {
-    /// A list of objects under a prefix and continuation token.
-    pub objects: Vec<File>,
-
-    /// The continuation token to retrieve the next list of objects under the prefix.
-    pub continuation_token: Option<String>,
 }

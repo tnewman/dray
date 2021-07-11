@@ -77,7 +77,13 @@ impl SftpSession {
         &self,
         close_request: request::handle::Handle,
     ) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(close_request.id))
+        self.object_storage.close_handle(&close_request.handle).await?;
+
+        Ok(Response::Status(response::status::Status {
+            id: close_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from(""),
+        }))
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
@@ -121,18 +127,31 @@ impl SftpSession {
         &self,
         opendir_request: request::path::Path,
     ) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(
-            opendir_request.id,
-        ))
+        let handle = self.object_storage.open_dir_handle(opendir_request.path).await?;
+
+        Ok(Response::Handle(response::handle::Handle {
+            id: opendir_request.id,
+            handle,
+        }))
     }
 
     async fn handle_readdir_request(
         &self,
         readdir_request: request::handle::Handle,
     ) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(
-            readdir_request.id,
-        ))
+        let files = self.object_storage.read_dir(&readdir_request.handle).await?;
+        
+        match files.is_empty() {
+            true => Ok(Response::Status(response::status::Status {
+                id: readdir_request.id,
+                status_code: response::status::StatusCode::Eof,
+                error_message: String::from("End of file."),
+            })),
+            false => Ok(Response::Name(response::name::Name {
+                id: readdir_request.id,
+                files,
+            })),
+        }
     }
 
     fn handle_remove_request(&self, remove_request: request::path::Path) -> Result<Response> {
