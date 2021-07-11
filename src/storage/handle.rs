@@ -1,65 +1,86 @@
-use std::{collections::HashMap, pin::Pin, sync::Arc};
-use tokio::{
-    io::{AsyncRead, AsyncWrite},
-    sync::Mutex,
-};
+use std::{collections::HashMap, sync::Arc};
+use tokio::sync::RwLock;
 use uuid::Uuid;
 
-pub struct HandleManager<ReadHandle, WriteHandle, DirHandle> {
-    read_handles: HashMap<String, ReadHandle>,
-    write_handles: HashMap<String, WriteHandle>,
-    dir_handles: HashMap<String, DirHandle>,
+pub struct HandleManager<ReadHandle: Send + Sync, WriteHandle: Send + Sync, DirHandle: Send + Sync>
+{
+    read_handles: RwLock<HashMap<String, Arc<ReadHandle>>>,
+    write_handles: RwLock<HashMap<String, Arc<WriteHandle>>>,
+    dir_handles: RwLock<HashMap<String, Arc<DirHandle>>>,
 }
 
-impl<ReadHandle, WriteHandle, DirHandle> HandleManager<ReadHandle, WriteHandle, DirHandle> {
+impl<ReadHandle: Send + Sync, WriteHandle: Send + Sync, DirHandle: Send + Sync>
+    HandleManager<ReadHandle, WriteHandle, DirHandle>
+{
     pub fn new() -> HandleManager<ReadHandle, WriteHandle, DirHandle> {
         HandleManager {
-            read_handles: HashMap::new(),
-            write_handles: HashMap::new(),
-            dir_handles: HashMap::new(),
+            read_handles: RwLock::new(HashMap::new()),
+            write_handles: RwLock::new(HashMap::new()),
+            dir_handles: RwLock::new(HashMap::new()),
         }
     }
 
-    pub fn create_dir_handle(&mut self, dir_handle: DirHandle) -> String {
+    pub async fn create_dir_handle(&mut self, dir_handle: DirHandle) -> String {
         let handle_id = generate_handle_id();
 
-        self.dir_handles.insert(handle_id.clone(), dir_handle);
+        self.dir_handles
+            .write()
+            .await
+            .insert(handle_id.clone(), Arc::from(dir_handle));
 
         handle_id
     }
 
-    pub fn create_read_handle(&mut self, read_handle: ReadHandle) -> String {
+    pub async fn create_read_handle(&mut self, read_handle: ReadHandle) -> String {
         let handle_id = generate_handle_id();
 
-        self.read_handles.insert(handle_id.clone(), read_handle);
+        self.read_handles
+            .write()
+            .await
+            .insert(handle_id.clone(), Arc::from(read_handle));
 
         handle_id
     }
 
-    pub fn create_write_handle(&mut self, write_handle: WriteHandle) -> String {
+    pub async fn create_write_handle(&mut self, write_handle: WriteHandle) -> String {
         let handle_id = generate_handle_id();
 
-        self.write_handles.insert(handle_id.clone(), write_handle);
+        self.write_handles
+            .write()
+            .await
+            .insert(handle_id.clone(), Arc::from(write_handle));
 
         handle_id
     }
 
-    pub fn get_dir_handle(&mut self, handle_id: &str) -> Option<&mut DirHandle> {
-        self.dir_handles.get_mut(handle_id)
+    pub async fn get_dir_handle(&mut self, handle_id: &str) -> Option<Arc<DirHandle>> {
+        self.dir_handles
+            .read()
+            .await
+            .get(handle_id)
+            .map(|dir_handle| dir_handle.clone())
     }
 
-    pub fn get_read_handle(&mut self, handle_id: &str) -> Option<&mut ReadHandle> {
-        self.read_handles.get_mut(handle_id)
+    pub async fn get_read_handle(&mut self, handle_id: &str) -> Option<Arc<ReadHandle>> {
+        self.read_handles
+            .read()
+            .await
+            .get(handle_id)
+            .map(|read_handle| read_handle.clone())
     }
 
-    pub fn get_write_handle(&mut self, handle_id: &str) -> Option<&mut WriteHandle> {
-        self.write_handles.get_mut(handle_id)
+    pub async fn get_write_handle(&mut self, handle_id: &str) -> Option<Arc<WriteHandle>> {
+        self.write_handles
+            .write()
+            .await
+            .get(handle_id)
+            .map(|write_handle| write_handle.clone())
     }
 
-    pub fn remove_handle(&mut self, handle: &str) {
-        self.dir_handles.remove(handle);
-        self.read_handles.remove(handle);
-        self.write_handles.remove(handle);
+    pub async fn remove_handle(&mut self, handle: &str) {
+        self.dir_handles.write().await.remove(handle);
+        self.read_handles.write().await.remove(handle);
+        self.write_handles.write().await.remove(handle);
     }
 }
 
@@ -72,21 +93,14 @@ pub trait Handle {
 }
 
 pub struct DirHandle {
-    id: String,
     prefix: String,
     continuation_token: Option<String>,
     eof: bool,
 }
 
 impl DirHandle {
-    pub fn new(
-        id: Option<String>,
-        prefix: String,
-        continuation_token: Option<String>,
-        eof: bool,
-    ) -> DirHandle {
+    pub fn new(prefix: String, continuation_token: Option<String>, eof: bool) -> DirHandle {
         DirHandle {
-            id: id.unwrap_or_else(generate_handle_id),
             prefix,
             continuation_token,
             eof,
@@ -109,12 +123,6 @@ impl DirHandle {
     }
 }
 
-impl Handle for DirHandle {
-    fn get_handle_id(&self) -> &str {
-        &self.id
-    }
-}
-
 fn generate_handle_id() -> String {
     Uuid::new_v4().to_string()
 }
@@ -123,101 +131,118 @@ fn generate_handle_id() -> String {
 mod test {
     use super::*;
 
-    use std::io::Cursor;
-    use tokio::io::{AsyncReadExt, AsyncWriteExt};
-
-    #[test]
-    fn test_handle_manager_dir_handle_create_get() {
+    #[tokio::test]
+    async fn test_handle_manager_dir_handle_create_get() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        let handle_id = handle_manager.create_dir_handle(String::from("dir"));
+        let handle_id = handle_manager.create_dir_handle(String::from("dir")).await;
 
-        assert!(handle_manager.get_dir_handle(&handle_id).is_some())
+        assert!(handle_manager.get_dir_handle(&handle_id).await.is_some())
     }
 
-    #[test]
-    fn test_handle_manager_dir_handle_delete() {
+    #[tokio::test]
+    async fn test_handle_manager_dir_handle_delete() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        let handle_id = handle_manager.create_dir_handle(String::from("dir"));
-        assert!(handle_manager.get_dir_handle(&handle_id).is_some());
+        let handle_id = handle_manager.create_dir_handle(String::from("dir")).await;
+        assert!(handle_manager.get_dir_handle(&handle_id).await.is_some());
 
-        handle_manager.remove_handle(&handle_id);
-        assert!(handle_manager.get_dir_handle(&handle_id).is_none());
+        handle_manager.remove_handle(&handle_id).await;
+        assert!(handle_manager.get_dir_handle(&handle_id).await.is_none());
     }
 
-    #[test]
-    fn test_handle_manager_get_missing_dir_handle() {
+    #[tokio::test]
+    async fn test_handle_manager_get_missing_dir_handle() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        assert!(handle_manager.get_dir_handle("missing_handle").is_none());
+        assert!(handle_manager
+            .get_dir_handle("missing_handle")
+            .await
+            .is_none());
     }
 
     #[tokio::test]
     async fn test_handle_manager_read_handle_create_get() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        let handle_id = handle_manager.create_read_handle(String::from("read"));
+        let handle_id = handle_manager
+            .create_read_handle(String::from("read"))
+            .await;
 
-        let handle = handle_manager.get_read_handle(&handle_id).unwrap();
+        let handle = handle_manager.get_read_handle(&handle_id).await.unwrap();
 
-        assert_eq!(&mut "read", &handle);
+        assert_eq!(&"read", &*handle);
     }
 
-    #[test]
-    fn test_handle_manager_read_handle_delete() {
+    #[tokio::test]
+    async fn test_handle_manager_read_handle_delete() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        let handle_id = handle_manager.create_read_handle(String::from("read"));
-        assert!(handle_manager.get_read_handle(&handle_id).is_some());
+        let handle_id = handle_manager
+            .create_read_handle(String::from("read"))
+            .await;
+        assert!(handle_manager.get_read_handle(&handle_id).await.is_some());
 
-        handle_manager.remove_handle(&handle_id);
-        assert!(handle_manager.get_read_handle(&handle_id).is_none());
+        handle_manager.remove_handle(&handle_id).await;
+        assert!(handle_manager.get_read_handle(&handle_id).await.is_none());
     }
 
-    #[test]
-    fn test_handle_manager_get_missing_read_handle() {
+    #[tokio::test]
+    async fn test_handle_manager_get_missing_read_handle() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        assert!(handle_manager.get_read_handle("missing_handle").is_none());
+        assert!(handle_manager
+            .get_read_handle("missing_handle")
+            .await
+            .is_none());
     }
 
     #[tokio::test]
     async fn test_handle_manager_write_handle_create_get() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        let handle_id = handle_manager.create_write_handle(String::from("write"));
+        let handle_id = handle_manager
+            .create_write_handle(String::from("write"))
+            .await;
 
-        let handle = handle_manager.get_write_handle(&handle_id).unwrap();
+        let handle = handle_manager.get_write_handle(&handle_id).await.unwrap();
 
-        assert_eq!(&mut "write", &handle)
+        assert_eq!("write", &*handle)
     }
 
-    #[test]
-    fn test_handle_manager_write_handle_delete() {
+    #[tokio::test]
+    async fn test_handle_manager_write_handle_delete() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        let handle_id = handle_manager.create_write_handle(String::from("write"));
-        assert!(handle_manager.get_write_handle(&handle_id).is_some());
+        let handle_id = handle_manager
+            .create_write_handle(String::from("write"))
+            .await;
+        assert!(handle_manager.get_write_handle(&handle_id).await.is_some());
 
-        handle_manager.remove_handle(&handle_id);
-        assert!(handle_manager.get_write_handle(&handle_id).is_none());
+        handle_manager.remove_handle(&handle_id).await;
+        assert!(handle_manager.get_write_handle(&handle_id).await.is_none());
     }
 
-    #[test]
-    fn test_handle_manager_get_missing_write_handle() {
+    #[tokio::test]
+    async fn test_handle_manager_get_missing_write_handle() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        assert!(handle_manager.get_write_handle("missing_handle").is_none());
+        assert!(handle_manager
+            .get_write_handle("missing_handle")
+            .await
+            .is_none());
     }
 
-    #[test]
-    fn test_handle_manager_remove_missing_handle() {
+    #[tokio::test]
+    async fn test_handle_manager_remove_missing_handle() {
         let mut handle_manager: HandleManager<String, String, String> = HandleManager::new();
 
-        handle_manager.remove_handle("missing_handle");
+        handle_manager.remove_handle("missing_handle").await;
 
-        assert!(handle_manager.get_write_handle("missing_handle").is_none());
+        assert!(handle_manager
+            .get_write_handle("missing_handle")
+            .await
+            .is_none());
     }
 
     #[test]

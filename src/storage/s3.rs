@@ -1,5 +1,6 @@
 use std::sync::Arc;
 
+use super::handle::HandleManager;
 use super::ListPrefixResult;
 use super::ObjectStorage;
 use super::ObjectStorageFactory;
@@ -63,15 +64,19 @@ impl ObjectStorageFactory for S3ObjectStorageFactory {
     }
 }
 
-#[derive(Clone)]
 pub struct S3ObjectStorage {
     s3_client: S3Client,
     bucket: String,
+    handle_manager: HandleManager<String, String, String>,
 }
 
 impl S3ObjectStorage {
     pub fn new(s3_client: S3Client, bucket: String) -> S3ObjectStorage {
-        S3ObjectStorage { s3_client, bucket }
+        S3ObjectStorage {
+            s3_client,
+            bucket,
+            handle_manager: HandleManager::new(),
+        }
     }
 }
 
