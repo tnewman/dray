@@ -64,14 +64,14 @@ pub trait ObjectStorage: Send + Sync {
     /// Creates a read handle for an object.
     async fn open_read_handle(&self, key: String) -> Result<String>;
 
+    /// Reads data from an object associated with a given handle.
+    async fn read_data(&self, handle: &str) -> Result<Vec<u8>>;
+
     /// Writes data to an object associated with a given handle.
     async fn write_data(&self, handle: &str, data: Bytes) -> Result<()>;
 
     /// Creates a write handle for an object.
     async fn open_write_handle(&self, key: String) -> Result<String>;
-
-    /// Reads data from an object associated with a given handle.
-    async fn read_data(&self, handle: &str) -> Result<Vec<u8>>;
 
     // Opens a directory handle for a prefix.
     async fn open_dir_handle(&self, prefix: String) -> Result<String>;

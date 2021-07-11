@@ -186,15 +186,15 @@ impl ObjectStorage for S3ObjectStorage {
         todo!()
     }
 
+    async fn read_data(&self, handle: &str) -> Result<Vec<u8>> {
+        todo!()
+    }
+
     async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
         todo!()
     }
 
     async fn open_write_handle(&self, key: String) -> Result<String> {
-        todo!()
-    }
-
-    async fn read_data(&self, handle: &str) -> Result<Vec<u8>> {
         todo!()
     }
 
