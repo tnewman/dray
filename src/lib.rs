@@ -18,8 +18,8 @@ use log::{debug, error, info};
 
 use protocol::request::Request;
 use sftp_session::SftpSession;
-use storage::{Storage, StorageFactory, s3::S3StorageFactory};
 use std::{convert::TryFrom, pin::Pin, sync::Arc};
+use storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use thrussh::{
     server::{run, Auth, Config, Handler, Server, Session},
     ChannelId, CryptoVec,

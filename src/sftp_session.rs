@@ -170,9 +170,7 @@ impl SftpSession {
         &self,
         mkdir_request: request::path_attributes::PathAttributes,
     ) -> Result<Response> {
-        self.object_storage
-            .create_dir(mkdir_request.path)
-            .await?;
+        self.object_storage.create_dir(mkdir_request.path).await?;
 
         Ok(Response::Status(response::status::Status {
             id: mkdir_request.id,

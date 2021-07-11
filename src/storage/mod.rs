@@ -28,7 +28,7 @@ pub trait Storage: Send + Sync {
     /// - The framework will sanitize the user.
     fn get_home(&self, user: &str) -> String;
 
-    /// Checks if storage is available. An error will be returned if  storage 
+    /// Checks if storage is available. An error will be returned if  storage
     /// operations cannot be performed.
     async fn health_check(&self) -> Result<()>;
 
