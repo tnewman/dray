@@ -4,6 +4,7 @@ use std::sync::Arc;
 use super::handle::HandleManager;
 use super::Storage;
 use super::StorageFactory;
+use crate::error::Error;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
@@ -119,6 +120,17 @@ impl Storage for S3Storage {
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
 
+    async fn open_dir_handle(&self, dir_name: String) -> Result<String> {
+        Ok(self
+            .handle_manager
+            .create_dir_handle(DirHandle {
+                prefix: dir_name,
+                continuation_token: None,
+                is_eof: false,
+            })
+            .await)
+    }
+
     async fn read_dir(&self, handle: &str) -> Result<Vec<File>> {
         let dir_handle = match self.handle_manager.get_dir_handle(&handle).await {
             Some(dir_handle) => dir_handle,
@@ -196,44 +208,65 @@ impl Storage for S3Storage {
         }
     }
 
-    async fn get_file_metadata(&self, key: String) -> Result<File> {
+    async fn get_file_metadata(&self, file_name: String) -> Result<File> {
         let head_object = self
             .s3_client
             .head_object(HeadObjectRequest {
                 bucket: self.bucket.clone(),
-                key: key.clone(),
+                key: file_name.clone(),
                 ..Default::default()
             })
             .await?;
 
-        Ok(map_head_object_to_file(&key, &head_object))
+        Ok(map_head_object_to_file(&file_name, &head_object))
     }
 
-    async fn open_read_handle(&self, key: String) -> Result<String> {
-        todo!()
+    async fn open_read_handle(&self, file_name: String) -> Result<String> {
+        let read_response = self
+            .s3_client
+            .get_object(GetObjectRequest {
+                bucket: self.bucket.clone(),
+                key: file_name,
+                ..Default::default()
+            })
+            .await?;
+
+        let read_stream = read_response
+            .body
+            .ok_or(Error::ServerError)?
+            .into_async_read();
+
+        Ok(self
+            .handle_manager
+            .create_read_handle(Box::pin(read_stream))
+            .await)
     }
 
-    async fn read_data(&self, handle: &str) -> Result<Vec<u8>> {
-        todo!()
+    async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>> {
+        let read_handle = match self.handle_manager.get_read_handle(&handle).await {
+            Some(dir_handle) => dir_handle,
+            None => return Err(anyhow::anyhow!("Missing read handle.")),
+        };
+
+        let mut buffer = Vec::with_capacity(len as usize);
+
+        read_handle
+            .lock()
+            .await
+            .as_mut()
+            .take(len as u64)
+            .read_to_end(&mut buffer)
+            .await?;
+
+        Ok(buffer)
     }
 
-    async fn open_write_handle(&self, key: String) -> Result<String> {
+    async fn open_write_handle(&self, file_name: String) -> Result<String> {
         todo!()
     }
 
     async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
         todo!()
-    }
-
-    async fn open_dir_handle(&self, prefix: String) -> Result<String> {
-        Ok(self
-            .handle_manager
-            .create_dir_handle(DirHandle {
-                prefix,
-                continuation_token: None,
-                is_eof: false,
-            })
-            .await)
     }
 
     async fn close_handle(&self, handle: &str) -> Result<()> {
@@ -245,8 +278,8 @@ impl Storage for S3Storage {
         todo!("TODO: Rename object {} to {}", current, new)
     }
 
-    async fn remove_file(&self, key: String) {
-        todo!("TODO: Remove object {}", key)
+    async fn remove_file(&self, file_name: String) {
+        todo!("TODO: Remove object {}", file_name)
     }
 }
 
@@ -265,10 +298,10 @@ fn get_s3_key(key: String) -> String {
     key
 }
 
-fn get_s3_prefix(prefix: String) -> String {
-    let prefix = match "".eq(&prefix) {
+fn get_s3_prefix(dir_name: String) -> String {
+    let prefix = match "".eq(&dir_name) {
         true => String::from("/"),
-        false => format!("{}/", prefix[1..prefix.len()].to_string()),
+        false => format!("{}/", dir_name[1..dir_name.len()].to_string()),
     };
     prefix
 }

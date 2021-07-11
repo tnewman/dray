@@ -70,7 +70,26 @@ impl SftpSession {
     }
 
     async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(open_request.id))
+        let handle = if open_request.open_options.create {
+            self.object_storage
+                .open_write_handle(open_request.filename)
+                .await?
+        } else if open_request.open_options.read {
+            self.object_storage
+                .open_read_handle(open_request.filename)
+                .await?
+        } else {
+            return Ok(Response::Status(response::status::Status {
+                id: open_request.id,
+                status_code: response::status::StatusCode::Failure,
+                error_message: String::from("Unsupported file open mode."),
+            }));
+        };
+
+        Ok(Response::Handle(response::handle::Handle {
+            id: open_request.id,
+            handle,
+        }))
     }
 
     async fn handle_close_request(
@@ -89,7 +108,20 @@ impl SftpSession {
     }
 
     async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(read_request.id))
+        let data = self.object_storage.read_data(&read_request.handle, read_request.len).await?;
+
+        if data.is_empty() {
+            Ok(Response::Status(response::status::Status {
+                id: read_request.id,
+                status_code: response::status::StatusCode::Eof,
+                error_message: String::from("End of file."),
+            }))
+        } else {
+            Ok(Response::Data(response::data::Data {
+                id: read_request.id,
+                data,
+            }))
+        }
     }
 
     async fn handle_write_request(

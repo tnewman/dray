@@ -65,8 +65,8 @@ pub trait Storage: Send + Sync {
     /// Creates a read handle for a file.
     async fn open_read_handle(&self, file_name: String) -> Result<String>;
 
-    /// Reads data from a file associated with a given handle.
-    async fn read_data(&self, handle: &str) -> Result<Vec<u8>>;
+    /// Reads up to len bytes of data data from a file associated with a given handle.
+    async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>>;
 
     /// Creates a write handle for a file.
     async fn open_write_handle(&self, file_name: String) -> Result<String>;
