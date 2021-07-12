@@ -13,11 +13,13 @@ use futures::{
     future::{ready, Ready},
     Future,
 };
+
 use log::{debug, error, info};
+
 use protocol::request::Request;
 use sftp_session::SftpSession;
 use std::{convert::TryFrom, pin::Pin, sync::Arc};
-use storage::{s3::S3ObjectStorage, ObjectStorage};
+use storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use thrussh::{
     server::{run, Auth, Config, Handler, Server, Session},
     ChannelId, CryptoVec,
@@ -30,16 +32,19 @@ use tokio::sync::RwLock;
 
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,
-    object_storage: Arc<dyn ObjectStorage>,
+    object_storage_factory: Arc<dyn StorageFactory>,
+    object_storage: Arc<dyn Storage>,
     sftp_session: RwLock<Option<SftpSession>>,
 }
 
 impl DraySshServer {
     pub fn new(dray_config: DrayConfig) -> DraySshServer {
-        let object_storage = Arc::from(S3ObjectStorage::new(&dray_config.s3));
+        let object_storage_factory = Arc::from(S3StorageFactory::new(&dray_config.s3));
+        let object_storage = object_storage_factory.create_storage();
 
         DraySshServer {
             dray_config: Arc::from(dray_config),
+            object_storage_factory,
             object_storage,
             sftp_session: RwLock::from(Option::None),
         }
@@ -120,8 +125,8 @@ impl DraySshServer {
             };
 
             let response = sftp_session.handle_request(request).await;
-
-            session.data(channel, CryptoVec::from(Bytes::from(&response).to_vec()));
+            let response_bytes = Bytes::from(&response).to_vec();
+            session.data(channel, CryptoVec::from(response_bytes));
         }
 
         Ok((self, session))
@@ -134,7 +139,8 @@ impl Server for DraySshServer {
     fn new(&mut self, _peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
         DraySshServer {
             dray_config: self.dray_config.clone(),
-            object_storage: self.object_storage.clone(),
+            object_storage_factory: self.object_storage_factory.clone(),
+            object_storage: self.object_storage_factory.create_storage(),
             sftp_session: RwLock::from(Option::None),
         }
     }

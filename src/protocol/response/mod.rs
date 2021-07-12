@@ -6,6 +6,9 @@ pub mod status;
 pub mod version;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
+use log::debug;
+use log::log_enabled;
+use log::Level::Debug;
 use std::convert::TryFrom;
 
 const DATA_TYPE_LENGTH: u32 = 1;
@@ -47,7 +50,13 @@ impl From<&Response> for Bytes {
         response_bytes.put_u8(data_type);
         response_bytes.put_slice(&data_payload);
 
-        response_bytes.freeze()
+        let response_bytes = response_bytes.freeze();
+
+        if log_enabled!(Debug) {
+            debug!("Response bytes: {}", hex::encode(&response_bytes));
+        }
+
+        response_bytes
     }
 }
 
@@ -138,21 +147,22 @@ mod test {
             id: 0x01,
             files: vec![name::File {
                 file_name: String::from("file"),
-                long_name: String::from("long"),
                 file_attributes: file_attributes,
             }],
         });
 
         let name_bytes = &mut Bytes::from(&name);
 
-        assert_eq!(37, name_bytes.get_u32());
+        assert_eq!(74, name_bytes.get_u32());
         assert_eq!(104, name_bytes.get_u8());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x01, name_bytes.get_u32());
         assert_eq!(0x04, name_bytes.get_u32()); // file length
         assert_eq!(&[0x66, 0x69, 0x6C, 0x65], &name_bytes.copy_to_bytes(4)[..]); // file
-        assert_eq!(0x04, name_bytes.get_u32()); // long length
-        assert_eq!(&[0x6C, 0x6F, 0x6E, 0x67], &name_bytes.copy_to_bytes(4)[..]); // long
+
+        let long = "---------- 0 2 3 0 Jan 01 1970 00:00 file";
+        assert_eq!(long.len() as u32, name_bytes.get_u32()); // long length
+        assert_eq!(long.as_bytes(), &name_bytes.copy_to_bytes(long.len())[..]); // long
         assert_eq!(file_attributes_bytes, &name_bytes[..]);
     }
 

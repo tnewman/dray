@@ -30,11 +30,11 @@ the MVP roadmap has been implemented.
 - [x] Accept SSH connections
 - [x] Verify SSH keys against authorized keys stored in S3
 - [x] SFTP subsystem initialization
-- [ ] List directory (S3-Compatible Storage Only)
-- [ ] Create directory (S3-Compatible Storage Only)
+- [x] List directory (S3-Compatible Storage Only)
+- [x] Create directory (S3-Compatible Storage Only)
 - [ ] Rename directory (S3-Compatible Storage Only)
 - [ ] Remove directory (S3-Compatible Storage Only)
-- [ ] Read file (S3-Compatible Storage Only)
+- [x] Read file (S3-Compatible Storage Only)
 - [ ] Write file (S3-Compatible Storage Only)
 - [ ] Rename file (S3-Compatible Storage Only)
 - [ ] Remove file (S3-Compatible Storage Only)

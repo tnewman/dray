@@ -3,8 +3,9 @@ use bytes::Bytes;
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 use std::convert::TryFrom;
+use std::fmt::Debug;
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq)]
 pub struct Write {
     pub id: u32,
     pub handle: String,
@@ -28,6 +29,17 @@ impl TryFrom<&mut Bytes> for Write {
             offset,
             data,
         })
+    }
+}
+
+impl Debug for Write {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Write")
+            .field("id", &self.id)
+            .field("handle", &self.handle)
+            .field("offset", &self.offset)
+            .field("len", &self.data.len())
+            .finish()
     }
 }
 
@@ -148,6 +160,21 @@ mod tests {
         assert_eq!(
             Write::try_from(&mut write_bytes.freeze()),
             Err(Error::BadMessage)
+        );
+    }
+
+    #[test]
+    fn test_debug_formats_efficient_debug_string() {
+        let write = Write {
+            id: 0x01,
+            handle: "handle".to_string(),
+            offset: 0x02,
+            data: Bytes::from(vec![0x01, 0x02, 0x03]),
+        };
+
+        assert_eq!(
+            "Write { id: 1, handle: \"handle\", offset: 2, len: 3 }",
+            format!("{:?}", write)
         );
     }
 }
