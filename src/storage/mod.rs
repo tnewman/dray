@@ -78,7 +78,7 @@ pub trait Storage: Send + Sync {
     async fn rename_file(&self, current: String, new: String);
 
     /// Removes a file.
-    async fn remove_file(&self, key: String);
+    async fn remove_file(&self, key: String) -> Result<()>;
 
     // Closes a handle.
     async fn close_handle(&self, handle: &str) -> Result<()>;

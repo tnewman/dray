@@ -17,6 +17,7 @@ use rusoto_s3::CompletedMultipartUpload;
 use rusoto_s3::CompletedPart;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
+use rusoto_s3::DeleteObjectRequest;
 use rusoto_s3::HeadBucketRequest;
 use rusoto_s3::UploadPartRequest;
 use rusoto_s3::{
@@ -357,8 +358,16 @@ impl Storage for S3Storage {
         todo!("TODO: Rename object {} to {}", current, new)
     }
 
-    async fn remove_file(&self, file_name: String) {
-        todo!("TODO: Remove object {}", file_name)
+    async fn remove_file(&self, file_name: String) -> Result<()> {
+        self.s3_client
+            .delete_object(DeleteObjectRequest {
+                bucket: self.bucket.clone(),
+                key: file_name,
+                ..Default::default()
+            })
+            .await?;
+
+        Ok(())
     }
 }
 

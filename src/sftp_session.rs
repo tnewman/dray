@@ -37,7 +37,7 @@ impl SftpSession {
             Request::Fsetstat(fsetstat_request) => self.handle_fsetstat_request(fsetstat_request),
             Request::Opendir(opendir_request) => self.handle_opendir_request(opendir_request).await,
             Request::Readdir(readdir_request) => self.handle_readdir_request(readdir_request).await,
-            Request::Remove(remove_request) => self.handle_remove_request(remove_request),
+            Request::Remove(remove_request) => self.handle_remove_request(remove_request).await,
             Request::Mkdir(mkdir_request) => self.handle_mkdir_request(mkdir_request).await,
             Request::Rmdir(rmdir_request) => self.handle_rmdir_request(rmdir_request),
             Request::Realpath(realpath_request) => self.handle_realpath_request(realpath_request),
@@ -207,8 +207,14 @@ impl SftpSession {
         }
     }
 
-    fn handle_remove_request(&self, remove_request: request::path::Path) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(remove_request.id))
+    async fn handle_remove_request(&self, remove_request: request::path::Path) -> Result<Response> {
+        self.object_storage.remove_file(remove_request.path).await?;
+
+        Ok(Response::Status(response::status::Status {
+            id: remove_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from("File removed."),
+        }))
     }
 
     async fn handle_mkdir_request(
