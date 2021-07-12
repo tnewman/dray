@@ -1,6 +1,3 @@
-use std::pin::Pin;
-use std::sync::Arc;
-
 use super::handle::HandleManager;
 use super::Storage;
 use super::StorageFactory;
@@ -10,16 +7,26 @@ use crate::protocol::response::name::File;
 use crate::ssh_keys;
 use anyhow::Result;
 use async_trait::async_trait;
-
+use bytes::BufMut;
 use chrono::{DateTime, TimeZone, Utc};
+use log::warn;
+use rusoto_core::ByteStream;
 use rusoto_core::Region;
+use rusoto_s3::CompleteMultipartUploadRequest;
+use rusoto_s3::CompletedMultipartUpload;
+use rusoto_s3::CompletedPart;
+use rusoto_s3::CreateMultipartUploadOutput;
+use rusoto_s3::CreateMultipartUploadRequest;
 use rusoto_s3::HeadBucketRequest;
+use rusoto_s3::UploadPartRequest;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
     Object, S3Client, S3,
 };
 use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
+use std::pin::Pin;
+use std::sync::Arc;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 
@@ -67,7 +74,7 @@ impl StorageFactory for S3StorageFactory {
 pub struct S3Storage {
     s3_client: S3Client,
     bucket: String,
-    handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send + Sync>>, String, DirHandle>,
+    handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send + Sync>>, WriteHandle, DirHandle>,
 }
 
 impl S3Storage {
@@ -77,6 +84,34 @@ impl S3Storage {
             bucket,
             handle_manager: HandleManager::new(),
         }
+    }
+
+    async fn complete_part_upload(
+        &self,
+        write_handle: &mut tokio::sync::MutexGuard<'_, WriteHandle>,
+    ) -> Result<()> {
+        let part_number = (write_handle.completed_parts.len() as i64) + 1;
+
+        let upload_part_response = self
+            .s3_client
+            .upload_part(UploadPartRequest {
+                bucket: self.bucket.clone(),
+                key: write_handle.key.clone(),
+                upload_id: write_handle.upload_id.clone(),
+                part_number,
+                body: Some(ByteStream::from(write_handle.buffer.clone())),
+                ..Default::default()
+            })
+            .await?;
+
+        write_handle.completed_parts.push(CompletedPart {
+            e_tag: upload_part_response.e_tag,
+            part_number: Some(part_number),
+        });
+
+        write_handle.buffer.clear();
+
+        Ok(())
     }
 }
 
@@ -262,14 +297,58 @@ impl Storage for S3Storage {
     }
 
     async fn open_write_handle(&self, file_name: String) -> Result<String> {
-        todo!()
+        let multipart_response = self
+            .s3_client
+            .create_multipart_upload(CreateMultipartUploadRequest {
+                bucket: self.bucket.clone(),
+                key: file_name,
+                ..Default::default()
+            })
+            .await?;
+
+        let write_handle = map_create_multipart_response_to_write_handle(multipart_response)?;
+
+        Ok(self.handle_manager.create_write_handle(write_handle).await)
     }
 
     async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
-        todo!()
+        let write_handle = match self.handle_manager.get_write_handle(&handle).await {
+            Some(dir_handle) => dir_handle,
+            None => return Err(anyhow::anyhow!("Missing write handle.")),
+        };
+
+        let mut write_handle = write_handle.lock().await;
+
+        write_handle.buffer.put(data);
+
+        if write_handle.buffer.len() > 10000000 {
+            warn!("COMPLETING PART");
+            self.complete_part_upload(&mut write_handle).await?;
+            write_handle.buffer.clear();
+        };
+
+        Ok(())
     }
 
     async fn close_handle(&self, handle: &str) -> Result<()> {
+        if let Some(write_handle) = self.handle_manager.get_write_handle(handle).await {
+            let mut write_handle = write_handle.lock().await;
+
+            self.complete_part_upload(&mut write_handle).await?;
+
+            self.s3_client
+                .complete_multipart_upload(CompleteMultipartUploadRequest {
+                    bucket: self.bucket.clone(),
+                    key: write_handle.key.clone(),
+                    upload_id: write_handle.upload_id.clone(),
+                    multipart_upload: Some(CompletedMultipartUpload {
+                        parts: Some(write_handle.completed_parts.clone()),
+                    }),
+                    ..Default::default()
+                })
+                .await?;
+        }
+
         self.handle_manager.remove_handle(handle).await;
         Ok(())
     }
@@ -283,10 +362,17 @@ impl Storage for S3Storage {
     }
 }
 
-pub struct DirHandle {
+struct DirHandle {
     prefix: String,
     continuation_token: Option<String>,
     is_eof: bool,
+}
+
+struct WriteHandle {
+    key: String,
+    upload_id: String,
+    completed_parts: Vec<CompletedPart>,
+    buffer: Vec<u8>,
 }
 
 fn get_home(user: &str) -> String {
@@ -390,6 +476,27 @@ fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
             .parse::<DateTime<Utc>>()
             .unwrap_or_else(|_e| Utc.timestamp(0, 0))
             .timestamp() as u32
+    })
+}
+
+fn map_create_multipart_response_to_write_handle(
+    create_multipart_response: CreateMultipartUploadOutput,
+) -> Result<WriteHandle> {
+    let upload_id = match create_multipart_response.upload_id {
+        Some(upload_id) => Ok(upload_id),
+        None => Err(anyhow::anyhow!("Missing upload id.")),
+    }?;
+
+    let key = match create_multipart_response.key {
+        Some(key) => Ok(key),
+        None => Err(anyhow::anyhow!("Missing key.")),
+    }?;
+
+    Ok(WriteHandle {
+        key,
+        upload_id,
+        completed_parts: Vec::new(),
+        buffer: Vec::with_capacity(5000000),
     })
 }
 
@@ -573,5 +680,42 @@ mod test {
             Some(0 as u32),
             map_rfc3339_to_epoch(Some(String::from("invalid")).as_ref())
         );
+    }
+
+    #[test]
+    fn test_map_create_multipart_response_to_write_handle() {
+        let multipart_response = CreateMultipartUploadOutput {
+            upload_id: Some(String::from("id")),
+            key: Some(String::from("key")),
+            ..Default::default()
+        };
+
+        let write_handle =
+            map_create_multipart_response_to_write_handle(multipart_response).unwrap();
+
+        assert_eq!("id", &write_handle.upload_id);
+        assert_eq!("key", &write_handle.key);
+        assert_eq!(0, write_handle.completed_parts.len());
+        assert_eq!(5000000, write_handle.buffer.capacity());
+    }
+
+    #[test]
+    fn test_map_create_multipart_response_to_write_handle_with_missing_multipart_id() {
+        let multipart_response = CreateMultipartUploadOutput {
+            key: Some(String::from("key")),
+            ..Default::default()
+        };
+
+        assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
+    }
+
+    #[test]
+    fn test_map_create_multipart_response_to_write_handle_with_missing_key() {
+        let multipart_response = CreateMultipartUploadOutput {
+            upload_id: Some(String::from("id")),
+            ..Default::default()
+        };
+
+        assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 }

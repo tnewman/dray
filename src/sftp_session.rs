@@ -7,7 +7,7 @@ use crate::storage::Storage;
 use anyhow::Result;
 use log::error;
 use log::info;
-use std::sync::Arc;
+use std::{sync::Arc, time::Duration};
 
 pub struct SftpSession {
     object_storage: Arc<dyn Storage>,
@@ -128,7 +128,20 @@ impl SftpSession {
     }
 
     async fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(write_request.id))
+        self.object_storage
+            .write_data(&write_request.handle, write_request.data)
+            .await?;
+
+        // TODO: This is a hack to prevent Filezilla from running out of request ids.
+        // Refactor the handle manager to lock the entire handle manager, so only
+        // one request will proceed at a time.
+        tokio::time::sleep(Duration::from_millis(10)).await;
+
+        Ok(Response::Status(response::status::Status {
+            id: write_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from("Bytes written."),
+        }))
     }
 
     fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response> {
