@@ -9,12 +9,12 @@ use anyhow::Result;
 use async_trait::async_trait;
 use bytes::BufMut;
 use chrono::{DateTime, TimeZone, Utc};
-use log::warn;
 use rusoto_core::ByteStream;
 use rusoto_core::Region;
 use rusoto_s3::CompleteMultipartUploadRequest;
 use rusoto_s3::CompletedMultipartUpload;
 use rusoto_s3::CompletedPart;
+use rusoto_s3::CopyObjectRequest;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
 use rusoto_s3::DeleteObjectRequest;
@@ -323,7 +323,6 @@ impl Storage for S3Storage {
         write_handle.buffer.put(data);
 
         if write_handle.buffer.len() > 10000000 {
-            warn!("COMPLETING PART");
             self.complete_part_upload(&mut write_handle).await?;
             write_handle.buffer.clear();
         };
@@ -354,8 +353,19 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn rename_file(&self, current: String, new: String) {
-        todo!("TODO: Rename object {} to {}", current, new)
+    async fn rename_file(&self, current: String, new: String) -> Result<()> {
+        self.s3_client
+            .copy_object(CopyObjectRequest {
+                bucket: self.bucket.clone(),
+                copy_source: get_s3_copy_source(&self.bucket, &current),
+                key: new,
+                ..Default::default()
+            })
+            .await?;
+
+        self.remove_file(current).await?;
+
+        Ok(())
     }
 
     async fn remove_file(&self, file_name: String) -> Result<()> {
@@ -398,6 +408,10 @@ fn get_s3_prefix(dir_name: String) -> String {
         false => format!("{}/", dir_name[1..dir_name.len()].to_string()),
     };
     prefix
+}
+
+fn get_s3_copy_source(bucket: &str, key: &str) -> String {
+    format!("{}/{}", bucket, key)
 }
 
 fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
@@ -538,6 +552,11 @@ mod test {
     #[test]
     fn test_get_s3_prefix_converts_unix_absolute_directory() {
         assert_eq!(String::from("test/"), get_s3_prefix(String::from("/test")))
+    }
+
+    #[test]
+    fn test_get_s3_copy_source() {
+        assert_eq!("bucket/key", get_s3_copy_source("bucket", "key"))
     }
 
     #[test]

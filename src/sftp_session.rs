@@ -42,7 +42,7 @@ impl SftpSession {
             Request::Rmdir(rmdir_request) => self.handle_rmdir_request(rmdir_request),
             Request::Realpath(realpath_request) => self.handle_realpath_request(realpath_request),
             Request::Stat(stat_request) => self.handle_stat_request(stat_request).await,
-            Request::Rename(rename_request) => self.handle_rename_request(rename_request),
+            Request::Rename(rename_request) => self.handle_rename_request(rename_request).await,
             Request::Readlink(readlink_request) => self.handle_readlink_request(readlink_request),
             Request::Symlink(symlink_request) => self.handle_symlink_request(symlink_request),
         };
@@ -285,8 +285,19 @@ impl SftpSession {
         }))
     }
 
-    fn handle_rename_request(&self, rename_request: request::rename::Rename) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(rename_request.id))
+    async fn handle_rename_request(
+        &self,
+        rename_request: request::rename::Rename,
+    ) -> Result<Response> {
+        self.object_storage
+            .rename_file(rename_request.old_path, rename_request.new_path)
+            .await?;
+
+        Ok(Response::Status(response::status::Status {
+            id: rename_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from("File renamed."),
+        }))
     }
 
     fn handle_readlink_request(&self, readlink_request: request::path::Path) -> Result<Response> {
