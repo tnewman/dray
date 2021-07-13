@@ -19,11 +19,11 @@ futures = "0.3"
 hex = "0.4.3"
 log = "0.4"
 serde = "1.0"
-thrussh = "0.32"
-thrussh-keys = "0.20"
+thrussh = { version = "0.33", features = ["flate2", "openssl"] }
+thrussh-keys = { version = "0.21", features = ["openssl"] }
 tokio = { version = "1.2", features = ["full"] }
 uuid = { version = "0.8", features = ["v4"], default-features = false }
 
 # S3 Dependencies
-rusoto_core = "0.46"
-rusoto_s3 = "0.46"
+rusoto_core = "0.47"
+rusoto_s3 = "0.47"

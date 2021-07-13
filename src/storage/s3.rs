@@ -75,7 +75,7 @@ impl StorageFactory for S3StorageFactory {
 pub struct S3Storage {
     s3_client: S3Client,
     bucket: String,
-    handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send + Sync>>, WriteHandle, DirHandle>,
+    handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send>>, WriteHandle, DirHandle>,
 }
 
 impl S3Storage {
