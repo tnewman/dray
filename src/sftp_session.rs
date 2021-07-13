@@ -290,7 +290,7 @@ impl SftpSession {
         rename_request: request::rename::Rename,
     ) -> Result<Response> {
         self.object_storage
-            .rename_file(rename_request.old_path, rename_request.new_path)
+            .rename(rename_request.old_path, rename_request.new_path)
             .await?;
 
         Ok(Response::Status(response::status::Status {

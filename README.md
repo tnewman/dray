@@ -32,7 +32,7 @@ the MVP roadmap has been implemented.
 - [x] SFTP subsystem initialization
 - [x] List directory (S3-Compatible Storage Only)
 - [x] Create directory (S3-Compatible Storage Only)
-- [ ] Rename directory (S3-Compatible Storage Only)
+- [x] Rename directory (S3-Compatible Storage Only)
 - [ ] Remove directory (S3-Compatible Storage Only)
 - [x] Read file (S3-Compatible Storage Only)
 - [ ] Write file (S3-Compatible Storage Only)

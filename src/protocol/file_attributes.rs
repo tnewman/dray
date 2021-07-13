@@ -20,6 +20,15 @@ pub struct FileAttributes {
     pub mtime: Option<u32>,
 }
 
+impl FileAttributes {
+    pub fn is_dir(&self) -> bool {
+        match self.permissions {
+            Some(permissions) => (permissions >> 14) & 0x1 == 0x01,
+            None => false,
+        }
+    }
+}
+
 impl TryFrom<&mut Bytes> for FileAttributes {
     type Error = Error;
 
@@ -237,5 +246,32 @@ mod tests {
             Error::BadMessage,
             FileAttributes::try_from(&mut file_attributes_bytes.freeze()).unwrap_err()
         );
+    }
+
+    #[test]
+    fn test_is_dir_returns_true_with_directory_permission_bit_set() {
+        assert!(FileAttributes {
+            permissions: Some(0o40777),
+            ..Default::default()
+        }
+        .is_dir());
+    }
+
+    #[test]
+    fn test_is_dir_returns_false_with_directory_permission_bit_unset() {
+        assert!(!FileAttributes {
+            permissions: Some(0o00777),
+            ..Default::default()
+        }
+        .is_dir());
+    }
+
+    #[test]
+    fn test_is_dir_returns_false_with_missing_permissions() {
+        assert!(!FileAttributes {
+            permissions: None,
+            ..Default::default()
+        }
+        .is_dir());
     }
 }

@@ -50,9 +50,6 @@ pub trait Storage: Send + Sync {
     // Reads a file listing from the prefix associated with a given handle.
     async fn read_dir(&self, handle: &str) -> Result<Vec<File>>;
 
-    /// Renames a directory.
-    async fn rename_dir(&self, current: String, new: String);
-
     /// Removes a directory.
     async fn remove_dir(&self, dir_name: String);
 
@@ -74,12 +71,12 @@ pub trait Storage: Send + Sync {
     /// Writes data to a file associated with a given handle.
     async fn write_data(&self, handle: &str, data: Bytes) -> Result<()>;
 
-    /// Renames a file.
-    async fn rename_file(&self, current: String, new: String) -> Result<()>;
-
     /// Removes a file.
     async fn remove_file(&self, key: String) -> Result<()>;
 
     // Closes a handle.
     async fn close_handle(&self, handle: &str) -> Result<()>;
+
+    /// Renames a file or directory.
+    async fn rename(&self, current: String, new: String) -> Result<()>;
 }

@@ -114,6 +114,59 @@ impl S3Storage {
 
         Ok(())
     }
+
+    async fn rename_file(&self, current: String, new: String) -> Result<()> {
+        self.s3_client
+            .copy_object(CopyObjectRequest {
+                bucket: self.bucket.clone(),
+                copy_source: get_s3_copy_source(&self.bucket, &current),
+                key: new,
+                ..Default::default()
+            })
+            .await?;
+
+        self.remove_file(current).await?;
+
+        Ok(())
+    }
+
+    async fn rename_dir(&self, current: String, new: String) -> Result<()> {
+        let current_prefix = get_s3_prefix(current);
+        let new_prefix = get_s3_prefix(new);
+
+        let mut continuation_token = None;
+
+        loop {
+            let objects = self
+                .s3_client
+                .list_objects_v2(ListObjectsV2Request {
+                    bucket: self.bucket.clone(),
+                    prefix: Some(current_prefix.clone()),
+                    continuation_token: continuation_token.clone(),
+                    delimiter: None,
+                    ..Default::default()
+                })
+                .await?;
+
+            continuation_token = objects.continuation_token;
+
+            if let Some(contents) = objects.contents {
+                let keys = contents.into_iter().filter_map(|content| content.key);
+
+                for key in keys {
+                    let destination = key.replace(&current_prefix, &new_prefix);
+
+                    self.rename_file(key, destination).await?;
+                }
+            }
+
+            if continuation_token.is_none() {
+                break;
+            }
+        }
+
+        Ok(())
+    }
 }
 
 #[async_trait]
@@ -207,10 +260,6 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn rename_dir(&self, current: String, new: String) {
-        todo!("TODO: Rename prefix {} to {}", current, new)
-    }
-
     async fn remove_dir(&self, prefix: String) {
         todo!("TODO: Remove prefix {}", prefix)
     }
@@ -245,16 +294,34 @@ impl Storage for S3Storage {
     }
 
     async fn get_file_metadata(&self, file_name: String) -> Result<File> {
-        let head_object = self
+        let head_object_response = self
             .s3_client
             .head_object(HeadObjectRequest {
                 bucket: self.bucket.clone(),
                 key: file_name.clone(),
                 ..Default::default()
             })
-            .await?;
+            .await;
 
-        Ok(map_head_object_to_file(&file_name, &head_object))
+        match head_object_response {
+            Ok(head_object_response) => {
+                Ok(map_head_object_to_file(&file_name, &head_object_response))
+            }
+            Err(error) => match error {
+                rusoto_core::RusotoError::Unknown(http_response) => {
+                    if 404 == http_response.status.as_u16() {
+                        Ok(create_file_with_directory_bit(&file_name))
+                    } else {
+                        Err(anyhow::Error::from(rusoto_core::RusotoError::<
+                            HeadObjectError,
+                        >::Unknown(
+                            http_response
+                        )))
+                    }
+                }
+                _ => Err(anyhow::Error::from(error)),
+            },
+        }
     }
 
     async fn open_read_handle(&self, file_name: String) -> Result<String> {
@@ -353,21 +420,6 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn rename_file(&self, current: String, new: String) -> Result<()> {
-        self.s3_client
-            .copy_object(CopyObjectRequest {
-                bucket: self.bucket.clone(),
-                copy_source: get_s3_copy_source(&self.bucket, &current),
-                key: new,
-                ..Default::default()
-            })
-            .await?;
-
-        self.remove_file(current).await?;
-
-        Ok(())
-    }
-
     async fn remove_file(&self, file_name: String) -> Result<()> {
         self.s3_client
             .delete_object(DeleteObjectRequest {
@@ -376,6 +428,17 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await?;
+
+        Ok(())
+    }
+
+    async fn rename(&self, current: String, new: String) -> Result<()> {
+        let file = self.get_file_metadata(current.clone()).await?;
+
+        match file.file_attributes.is_dir() {
+            true => self.rename_dir(current, new).await,
+            false => self.rename_file(current, new).await,
+        }?;
 
         Ok(())
     }
@@ -487,6 +550,23 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
             uid: None,
             gid: None,
             permissions: Some(0o100777),
+            atime: None,
+            mtime: None,
+        },
+    }
+}
+
+fn create_file_with_directory_bit(key: &str) -> File {
+    let mut key_pieces = key.rsplit('/');
+    let file_name = key_pieces.next().unwrap_or("");
+
+    File {
+        file_name: file_name.to_string(),
+        file_attributes: FileAttributes {
+            size: None,
+            uid: None,
+            gid: None,
+            permissions: Some(0o40777),
             atime: None,
             mtime: None,
         },
@@ -687,6 +767,24 @@ mod test {
             },
             map_head_object_to_file("file", &head_object)
         );
+    }
+
+    #[test]
+    fn test_create_file_with_directory_bit() {
+        assert_eq!(
+            File {
+                file_name: "file".to_owned(),
+                file_attributes: FileAttributes {
+                    size: None,
+                    gid: None,
+                    uid: None,
+                    permissions: Some(0o40777),
+                    atime: None,
+                    mtime: None,
+                }
+            },
+            create_file_with_directory_bit("file")
+        )
     }
 
     #[test]
