@@ -258,26 +258,11 @@ impl SftpSession {
     }
 
     async fn handle_stat_request(&self, stat_request: request::path::Path) -> Result<Response> {
-        let file_attributes = match self
+        let file_attributes = self
             .object_storage
-            .file_exists(stat_request.path.clone())
+            .get_file_metadata(stat_request.path.clone())
             .await?
-        {
-            true => {
-                self.object_storage
-                    .get_file_metadata(stat_request.path)
-                    .await?
-                    .file_attributes
-            }
-            false => FileAttributes {
-                permissions: Some(0o40777),
-                size: None,
-                uid: None,
-                gid: None,
-                atime: None,
-                mtime: None,
-            },
-        };
+            .file_attributes;
 
         Ok(Response::Attrs(response::attrs::Attrs {
             id: stat_request.id,

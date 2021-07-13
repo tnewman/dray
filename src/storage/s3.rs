@@ -264,35 +264,6 @@ impl Storage for S3Storage {
         todo!("TODO: Remove prefix {}", prefix)
     }
 
-    async fn file_exists(&self, key: String) -> Result<bool> {
-        let head_object_response = self
-            .s3_client
-            .head_object(HeadObjectRequest {
-                bucket: self.bucket.clone(),
-                key: get_s3_key(key),
-                ..Default::default()
-            })
-            .await;
-
-        match head_object_response {
-            Ok(_) => Ok(true),
-            Err(error) => match error {
-                rusoto_core::RusotoError::Unknown(http_response) => {
-                    if 404 == http_response.status.as_u16() {
-                        Ok(false)
-                    } else {
-                        Err(anyhow::Error::from(rusoto_core::RusotoError::<
-                            HeadObjectError,
-                        >::Unknown(
-                            http_response
-                        )))
-                    }
-                }
-                _ => Err(anyhow::Error::from(error)),
-            },
-        }
-    }
-
     async fn get_file_metadata(&self, file_name: String) -> Result<File> {
         let head_object_response = self
             .s3_client
@@ -461,10 +432,6 @@ fn get_home(user: &str) -> String {
     format!("/home/{}", user)
 }
 
-fn get_s3_key(key: String) -> String {
-    key[1..key.len()].to_string()
-}
-
 fn get_s3_prefix(dir_name: String) -> String {
     let prefix = match "".eq(&dir_name) {
         true => String::from("/"),
@@ -619,14 +586,6 @@ mod test {
     #[test]
     fn test_get_default_endpoint_region() {
         assert_eq!("custom", get_default_endpoint_region());
-    }
-
-    #[test]
-    fn test_get_s3_key_converts_unix_absolute_directory() {
-        assert_eq!(
-            String::from("test/file1.txt"),
-            get_s3_key(String::from("/test/file1.txt"))
-        )
     }
 
     #[test]

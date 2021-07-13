@@ -53,9 +53,6 @@ pub trait Storage: Send + Sync {
     /// Removes a directory.
     async fn remove_dir(&self, dir_name: String);
 
-    /// Checks if a file exists.
-    async fn file_exists(&self, file_name: String) -> Result<bool>;
-
     /// Retrieves an file's metadata.
     async fn get_file_metadata(&self, file_name: String) -> Result<File>;
 
