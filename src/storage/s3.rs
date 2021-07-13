@@ -260,8 +260,37 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn remove_dir(&self, prefix: String) {
-        todo!("TODO: Remove prefix {}", prefix)
+    async fn remove_dir(&self, prefix: String) -> Result<()> {
+        let mut continuation_token = None;
+
+        loop {
+            let objects = self
+                .s3_client
+                .list_objects_v2(ListObjectsV2Request {
+                    bucket: self.bucket.clone(),
+                    prefix: Some(prefix.clone()),
+                    continuation_token: continuation_token.clone(),
+                    delimiter: None,
+                    ..Default::default()
+                })
+                .await?;
+
+            continuation_token = objects.continuation_token;
+
+            if let Some(contents) = objects.contents {
+                let keys = contents.into_iter().filter_map(|content| content.key);
+
+                for key in keys {
+                    self.remove_file(key).await?;
+                }
+            }
+
+            if continuation_token.is_none() {
+                break;
+            }
+        }
+
+        Ok(())
     }
 
     async fn get_file_metadata(&self, file_name: String) -> Result<File> {

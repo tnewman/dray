@@ -51,7 +51,7 @@ pub trait Storage: Send + Sync {
     async fn read_dir(&self, handle: &str) -> Result<Vec<File>>;
 
     /// Removes a directory.
-    async fn remove_dir(&self, dir_name: String);
+    async fn remove_dir(&self, dir_name: String) -> Result<()>;
 
     /// Retrieves an file's metadata.
     async fn get_file_metadata(&self, file_name: String) -> Result<File>;

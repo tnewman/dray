@@ -39,7 +39,7 @@ impl SftpSession {
             Request::Readdir(readdir_request) => self.handle_readdir_request(readdir_request).await,
             Request::Remove(remove_request) => self.handle_remove_request(remove_request).await,
             Request::Mkdir(mkdir_request) => self.handle_mkdir_request(mkdir_request).await,
-            Request::Rmdir(rmdir_request) => self.handle_rmdir_request(rmdir_request),
+            Request::Rmdir(rmdir_request) => self.handle_rmdir_request(rmdir_request).await,
             Request::Realpath(realpath_request) => self.handle_realpath_request(realpath_request),
             Request::Stat(stat_request) => self.handle_stat_request(stat_request).await,
             Request::Rename(rename_request) => self.handle_rename_request(rename_request).await,
@@ -230,8 +230,14 @@ impl SftpSession {
         }))
     }
 
-    fn handle_rmdir_request(&self, rmdir_request: request::path::Path) -> Result<Response> {
-        Ok(SftpSession::build_not_supported_response(rmdir_request.id))
+    async fn handle_rmdir_request(&self, rmdir_request: request::path::Path) -> Result<Response> {
+        self.object_storage.remove_dir(rmdir_request.path).await?;
+
+        Ok(Response::Status(response::status::Status {
+            id: rmdir_request.id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from("Successfully removed directory."),
+        }))
     }
 
     fn handle_realpath_request(&self, realpath_request: request::path::Path) -> Result<Response> {
