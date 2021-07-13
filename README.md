@@ -38,4 +38,5 @@ the MVP roadmap has been implemented.
 - [ ] Write file (S3-Compatible Storage Only)
 - [x] Rename file (S3-Compatible Storage Only)
 - [x] Remove file (S3-Compatible Storage Only)
+- [ ] Stat commands (S3-Compatible Storage Only)
 - [ ] No-Op/Defaults for other SFTP commands
