@@ -57,6 +57,8 @@ impl DraySshServer {
     pub async fn run_server(self) -> Result<(), Error> {
         let ssh_config = Config {
             keys: self.dray_config.get_ssh_keys()?,
+            window_size: 16777216,
+            maximum_packet_size: 32768,
             ..Default::default()
         };
 
