@@ -1,10 +1,12 @@
-use crate::protocol::{
-    file_attributes::FileAttributes,
-    request::{self, Request, RequestId},
-    response::{self, Response},
-};
 use crate::storage::Storage;
-use anyhow::Result;
+use crate::{
+    error::Error,
+    protocol::{
+        file_attributes::FileAttributes,
+        request::{self, Request, RequestId},
+        response::{self, Response},
+    },
+};
 use log::error;
 use log::info;
 use std::sync::Arc;
@@ -66,11 +68,14 @@ impl SftpSession {
         response
     }
 
-    fn handle_init_request(&self, _init_request: request::init::Init) -> Result<Response> {
+    fn handle_init_request(&self, _init_request: request::init::Init) -> Result<Response, Error> {
         Ok(Response::Version(response::version::Version { version: 3 }))
     }
 
-    async fn handle_open_request(&self, open_request: request::open::Open) -> Result<Response> {
+    async fn handle_open_request(
+        &self,
+        open_request: request::open::Open,
+    ) -> Result<Response, Error> {
         let handle = if open_request.open_options.create {
             self.object_storage
                 .open_write_handle(open_request.filename)
@@ -96,7 +101,7 @@ impl SftpSession {
     async fn handle_close_request(
         &self,
         close_request: request::handle::Handle,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         self.object_storage
             .close_handle(&close_request.handle)
             .await?;
@@ -108,7 +113,10 @@ impl SftpSession {
         }))
     }
 
-    async fn handle_read_request(&self, read_request: request::read::Read) -> Result<Response> {
+    async fn handle_read_request(
+        &self,
+        read_request: request::read::Read,
+    ) -> Result<Response, Error> {
         let data = self
             .object_storage
             .read_data(&read_request.handle, read_request.len)
@@ -128,7 +136,10 @@ impl SftpSession {
         }
     }
 
-    async fn handle_write_request(&self, write_request: request::write::Write) -> Result<Response> {
+    async fn handle_write_request(
+        &self,
+        write_request: request::write::Write,
+    ) -> Result<Response, Error> {
         self.object_storage
             .write_data(&write_request.handle, write_request.data)
             .await?;
@@ -140,18 +151,18 @@ impl SftpSession {
         }))
     }
 
-    fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response> {
+    fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response, Error> {
         Ok(SftpSession::build_not_supported_response(lstat_request.id))
     }
 
-    fn handle_fstat_request(&self, fstat_request: request::path::Path) -> Result<Response> {
+    fn handle_fstat_request(&self, fstat_request: request::path::Path) -> Result<Response, Error> {
         Ok(SftpSession::build_not_supported_response(fstat_request.id))
     }
 
     fn handle_setstat_request(
         &self,
         setstat_request: request::path_attributes::PathAttributes,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         Ok(SftpSession::build_not_supported_response(
             setstat_request.id,
         ))
@@ -160,7 +171,7 @@ impl SftpSession {
     fn handle_fsetstat_request(
         &self,
         fsetstat_request: request::handle_attributes::HandleAttributes,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         Ok(SftpSession::build_not_supported_response(
             fsetstat_request.id,
         ))
@@ -169,7 +180,7 @@ impl SftpSession {
     async fn handle_opendir_request(
         &self,
         opendir_request: request::path::Path,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         let handle = self
             .object_storage
             .open_dir_handle(opendir_request.path)
@@ -184,7 +195,7 @@ impl SftpSession {
     async fn handle_readdir_request(
         &self,
         readdir_request: request::handle::Handle,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         let files = self
             .object_storage
             .read_dir(&readdir_request.handle)
@@ -203,7 +214,10 @@ impl SftpSession {
         }
     }
 
-    async fn handle_remove_request(&self, remove_request: request::path::Path) -> Result<Response> {
+    async fn handle_remove_request(
+        &self,
+        remove_request: request::path::Path,
+    ) -> Result<Response, Error> {
         self.object_storage.remove_file(remove_request.path).await?;
 
         Ok(Response::Status(response::status::Status {
@@ -216,7 +230,7 @@ impl SftpSession {
     async fn handle_mkdir_request(
         &self,
         mkdir_request: request::path_attributes::PathAttributes,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         self.object_storage.create_dir(mkdir_request.path).await?;
 
         Ok(Response::Status(response::status::Status {
@@ -226,7 +240,10 @@ impl SftpSession {
         }))
     }
 
-    async fn handle_rmdir_request(&self, rmdir_request: request::path::Path) -> Result<Response> {
+    async fn handle_rmdir_request(
+        &self,
+        rmdir_request: request::path::Path,
+    ) -> Result<Response, Error> {
         self.object_storage.remove_dir(rmdir_request.path).await?;
 
         Ok(Response::Status(response::status::Status {
@@ -236,7 +253,10 @@ impl SftpSession {
         }))
     }
 
-    fn handle_realpath_request(&self, realpath_request: request::path::Path) -> Result<Response> {
+    fn handle_realpath_request(
+        &self,
+        realpath_request: request::path::Path,
+    ) -> Result<Response, Error> {
         let path = if realpath_request.path == "." {
             self.object_storage.get_home(&self.user)
         } else {
@@ -259,7 +279,10 @@ impl SftpSession {
         }))
     }
 
-    async fn handle_stat_request(&self, stat_request: request::path::Path) -> Result<Response> {
+    async fn handle_stat_request(
+        &self,
+        stat_request: request::path::Path,
+    ) -> Result<Response, Error> {
         let file_attributes = self
             .object_storage
             .get_file_metadata(stat_request.path.clone())
@@ -275,7 +298,7 @@ impl SftpSession {
     async fn handle_rename_request(
         &self,
         rename_request: request::rename::Rename,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         self.object_storage
             .rename(rename_request.old_path, rename_request.new_path)
             .await?;
@@ -287,7 +310,10 @@ impl SftpSession {
         }))
     }
 
-    fn handle_readlink_request(&self, readlink_request: request::path::Path) -> Result<Response> {
+    fn handle_readlink_request(
+        &self,
+        readlink_request: request::path::Path,
+    ) -> Result<Response, Error> {
         Ok(SftpSession::build_not_supported_response(
             readlink_request.id,
         ))
@@ -296,7 +322,7 @@ impl SftpSession {
     fn handle_symlink_request(
         &self,
         symlink_request: request::symlink::Symlink,
-    ) -> Result<Response> {
+    ) -> Result<Response, Error> {
         Ok(SftpSession::build_not_supported_response(
             symlink_request.id,
         ))

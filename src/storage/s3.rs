@@ -5,12 +5,12 @@ use crate::error::Error;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
-use anyhow::Result;
 use async_trait::async_trait;
 use bytes::BufMut;
 use chrono::{DateTime, TimeZone, Utc};
 use rusoto_core::ByteStream;
 use rusoto_core::Region;
+use rusoto_core::RusotoError;
 use rusoto_s3::CompleteMultipartUploadRequest;
 use rusoto_s3::CompletedMultipartUpload;
 use rusoto_s3::CompletedPart;
@@ -19,12 +19,12 @@ use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
 use rusoto_s3::DeleteObjectRequest;
 use rusoto_s3::HeadBucketRequest;
+use rusoto_s3::HeadObjectRequest;
 use rusoto_s3::UploadPartRequest;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
     Object, S3Client, S3,
 };
-use rusoto_s3::{HeadObjectError, HeadObjectRequest};
 use serde::Deserialize;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -90,7 +90,7 @@ impl S3Storage {
     async fn complete_part_upload(
         &self,
         write_handle: &mut tokio::sync::MutexGuard<'_, WriteHandle>,
-    ) -> Result<()> {
+    ) -> Result<(), Error> {
         let part_number = (write_handle.completed_parts.len() as i64) + 1;
 
         let upload_part_response = self
@@ -103,7 +103,8 @@ impl S3Storage {
                 body: Some(ByteStream::from(write_handle.buffer.clone())),
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         write_handle.completed_parts.push(CompletedPart {
             e_tag: upload_part_response.e_tag,
@@ -115,7 +116,7 @@ impl S3Storage {
         Ok(())
     }
 
-    async fn rename_file(&self, current: String, new: String) -> Result<()> {
+    async fn rename_file(&self, current: String, new: String) -> Result<(), Error> {
         self.s3_client
             .copy_object(CopyObjectRequest {
                 bucket: self.bucket.clone(),
@@ -123,14 +124,15 @@ impl S3Storage {
                 key: new,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         self.remove_file(current).await?;
 
         Ok(())
     }
 
-    async fn rename_dir(&self, current: String, new: String) -> Result<()> {
+    async fn rename_dir(&self, current: String, new: String) -> Result<(), Error> {
         let current_prefix = get_s3_prefix(current);
         let new_prefix = get_s3_prefix(new);
 
@@ -146,7 +148,8 @@ impl S3Storage {
                     delimiter: None,
                     ..Default::default()
                 })
-                .await?;
+                .await
+                .map_err(map_err)?;
 
             continuation_token = objects.continuation_token;
 
@@ -175,18 +178,19 @@ impl Storage for S3Storage {
         get_home(user)
     }
 
-    async fn health_check(&self) -> Result<()> {
+    async fn health_check(&self) -> Result<(), Error> {
         self.s3_client
             .head_bucket(HeadBucketRequest {
                 bucket: self.bucket.clone(),
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         Ok(())
     }
 
-    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>> {
+    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>, Error> {
         let authorized_keys_key = format!(".ssh/{}/authorized_keys", user);
 
         let object = self
@@ -196,7 +200,8 @@ impl Storage for S3Storage {
                 key: authorized_keys_key,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         let body = match object.body {
             Some(body) => body,
@@ -209,7 +214,7 @@ impl Storage for S3Storage {
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
 
-    async fn open_dir_handle(&self, dir_name: String) -> Result<String> {
+    async fn open_dir_handle(&self, dir_name: String) -> Result<String, Error> {
         Ok(self
             .handle_manager
             .create_dir_handle(DirHandle {
@@ -220,10 +225,10 @@ impl Storage for S3Storage {
             .await)
     }
 
-    async fn read_dir(&self, handle: &str) -> Result<Vec<File>> {
+    async fn read_dir(&self, handle: &str) -> Result<Vec<File>, Error> {
         let dir_handle = match self.handle_manager.get_dir_handle(&handle).await {
             Some(dir_handle) => dir_handle,
-            None => return Err(anyhow::anyhow!("Missing directory handle.")),
+            None => return Err(Error::Failure("Missing directory handle.".to_string())),
         };
 
         let mut dir_handle = dir_handle.lock().await;
@@ -243,7 +248,8 @@ impl Storage for S3Storage {
                 delimiter: Some("/".to_owned()),
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         dir_handle.continuation_token = objects.next_continuation_token.clone();
         dir_handle.is_eof = objects.next_continuation_token.is_none();
@@ -251,7 +257,7 @@ impl Storage for S3Storage {
         Ok(map_list_objects_to_files(objects))
     }
 
-    async fn create_dir(&self, _prefix: String) -> Result<()> {
+    async fn create_dir(&self, _prefix: String) -> Result<(), Error> {
         /*
             S3 does not support creating empty prefixes. The prefix is created when the
             first object is added to it. This operation is a NO-OP to allow GUI-based
@@ -260,7 +266,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn remove_dir(&self, prefix: String) -> Result<()> {
+    async fn remove_dir(&self, prefix: String) -> Result<(), Error> {
         let mut continuation_token = None;
 
         loop {
@@ -273,7 +279,8 @@ impl Storage for S3Storage {
                     delimiter: None,
                     ..Default::default()
                 })
-                .await?;
+                .await
+                .map_err(map_err)?;
 
             continuation_token = objects.continuation_token;
 
@@ -293,7 +300,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn get_file_metadata(&self, file_name: String) -> Result<File> {
+    async fn get_file_metadata(&self, file_name: String) -> Result<File, Error> {
         let head_object_response = self
             .s3_client
             .head_object(HeadObjectRequest {
@@ -301,30 +308,21 @@ impl Storage for S3Storage {
                 key: file_name.clone(),
                 ..Default::default()
             })
-            .await;
+            .await
+            .map_err(map_err);
 
         match head_object_response {
             Ok(head_object_response) => {
                 Ok(map_head_object_to_file(&file_name, &head_object_response))
             }
             Err(error) => match error {
-                rusoto_core::RusotoError::Unknown(http_response) => {
-                    if 404 == http_response.status.as_u16() {
-                        Ok(create_file_with_directory_bit(&file_name))
-                    } else {
-                        Err(anyhow::Error::from(rusoto_core::RusotoError::<
-                            HeadObjectError,
-                        >::Unknown(
-                            http_response
-                        )))
-                    }
-                }
-                _ => Err(anyhow::Error::from(error)),
+                Error::NoSuchFile => Ok(create_file_with_directory_bit(&file_name)),
+                _ => Err(error),
             },
         }
     }
 
-    async fn open_read_handle(&self, file_name: String) -> Result<String> {
+    async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
         let read_response = self
             .s3_client
             .get_object(GetObjectRequest {
@@ -332,11 +330,12 @@ impl Storage for S3Storage {
                 key: file_name,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         let read_stream = read_response
             .body
-            .ok_or(Error::ServerError)?
+            .ok_or_else(|| Error::StorageError("Read stream body is not available.".to_string()))?
             .into_async_read();
 
         Ok(self
@@ -345,10 +344,10 @@ impl Storage for S3Storage {
             .await)
     }
 
-    async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>> {
+    async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>, Error> {
         let read_handle = match self.handle_manager.get_read_handle(&handle).await {
             Some(dir_handle) => dir_handle,
-            None => return Err(anyhow::anyhow!("Missing read handle.")),
+            None => return Err(Error::StorageError("Missing read handle.".to_string())),
         };
 
         let mut buffer = Vec::with_capacity(len as usize);
@@ -364,7 +363,7 @@ impl Storage for S3Storage {
         Ok(buffer)
     }
 
-    async fn open_write_handle(&self, file_name: String) -> Result<String> {
+    async fn open_write_handle(&self, file_name: String) -> Result<String, Error> {
         let multipart_response = self
             .s3_client
             .create_multipart_upload(CreateMultipartUploadRequest {
@@ -372,17 +371,18 @@ impl Storage for S3Storage {
                 key: file_name,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         let write_handle = map_create_multipart_response_to_write_handle(multipart_response)?;
 
         Ok(self.handle_manager.create_write_handle(write_handle).await)
     }
 
-    async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<()> {
+    async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<(), Error> {
         let write_handle = match self.handle_manager.get_write_handle(&handle).await {
             Some(dir_handle) => dir_handle,
-            None => return Err(anyhow::anyhow!("Missing write handle.")),
+            None => return Err(Error::StorageError("Missing write handle.".to_string())),
         };
 
         let mut write_handle = write_handle.lock().await;
@@ -397,7 +397,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn close_handle(&self, handle: &str) -> Result<()> {
+    async fn close_handle(&self, handle: &str) -> Result<(), Error> {
         if let Some(write_handle) = self.handle_manager.get_write_handle(handle).await {
             let mut write_handle = write_handle.lock().await;
 
@@ -413,26 +413,28 @@ impl Storage for S3Storage {
                     }),
                     ..Default::default()
                 })
-                .await?;
+                .await
+                .map_err(map_err)?;
         }
 
         self.handle_manager.remove_handle(handle).await;
         Ok(())
     }
 
-    async fn remove_file(&self, file_name: String) -> Result<()> {
+    async fn remove_file(&self, file_name: String) -> Result<(), Error> {
         self.s3_client
             .delete_object(DeleteObjectRequest {
                 bucket: self.bucket.clone(),
                 key: file_name,
                 ..Default::default()
             })
-            .await?;
+            .await
+            .map_err(map_err)?;
 
         Ok(())
     }
 
-    async fn rename(&self, current: String, new: String) -> Result<()> {
+    async fn rename(&self, current: String, new: String) -> Result<(), Error> {
         let file = self.get_file_metadata(current.clone()).await?;
 
         match file.file_attributes.is_dir() {
@@ -580,15 +582,15 @@ fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
 
 fn map_create_multipart_response_to_write_handle(
     create_multipart_response: CreateMultipartUploadOutput,
-) -> Result<WriteHandle> {
+) -> Result<WriteHandle, Error> {
     let upload_id = match create_multipart_response.upload_id {
         Some(upload_id) => Ok(upload_id),
-        None => Err(anyhow::anyhow!("Missing upload id.")),
+        None => Err(Error::StorageError("Missing upload id.".to_string())),
     }?;
 
     let key = match create_multipart_response.key {
         Some(key) => Ok(key),
-        None => Err(anyhow::anyhow!("Missing key.")),
+        None => Err(Error::StorageError("Missing key.".to_string())),
     }?;
 
     Ok(WriteHandle {
@@ -603,8 +605,25 @@ fn get_default_endpoint_region() -> String {
     String::from("custom")
 }
 
+fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
+    match rusoto_error {
+        rusoto_core::RusotoError::Unknown(http_response) => {
+            if 404 == http_response.status.as_u16() {
+                Error::NoSuchFile
+            } else {
+                Error::StorageError(http_response.body_as_str().to_string())
+            }
+        }
+        _ => Error::StorageError(rusoto_error.to_string()),
+    }
+}
+
 #[cfg(test)]
 mod test {
+    use bytes::Bytes;
+    use rusoto_core::request::BufferedHttpResponse;
+    use rusoto_s3::UploadPartError;
+
     use super::*;
 
     #[test]
@@ -831,5 +850,55 @@ mod test {
         };
 
         assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
+    }
+
+    /*
+    fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
+        match rusoto_error {
+            rusoto_core::RusotoError::Unknown(http_response) => {
+                if 404 == http_response.status.as_u16() {
+                    Error::NoSuchFile
+                } else {
+                    Error::StorageError(http_response.body_as_str().to_string())
+                }
+            },
+            _ => Error::StorageError(rusoto_error.to_string()),
+        }
+    }
+        */
+
+    #[test]
+    fn test_map_err_maps_404_to_no_such_file() {
+        let not_found_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
+            status: http::StatusCode::NOT_FOUND,
+            body: Bytes::from(&b"test"[..]),
+            headers: http::HeaderMap::<String>::with_capacity(0),
+        });
+
+        assert_eq!(Error::NoSuchFile, map_err(not_found_error));
+    }
+
+    #[test]
+    fn test_map_error_maps_error_code_to_storage_error() {
+        let internal_server_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
+            status: http::StatusCode::INTERNAL_SERVER_ERROR,
+            body: Bytes::from(&b"test"[..]),
+            headers: http::HeaderMap::<String>::with_capacity(0),
+        });
+
+        assert_eq!(
+            Error::StorageError(String::from("test")),
+            map_err(internal_server_error)
+        );
+    }
+
+    #[test]
+    fn test_map_error_maps_generic_error_to_storage_error() {
+        assert_eq!(
+            Error::StorageError(String::from("parse error")),
+            map_err(RusotoError::ParseError::<UploadPartError>(String::from(
+                "parse error"
+            )))
+        );
     }
 }

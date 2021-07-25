@@ -1,9 +1,9 @@
 use std::path::Path;
 
-use anyhow::Result;
 use serde::Deserialize;
 use thrussh_keys::key;
 
+use crate::error::Error;
 pub use crate::storage::s3::S3Config;
 
 #[derive(Deserialize, Debug)]
@@ -17,12 +17,12 @@ pub struct DrayConfig {
 }
 
 impl DrayConfig {
-    pub fn new() -> Result<DrayConfig> {
+    pub fn new() -> Result<DrayConfig, Error> {
         let dray_config = envy::prefixed("DRAY_").from_env::<DrayConfig>()?;
         Ok(dray_config)
     }
 
-    pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>> {
+    pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>, Error> {
         let keys: Result<Vec<key::KeyPair>, _> = self
             .ssh_key_paths
             .split(',')

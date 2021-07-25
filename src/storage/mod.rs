@@ -3,11 +3,10 @@ pub mod s3;
 
 use std::sync::Arc;
 
-use anyhow::Result;
 use async_trait::async_trait;
 use bytes::Bytes;
 
-use crate::protocol::response::name::File;
+use crate::{error::Error, protocol::response::name::File};
 
 /// Builds an instance of a Storage backend, such as AWS S3.
 ///
@@ -30,7 +29,7 @@ pub trait Storage: Send + Sync {
 
     /// Checks if storage is available. An error will be returned if  storage
     /// operations cannot be performed.
-    async fn health_check(&self) -> Result<()>;
+    async fn health_check(&self) -> Result<(), Error>;
 
     /// Retrieves the authorized key fingerprints for a user that will be compared
     /// against the fingerprint of the user-supplied key to determine if a user is
@@ -39,41 +38,41 @@ pub trait Storage: Send + Sync {
     /// # Warning
     /// An empty list of keys should be returned for missing users instead of an error
     /// to prevent clients from determining whether or not a user exists.
-    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>>;
+    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>, Error>;
 
     // Opens a directory handle for a prefix.
-    async fn open_dir_handle(&self, dir_name: String) -> Result<String>;
+    async fn open_dir_handle(&self, dir_name: String) -> Result<String, Error>;
 
     /// Creates a directory.
-    async fn create_dir(&self, dir_name: String) -> Result<()>;
+    async fn create_dir(&self, dir_name: String) -> Result<(), Error>;
 
     // Reads a file listing from the prefix associated with a given handle.
-    async fn read_dir(&self, handle: &str) -> Result<Vec<File>>;
+    async fn read_dir(&self, handle: &str) -> Result<Vec<File>, Error>;
 
     /// Removes a directory.
-    async fn remove_dir(&self, dir_name: String) -> Result<()>;
+    async fn remove_dir(&self, dir_name: String) -> Result<(), Error>;
 
     /// Retrieves an file's metadata.
-    async fn get_file_metadata(&self, file_name: String) -> Result<File>;
+    async fn get_file_metadata(&self, file_name: String) -> Result<File, Error>;
 
     /// Creates a read handle for a file.
-    async fn open_read_handle(&self, file_name: String) -> Result<String>;
+    async fn open_read_handle(&self, file_name: String) -> Result<String, Error>;
 
     /// Reads up to len bytes of data data from a file associated with a given handle.
-    async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>>;
+    async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>, Error>;
 
     /// Creates a write handle for a file.
-    async fn open_write_handle(&self, file_name: String) -> Result<String>;
+    async fn open_write_handle(&self, file_name: String) -> Result<String, Error>;
 
     /// Writes data to a file associated with a given handle.
-    async fn write_data(&self, handle: &str, data: Bytes) -> Result<()>;
+    async fn write_data(&self, handle: &str, data: Bytes) -> Result<(), Error>;
 
     /// Removes a file.
-    async fn remove_file(&self, key: String) -> Result<()>;
+    async fn remove_file(&self, key: String) -> Result<(), Error>;
 
     // Closes a handle.
-    async fn close_handle(&self, handle: &str) -> Result<()>;
+    async fn close_handle(&self, handle: &str) -> Result<(), Error>;
 
     /// Renames a file or directory.
-    async fn rename(&self, current: String, new: String) -> Result<()>;
+    async fn rename(&self, current: String, new: String) -> Result<(), Error>;
 }

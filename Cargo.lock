@@ -31,12 +31,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "anyhow"
-version = "1.0.42"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "595d3cfa7a60d4555cb5067b99f07142a08ea778de5cf993f7b75c7d8fabc486"
-
-[[package]]
 name = "async-trait"
 version = "0.1.50"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -313,7 +307,6 @@ checksum = "77c90badedccf4105eca100756a0b1289e191f6fcbdadd3cee1d2f614f97da8f"
 name = "dray"
 version = "0.1.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "base64",
  "bytes",
@@ -323,10 +316,12 @@ dependencies = [
  "envy",
  "futures",
  "hex",
+ "http",
  "log",
  "rusoto_core",
  "rusoto_s3",
  "serde",
+ "thiserror",
  "thrussh",
  "thrussh-keys",
  "tokio",

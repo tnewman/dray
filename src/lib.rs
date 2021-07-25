@@ -7,8 +7,8 @@ mod storage;
 mod try_buf;
 
 use crate::config::DrayConfig;
-use anyhow::{bail, Error};
 use bytes::Bytes;
+use error::Error;
 use futures::{
     future::{ready, Ready},
     Future,
@@ -66,7 +66,7 @@ impl DraySshServer {
 
         run(ssh_config, &self.dray_config.host.clone(), self)
             .await
-            .map_err(Error::from)
+            .map_err(|error| Error::Failure(error.to_string()))
     }
 
     async fn auth_publickey(
@@ -123,7 +123,7 @@ impl DraySshServer {
 
             let sftp_session = match sftp_session {
                 Some(sftp_session) => sftp_session,
-                None => bail!("Missing SFTP session!"),
+                None => return Err(Error::Failure("Missing SFTP session!".to_string())),
             };
 
             let response = sftp_session.handle_request(request).await;
@@ -155,10 +155,10 @@ impl Handler for DraySshServer {
     type FutureAuth =
         Pin<Box<dyn Future<Output = Result<(DraySshServer, Auth), Self::Error>> + Send>>;
 
-    type FutureBool = Ready<Result<(Self, Session, bool), anyhow::Error>>;
+    type FutureBool = Ready<Result<(Self, Session, bool), Error>>;
 
     #[allow(clippy::type_complexity)]
-    type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), anyhow::Error>> + Send>>;
+    type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), Error>> + Send>>;
 
     fn auth_publickey(self, user: &str, public_key: &PublicKey) -> Self::FutureAuth {
         let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
