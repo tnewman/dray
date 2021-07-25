@@ -226,6 +226,81 @@ mod test {
         assert_eq!(file_attributes_bytes, &attrs_bytes[..]);
     }
 
+    #[test]
+    fn test_map_error_response_maps_bad_message() {
+        let expected_status = Response::Status(status::Status {
+            id: 1000,
+            status_code: status::StatusCode::BadMessage,
+            error_message: String::from("The client sent a bad message."),
+        });
+
+        assert_eq!(
+            expected_status,
+            Response::build_error_response(1000, Error::BadMessage)
+        );
+    }
+
+    #[test]
+    fn test_map_error_response_maps_no_such_file() {
+        let expected_status = Response::Status(status::Status {
+            id: 1000,
+            status_code: status::StatusCode::NoSuchFile,
+            error_message: String::from("The requested file was not found."),
+        });
+
+        assert_eq!(
+            expected_status,
+            Response::build_error_response(1000, Error::NoSuchFile)
+        );
+    }
+
+    #[test]
+    fn test_map_error_response_maps_permission_denied() {
+        let expected_status = Response::Status(status::Status {
+            id: 1000,
+            status_code: status::StatusCode::PermissionDenied,
+            error_message: String::from(
+                "The client has insufficient privileges to perform the requested operation.",
+            ),
+        });
+
+        assert_eq!(
+            expected_status,
+            Response::build_error_response(1000, Error::PermissionDenied)
+        );
+    }
+
+    #[test]
+    fn test_map_error_response_maps_unimplemented() {
+        let expected_status = Response::Status(status::Status {
+            id: 1000,
+            status_code: status::StatusCode::OperationUnsupported,
+            error_message: String::from("The requested operation is unsupported."),
+        });
+
+        assert_eq!(
+            expected_status,
+            Response::build_error_response(1000, Error::Unimplemented)
+        );
+    }
+
+    #[test]
+    fn test_map_error_response_maps_other_error() {
+        let expected_status = Response::Status(status::Status {
+            id: 1000,
+            status_code: status::StatusCode::Failure,
+            error_message: String::from("An error occurred on the server."),
+        });
+
+        assert_eq!(
+            expected_status,
+            Response::build_error_response(
+                1000,
+                Error::StorageError(String::from("Storage is unavailable."))
+            )
+        );
+    }
+
     fn get_file_attributes() -> FileAttributes {
         FileAttributes {
             size: None,
