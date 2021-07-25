@@ -12,7 +12,7 @@ base64 = "0.13"
 bytes = "1.0"
 chrono = "0.4"
 dotenv = "0.15"
-env_logger = "0.8"
+env_logger = "0.9"
 envy = "0.4"
 futures = "0.3"
 hex = "0.4.3"
@@ -21,7 +21,7 @@ serde = "1.0"
 thiserror = "1.0"
 thrussh = { version = "0.33", features = ["flate2", "openssl"] }
 thrussh-keys = { version = "0.21", features = ["openssl"] }
-tokio = { version = "1.2", features = ["full"] }
+tokio = { version = "1.9", features = ["full"] }
 uuid = { version = "0.8", features = ["v4"], default-features = false }
 
 # S3 Dependencies
