@@ -301,7 +301,7 @@ impl SftpSession {
 
     fn build_successful_response(id: u32) -> Response {
         Response::Status(response::status::Status {
-            id: id,
+            id,
             status_code: response::status::StatusCode::Ok,
             error_message: String::from(""),
         })
