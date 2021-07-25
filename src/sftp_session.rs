@@ -101,11 +101,7 @@ impl SftpSession {
             .close_handle(&close_request.handle)
             .await?;
 
-        Ok(Response::Status(response::status::Status {
-            id: close_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from(""),
-        }))
+        Ok(SftpSession::build_successful_response(close_request.id))
     }
 
     async fn handle_read_request(
@@ -139,11 +135,7 @@ impl SftpSession {
             .write_data(&write_request.handle, write_request.data)
             .await?;
 
-        Ok(Response::Status(response::status::Status {
-            id: write_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("Bytes written."),
-        }))
+        Ok(SftpSession::build_successful_response(write_request.id))
     }
 
     fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response, Error> {
@@ -215,11 +207,7 @@ impl SftpSession {
     ) -> Result<Response, Error> {
         self.object_storage.remove_file(remove_request.path).await?;
 
-        Ok(Response::Status(response::status::Status {
-            id: remove_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("File removed."),
-        }))
+        Ok(SftpSession::build_successful_response(remove_request.id))
     }
 
     async fn handle_mkdir_request(
@@ -228,11 +216,7 @@ impl SftpSession {
     ) -> Result<Response, Error> {
         self.object_storage.create_dir(mkdir_request.path).await?;
 
-        Ok(Response::Status(response::status::Status {
-            id: mkdir_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("Successfully created directory."),
-        }))
+        Ok(SftpSession::build_successful_response(mkdir_request.id))
     }
 
     async fn handle_rmdir_request(
@@ -241,11 +225,7 @@ impl SftpSession {
     ) -> Result<Response, Error> {
         self.object_storage.remove_dir(rmdir_request.path).await?;
 
-        Ok(Response::Status(response::status::Status {
-            id: rmdir_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("Successfully removed directory."),
-        }))
+        Ok(SftpSession::build_successful_response(rmdir_request.id))
     }
 
     fn handle_realpath_request(
@@ -298,11 +278,7 @@ impl SftpSession {
             .rename(rename_request.old_path, rename_request.new_path)
             .await?;
 
-        Ok(Response::Status(response::status::Status {
-            id: rename_request.id,
-            status_code: response::status::StatusCode::Ok,
-            error_message: String::from("File renamed."),
-        }))
+        Ok(SftpSession::build_successful_response(rename_request.id))
     }
 
     fn handle_readlink_request(
@@ -321,6 +297,14 @@ impl SftpSession {
         Ok(SftpSession::build_not_supported_response(
             symlink_request.id,
         ))
+    }
+
+    fn build_successful_response(id: u32) -> Response {
+        Response::Status(response::status::Status {
+            id: id,
+            status_code: response::status::StatusCode::Ok,
+            error_message: String::from(""),
+        })
     }
 
     pub fn build_invalid_request_message_response() -> Response {
