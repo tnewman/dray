@@ -5,12 +5,20 @@ use crate::try_buf::TryBuf;
 use std::convert::TryFrom;
 use std::fmt::Debug;
 
+use super::RequestId;
+
 #[derive(PartialEq)]
 pub struct Write {
     pub id: u32,
     pub handle: String,
     pub offset: u64,
     pub data: Bytes,
+}
+
+impl RequestId for Write {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for Write {
@@ -176,5 +184,17 @@ mod tests {
             "Write { id: 1, handle: \"handle\", offset: 2, len: 3 }",
             format!("{:?}", write)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let write = Write {
+            id: 1000,
+            handle: String::from("handle"),
+            offset: 0,
+            data: Bytes::from(vec![]),
+        };
+
+        assert_eq!(1000, write.get_request_id());
     }
 }

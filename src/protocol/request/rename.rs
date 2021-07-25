@@ -4,11 +4,19 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct Rename {
     pub id: u32,
     pub old_path: String,
     pub new_path: String,
+}
+
+impl RequestId for Rename {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for Rename {
@@ -91,5 +99,16 @@ mod test {
             Rename::try_from(&mut rename_bytes.freeze()),
             Err(Error::BadMessage)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let rename = Rename {
+            id: 1000,
+            old_path: String::from("old"),
+            new_path: String::from("new"),
+        };
+
+        assert_eq!(1000, rename.get_request_id());
     }
 }

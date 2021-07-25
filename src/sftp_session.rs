@@ -1,6 +1,6 @@
 use crate::protocol::{
     file_attributes::FileAttributes,
-    request::{self, Request},
+    request::{self, Request, RequestId},
     response::{self, Response},
 };
 use crate::storage::Storage;
@@ -24,6 +24,8 @@ impl SftpSession {
 
     pub async fn handle_request(&self, request: Request) -> Response {
         info!("Received request: {:?}", request);
+
+        let request_id = request.get_request_id();
 
         let response = match request {
             Request::Init(init_request) => self.handle_init_request(init_request),
@@ -52,10 +54,9 @@ impl SftpSession {
             Err(error) => {
                 error!("Received error while processing request: {}", error);
 
-                // TODO: Move error handling into individual handlers to get the id right
                 Response::Status(response::status::Status {
-                    id: 0,
-                    status_code: response::status::StatusCode::BadMessage,
+                    id: request_id,
+                    status_code: response::status::StatusCode::Failure,
                     error_message: String::from("Internal server error."),
                 })
             }

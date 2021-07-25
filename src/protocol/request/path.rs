@@ -4,6 +4,8 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct Path {
     pub id: u32,
@@ -37,6 +39,12 @@ impl Path {
         } else {
             "/".to_owned()
         }
+    }
+}
+
+impl RequestId for Path {
+    fn get_request_id(&self) -> u32 {
+        self.id
     }
 }
 
@@ -148,6 +156,16 @@ mod test {
         let path = create_path("//////sample///////path////");
 
         assert_eq!("/sample/path", path.to_normalized_path());
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let path = Path {
+            id: 1000,
+            path: String::from("path"),
+        };
+
+        assert_eq!(1000, path.get_request_id());
     }
 
     fn create_path(path: &str) -> Path {

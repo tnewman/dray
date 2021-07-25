@@ -5,6 +5,8 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 const READ: u32 = 0x00000001;
 const WRITE: u32 = 0x00000002;
 const APPEND: u32 = 0x00000004;
@@ -18,6 +20,12 @@ pub struct Open {
     pub filename: String,
     pub file_attributes: FileAttributes,
     pub open_options: OpenOptions,
+}
+
+impl RequestId for Open {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for Open {
@@ -281,6 +289,18 @@ mod tests {
             OpenOptions::try_from(&mut Bytes::new()),
             Err(Error::BadMessage)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let open = Open {
+            id: 1000,
+            filename: String::from("file"),
+            file_attributes: get_file_attributes(),
+            open_options: get_open_options(),
+        };
+
+        assert_eq!(1000, open.get_request_id());
     }
 
     fn get_file_attributes() -> FileAttributes {

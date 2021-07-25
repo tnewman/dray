@@ -5,11 +5,19 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct PathAttributes {
     pub id: u32,
     pub path: String,
     pub file_attributes: FileAttributes,
+}
+
+impl RequestId for PathAttributes {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for PathAttributes {
@@ -95,6 +103,17 @@ mod test {
             PathAttributes::try_from(&mut path_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let path_attributes = PathAttributes {
+            id: 1000,
+            path: String::from("path"),
+            file_attributes: get_file_attributes(),
+        };
+
+        assert_eq!(1000, path_attributes.get_request_id());
     }
 
     fn get_file_attributes() -> FileAttributes {

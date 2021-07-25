@@ -4,10 +4,18 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct Handle {
     pub id: u32,
     pub handle: String,
+}
+
+impl RequestId for Handle {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for Handle {
@@ -69,5 +77,15 @@ mod test {
             Handle::try_from(&mut handle_bytes.freeze()),
             Err(Error::BadMessage)
         )
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let handle = Handle {
+            id: 1000,
+            handle: String::from("handle"),
+        };
+
+        assert_eq!(1000, handle.get_request_id());
     }
 }

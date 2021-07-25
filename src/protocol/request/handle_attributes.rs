@@ -5,11 +5,19 @@ use crate::protocol::file_attributes::FileAttributes;
 use crate::try_buf::TryBuf;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct HandleAttributes {
     pub id: u32,
     pub handle: String,
     pub file_attributes: FileAttributes,
+}
+
+impl RequestId for HandleAttributes {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for HandleAttributes {
@@ -95,6 +103,17 @@ mod test {
             HandleAttributes::try_from(&mut handle_attributes_bytes.freeze()),
             Err(Error::BadMessage)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let handle_attributes = HandleAttributes {
+            id: 1000,
+            file_attributes: get_file_attributes(),
+            handle: String::from("handle"),
+        };
+
+        assert_eq!(1000, handle_attributes.get_request_id());
     }
 
     fn get_file_attributes() -> FileAttributes {

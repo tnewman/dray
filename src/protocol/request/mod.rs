@@ -44,6 +44,36 @@ pub enum Request {
     Symlink(symlink::Symlink),
 }
 
+pub trait RequestId {
+    fn get_request_id(&self) -> u32;
+}
+
+impl RequestId for Request {
+    fn get_request_id(&self) -> u32 {
+        match self {
+            Request::Init(init) => init.get_request_id(),
+            Request::Open(open) => open.get_request_id(),
+            Request::Close(close) => close.get_request_id(),
+            Request::Read(read) => read.get_request_id(),
+            Request::Write(write) => write.get_request_id(),
+            Request::Lstat(lstat) => lstat.get_request_id(),
+            Request::Fstat(fstat) => fstat.get_request_id(),
+            Request::Setstat(setstat) => setstat.get_request_id(),
+            Request::Fsetstat(fsetstat) => fsetstat.get_request_id(),
+            Request::Opendir(opendir) => opendir.get_request_id(),
+            Request::Readdir(readdir) => readdir.get_request_id(),
+            Request::Remove(remove) => remove.get_request_id(),
+            Request::Mkdir(mkdir) => mkdir.get_request_id(),
+            Request::Rmdir(rmdir) => rmdir.get_request_id(),
+            Request::Realpath(realpath) => realpath.get_request_id(),
+            Request::Stat(stat) => stat.get_request_id(),
+            Request::Rename(rename) => rename.get_request_id(),
+            Request::Readlink(readlink) => readlink.get_request_id(),
+            Request::Symlink(symlink) => symlink.get_request_id(),
+        }
+    }
+}
+
 impl TryFrom<&mut Bytes> for Request {
     type Error = Error;
 
@@ -150,16 +180,9 @@ mod tests {
                 id: 0x01,
                 filename: String::from("filename"),
                 file_attributes: get_file_attrs(),
-                open_options: open::OpenOptions {
-                    read: true,
-                    write: false,
-                    create: false,
-                    create_new_only: false,
-                    append: false,
-                    truncate: false,
-                },
+                open_options: get_open_options()
             })),
-        )
+        );
     }
 
     #[test]
@@ -541,6 +564,204 @@ mod tests {
         assert_invalid_message(20);
     }
 
+    #[test]
+    fn test_init_get_request_id() {
+        let init_request = Request::Init(super::init::Init { version: 3 });
+
+        assert_eq!(0, init_request.get_request_id());
+    }
+
+    #[test]
+    fn test_open_get_request_id() {
+        let open_request = Request::Open(super::open::Open {
+            id: 1000,
+            filename: String::from("filename"),
+            file_attributes: get_file_attrs(),
+            open_options: get_open_options(),
+        });
+
+        assert_eq!(1000, open_request.get_request_id());
+    }
+
+    #[test]
+    fn test_close_get_request_id() {
+        let close_request = Request::Close(super::handle::Handle {
+            id: 1000,
+            handle: String::from("handle"),
+        });
+
+        assert_eq!(1000, close_request.get_request_id());
+    }
+
+    #[test]
+    fn test_read_get_request_id() {
+        let read_request = Request::Read(super::read::Read {
+            id: 1000,
+            handle: String::from("handle"),
+            offset: 0,
+            len: 0,
+        });
+
+        assert_eq!(1000, read_request.get_request_id());
+    }
+
+    #[test]
+    fn test_write_get_request_id() {
+        let write_request = Request::Write(super::write::Write {
+            id: 1000,
+            handle: String::from("handle"),
+            offset: 0,
+            data: Bytes::from(vec![]),
+        });
+
+        assert_eq!(1000, write_request.get_request_id());
+    }
+
+    #[test]
+    fn test_lstat_get_request_id() {
+        let lstat_request = Request::Lstat(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, lstat_request.get_request_id());
+    }
+
+    #[test]
+    fn test_fstat_get_request_id() {
+        let fstat_request = Request::Fstat(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, fstat_request.get_request_id());
+    }
+
+    #[test]
+    fn test_setstat_get_request_id() {
+        let setstat_request = Request::Setstat(super::path_attributes::PathAttributes {
+            id: 1000,
+            path: String::from("path"),
+            file_attributes: get_file_attrs(),
+        });
+
+        assert_eq!(1000, setstat_request.get_request_id());
+    }
+
+    #[test]
+    fn test_fsetstat_get_request_id() {
+        let fsetstat_request = Request::Fsetstat(super::handle_attributes::HandleAttributes {
+            id: 1000,
+            handle: String::from("handle"),
+            file_attributes: get_file_attrs(),
+        });
+
+        assert_eq!(1000, fsetstat_request.get_request_id());
+    }
+
+    #[test]
+    fn test_opendir_get_request_id() {
+        let opendir_request = Request::Opendir(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, opendir_request.get_request_id());
+    }
+
+    #[test]
+    fn test_readdir_get_request_id() {
+        let readdir_request = Request::Readdir(super::handle::Handle {
+            id: 1000,
+            handle: String::from("handle"),
+        });
+
+        assert_eq!(1000, readdir_request.get_request_id());
+    }
+
+    #[test]
+    fn test_remove_get_request_id() {
+        let remove_request = Request::Remove(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, remove_request.get_request_id());
+    }
+
+    #[test]
+    fn test_mkdir_get_request_id() {
+        let mkdir_request = Request::Mkdir(super::path_attributes::PathAttributes {
+            id: 1000,
+            path: String::from("path"),
+            file_attributes: get_file_attrs(),
+        });
+
+        assert_eq!(1000, mkdir_request.get_request_id());
+    }
+
+    #[test]
+    fn test_rmdir_get_request_id() {
+        let rmdir_request = Request::Rmdir(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, rmdir_request.get_request_id());
+    }
+
+    #[test]
+    fn test_realpath_get_request_id() {
+        let realpath_request = Request::Realpath(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, realpath_request.get_request_id());
+    }
+
+    #[test]
+    fn test_stat_get_request_id() {
+        let stat_request = Request::Stat(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, stat_request.get_request_id());
+    }
+
+    #[test]
+    fn test_rename_get_request_id() {
+        let rename_request = Request::Rename(super::rename::Rename {
+            id: 1000,
+            old_path: String::from("old"),
+            new_path: String::from("new"),
+        });
+
+        assert_eq!(1000, rename_request.get_request_id());
+    }
+
+    #[test]
+    fn test_readlink_get_request_id() {
+        let readlink_request = Request::Readlink(super::path::Path {
+            id: 1000,
+            path: String::from("path"),
+        });
+
+        assert_eq!(1000, readlink_request.get_request_id());
+    }
+
+    #[test]
+    fn test_symlink_get_request_id() {
+        let symlink_request = Request::Symlink(super::symlink::Symlink {
+            id: 1000,
+            link_path: String::from("link"),
+            target_path: String::from("target"),
+        });
+
+        assert_eq!(1000, symlink_request.get_request_id());
+    }
+
     fn assert_invalid_message(message_type: u8) {
         let payload = BytesMut::new();
 
@@ -571,6 +792,17 @@ mod tests {
             permissions: None,
             atime: None,
             mtime: None,
+        }
+    }
+
+    fn get_open_options() -> open::OpenOptions {
+        open::OpenOptions {
+            read: true,
+            write: false,
+            create: false,
+            create_new_only: false,
+            append: false,
+            truncate: false,
         }
     }
 }

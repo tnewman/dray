@@ -4,9 +4,17 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct Init {
     pub version: u8,
+}
+
+impl RequestId for Init {
+    fn get_request_id(&self) -> u32 {
+        0
+    }
 }
 
 impl TryFrom<&mut Bytes> for Init {
@@ -45,5 +53,12 @@ mod tests {
             Init::try_from(&mut init_bytes.freeze()),
             Err(Error::BadMessage)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let init = Init { version: 3 };
+
+        assert_eq!(0, init.get_request_id());
     }
 }

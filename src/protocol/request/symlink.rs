@@ -4,11 +4,19 @@ use crate::try_buf::TryBuf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 
+use super::RequestId;
+
 #[derive(Debug, PartialEq)]
 pub struct Symlink {
     pub id: u32,
     pub link_path: String,
     pub target_path: String,
+}
+
+impl RequestId for Symlink {
+    fn get_request_id(&self) -> u32 {
+        self.id
+    }
 }
 
 impl TryFrom<&mut Bytes> for Symlink {
@@ -91,5 +99,16 @@ mod test {
             Symlink::try_from(&mut symlink_bytes.freeze()),
             Err(Error::BadMessage)
         );
+    }
+
+    #[test]
+    fn test_get_request_id() {
+        let symlink = Symlink {
+            id: 1000,
+            link_path: String::from("link"),
+            target_path: String::from("target"),
+        };
+
+        assert_eq!(1000, symlink.get_request_id());
     }
 }
