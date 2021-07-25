@@ -215,14 +215,13 @@ impl Storage for S3Storage {
     }
 
     async fn open_dir_handle(&self, dir_name: String) -> Result<String, Error> {
-        Ok(self
-            .handle_manager
+        self.handle_manager
             .create_dir_handle(DirHandle {
                 prefix: dir_name,
                 continuation_token: None,
                 is_eof: false,
             })
-            .await)
+            .await
     }
 
     async fn read_dir(&self, handle: &str) -> Result<Vec<File>, Error> {
@@ -338,10 +337,9 @@ impl Storage for S3Storage {
             .ok_or_else(|| Error::StorageError("Read stream body is not available.".to_string()))?
             .into_async_read();
 
-        Ok(self
-            .handle_manager
+        self.handle_manager
             .create_read_handle(Box::pin(read_stream))
-            .await)
+            .await
     }
 
     async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>, Error> {
@@ -376,7 +374,7 @@ impl Storage for S3Storage {
 
         let write_handle = map_create_multipart_response_to_write_handle(multipart_response)?;
 
-        Ok(self.handle_manager.create_write_handle(write_handle).await)
+        self.handle_manager.create_write_handle(write_handle).await
     }
 
     async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<(), Error> {
@@ -862,21 +860,6 @@ mod test {
 
         assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
-
-    /*
-    fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
-        match rusoto_error {
-            rusoto_core::RusotoError::Unknown(http_response) => {
-                if 404 == http_response.status.as_u16() {
-                    Error::NoSuchFile
-                } else {
-                    Error::StorageError(http_response.body_as_str().to_string())
-                }
-            },
-            _ => Error::StorageError(rusoto_error.to_string()),
-        }
-    }
-        */
 
     #[test]
     fn test_map_err_maps_404_to_no_such_file() {
