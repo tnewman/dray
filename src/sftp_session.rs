@@ -55,12 +55,7 @@ impl SftpSession {
             Ok(response) => response,
             Err(error) => {
                 error!("Received error while processing request: {}", error);
-
-                Response::Status(response::status::Status {
-                    id: request_id,
-                    status_code: response::status::StatusCode::Failure,
-                    error_message: String::from("Internal server error."),
-                })
+                Response::build_error_response(request_id, error)
             }
         };
 

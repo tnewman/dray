@@ -11,6 +11,8 @@ use log::log_enabled;
 use log::Level::Debug;
 use std::convert::TryFrom;
 
+use crate::error::Error;
+
 const DATA_TYPE_LENGTH: u32 = 1;
 
 #[derive(Debug, PartialEq)]
@@ -21,6 +23,46 @@ pub enum Response {
     Data(data::Data),
     Name(name::Name),
     Attrs(attrs::Attrs),
+}
+
+impl Response {
+    pub fn build_error_response(id: u32, error: Error) -> Self {
+        match error {
+            Error::BadMessage => Response::build_status(
+                id,
+                status::StatusCode::BadMessage,
+                "The client sent a bad message.",
+            ),
+            Error::NoSuchFile => Response::build_status(
+                id,
+                status::StatusCode::NoSuchFile,
+                "The requested file was not found.",
+            ),
+            Error::PermissionDenied => Response::build_status(
+                id,
+                status::StatusCode::PermissionDenied,
+                "The client has insufficient privileges to perform the requested operation.",
+            ),
+            Error::Unimplemented => Response::build_status(
+                id,
+                status::StatusCode::OperationUnsupported,
+                "The requested operation is unsupported.",
+            ),
+            _ => Response::build_status(
+                id,
+                status::StatusCode::Failure,
+                "An error occurred on the server.",
+            ),
+        }
+    }
+
+    fn build_status(id: u32, status_code: status::StatusCode, error_message: &str) -> Response {
+        Response::Status(status::Status {
+            id,
+            status_code,
+            error_message: error_message.to_string(),
+        })
+    }
 }
 
 impl From<&Response> for Bytes {

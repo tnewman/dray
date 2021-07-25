@@ -607,11 +607,22 @@ fn get_default_endpoint_region() -> String {
 
 fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
     match rusoto_error {
+        rusoto_core::RusotoError::Service(error) => {
+            if "The specified key does not exist." == error.to_string() {
+                Error::NoSuchFile
+            } else {
+                Error::StorageError(error.to_string())
+            }
+        }
         rusoto_core::RusotoError::Unknown(http_response) => {
             if 404 == http_response.status.as_u16() {
                 Error::NoSuchFile
             } else {
-                Error::StorageError(http_response.body_as_str().to_string())
+                Error::StorageError(format!(
+                    "{} - {}",
+                    http_response.status.to_string(),
+                    http_response.body_as_str().to_string()
+                ))
             }
         }
         _ => Error::StorageError(rusoto_error.to_string()),
@@ -622,7 +633,7 @@ fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Erro
 mod test {
     use bytes::Bytes;
     use rusoto_core::request::BufferedHttpResponse;
-    use rusoto_s3::UploadPartError;
+    use rusoto_s3::{GetObjectError, UploadPartError};
 
     use super::*;
 
@@ -879,6 +890,15 @@ mod test {
     }
 
     #[test]
+    fn test_map_err_maps_missing_key_to_no_such_file() {
+        let not_found_error = RusotoError::Service::<GetObjectError>(GetObjectError::NoSuchKey(
+            "The specified key does not exist.".to_string(),
+        ));
+
+        assert_eq!(Error::NoSuchFile, map_err(not_found_error));
+    }
+
+    #[test]
     fn test_map_error_maps_error_code_to_storage_error() {
         let internal_server_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
             status: http::StatusCode::INTERNAL_SERVER_ERROR,
@@ -887,8 +907,20 @@ mod test {
         });
 
         assert_eq!(
-            Error::StorageError(String::from("test")),
+            Error::StorageError(String::from("500 Internal Server Error - test")),
             map_err(internal_server_error)
+        );
+    }
+
+    #[test]
+    fn test_map_err_maps_unknown_service_error_to_storage_error() {
+        let not_found_error = RusotoError::Service::<GetObjectError>(
+            GetObjectError::InvalidObjectState("Unknown".to_string()),
+        );
+
+        assert_eq!(
+            Error::StorageError(String::from("Unknown")),
+            map_err(not_found_error)
         );
     }
 
