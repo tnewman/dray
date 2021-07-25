@@ -14,13 +14,17 @@ use std::sync::Arc;
 pub struct SftpSession {
     object_storage: Arc<dyn Storage>,
     user: String,
+    user_home: String,
 }
 
 impl SftpSession {
     pub fn new(object_storage: Arc<dyn Storage>, user: String) -> Self {
+        let user_home = object_storage.get_home(&user);
+
         SftpSession {
             object_storage,
             user,
+            user_home,
         }
     }
 
@@ -71,6 +75,8 @@ impl SftpSession {
         &self,
         open_request: request::open::Open,
     ) -> Result<Response, Error> {
+        self.check_permission(&open_request.filename)?;
+
         let handle = if open_request.open_options.create {
             self.object_storage
                 .open_write_handle(open_request.filename)
@@ -168,6 +174,8 @@ impl SftpSession {
         &self,
         opendir_request: request::path::Path,
     ) -> Result<Response, Error> {
+        self.check_permission(&opendir_request.path)?;
+
         let handle = self
             .object_storage
             .open_dir_handle(opendir_request.path)
@@ -205,6 +213,8 @@ impl SftpSession {
         &self,
         remove_request: request::path::Path,
     ) -> Result<Response, Error> {
+        self.check_permission(&remove_request.path)?;
+
         self.object_storage.remove_file(remove_request.path).await?;
 
         Ok(SftpSession::build_successful_response(remove_request.id))
@@ -214,6 +224,8 @@ impl SftpSession {
         &self,
         mkdir_request: request::path_attributes::PathAttributes,
     ) -> Result<Response, Error> {
+        self.check_permission(&mkdir_request.path)?;
+
         self.object_storage.create_dir(mkdir_request.path).await?;
 
         Ok(SftpSession::build_successful_response(mkdir_request.id))
@@ -223,6 +235,8 @@ impl SftpSession {
         &self,
         rmdir_request: request::path::Path,
     ) -> Result<Response, Error> {
+        self.check_permission(&rmdir_request.path)?;
+
         self.object_storage.remove_dir(rmdir_request.path).await?;
 
         Ok(SftpSession::build_successful_response(rmdir_request.id))
@@ -258,6 +272,8 @@ impl SftpSession {
         &self,
         stat_request: request::path::Path,
     ) -> Result<Response, Error> {
+        self.check_permission(&stat_request.path)?;
+
         let file_attributes = self
             .object_storage
             .get_file_metadata(stat_request.path.clone())
@@ -274,6 +290,9 @@ impl SftpSession {
         &self,
         rename_request: request::rename::Rename,
     ) -> Result<Response, Error> {
+        self.check_permission(&rename_request.new_path)?;
+        self.check_permission(&rename_request.old_path)?;
+
         self.object_storage
             .rename(rename_request.old_path, rename_request.new_path)
             .await?;
@@ -321,5 +340,12 @@ impl SftpSession {
             status_code: response::status::StatusCode::OperationUnsupported,
             error_message: String::from("Operation Unsupported!"),
         })
+    }
+
+    fn check_permission(&self, path: &str) -> Result<(), Error> {
+        match path.starts_with(&self.user_home) {
+            true => Ok(()),
+            false => Err(Error::PermissionDenied),
+        }
     }
 }
