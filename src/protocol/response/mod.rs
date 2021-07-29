@@ -296,7 +296,7 @@ mod test {
             expected_status,
             Response::build_error_response(
                 1000,
-                Error::StorageError(String::from("Storage is unavailable."))
+                Error::Storage(String::from("Storage is unavailable."))
             )
         );
     }

@@ -225,7 +225,7 @@ impl Storage for S3Storage {
     }
 
     async fn read_dir(&self, handle: &str) -> Result<Vec<File>, Error> {
-        let dir_handle = match self.handle_manager.get_dir_handle(&handle).await {
+        let dir_handle = match self.handle_manager.get_dir_handle(handle).await {
             Some(dir_handle) => dir_handle,
             None => return Err(Error::Failure("Missing directory handle.".to_string())),
         };
@@ -334,7 +334,7 @@ impl Storage for S3Storage {
 
         let read_stream = read_response
             .body
-            .ok_or_else(|| Error::StorageError("Read stream body is not available.".to_string()))?
+            .ok_or_else(|| Error::Storage("Read stream body is not available.".to_string()))?
             .into_async_read();
 
         self.handle_manager
@@ -343,9 +343,9 @@ impl Storage for S3Storage {
     }
 
     async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>, Error> {
-        let read_handle = match self.handle_manager.get_read_handle(&handle).await {
+        let read_handle = match self.handle_manager.get_read_handle(handle).await {
             Some(dir_handle) => dir_handle,
-            None => return Err(Error::StorageError("Missing read handle.".to_string())),
+            None => return Err(Error::Storage("Missing read handle.".to_string())),
         };
 
         let mut buffer = Vec::with_capacity(len as usize);
@@ -378,9 +378,9 @@ impl Storage for S3Storage {
     }
 
     async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<(), Error> {
-        let write_handle = match self.handle_manager.get_write_handle(&handle).await {
+        let write_handle = match self.handle_manager.get_write_handle(handle).await {
             Some(dir_handle) => dir_handle,
-            None => return Err(Error::StorageError("Missing write handle.".to_string())),
+            None => return Err(Error::Storage("Missing write handle.".to_string())),
         };
 
         let mut write_handle = write_handle.lock().await;
@@ -583,12 +583,12 @@ fn map_create_multipart_response_to_write_handle(
 ) -> Result<WriteHandle, Error> {
     let upload_id = match create_multipart_response.upload_id {
         Some(upload_id) => Ok(upload_id),
-        None => Err(Error::StorageError("Missing upload id.".to_string())),
+        None => Err(Error::Storage("Missing upload id.".to_string())),
     }?;
 
     let key = match create_multipart_response.key {
         Some(key) => Ok(key),
-        None => Err(Error::StorageError("Missing key.".to_string())),
+        None => Err(Error::Storage("Missing key.".to_string())),
     }?;
 
     Ok(WriteHandle {
@@ -609,21 +609,21 @@ fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Erro
             if "The specified key does not exist." == error.to_string() {
                 Error::NoSuchFile
             } else {
-                Error::StorageError(error.to_string())
+                Error::Storage(error.to_string())
             }
         }
         rusoto_core::RusotoError::Unknown(http_response) => {
             if 404 == http_response.status.as_u16() {
                 Error::NoSuchFile
             } else {
-                Error::StorageError(format!(
+                Error::Storage(format!(
                     "{} - {}",
                     http_response.status.to_string(),
                     http_response.body_as_str().to_string()
                 ))
             }
         }
-        _ => Error::StorageError(rusoto_error.to_string()),
+        _ => Error::Storage(rusoto_error.to_string()),
     }
 }
 
@@ -890,7 +890,7 @@ mod test {
         });
 
         assert_eq!(
-            Error::StorageError(String::from("500 Internal Server Error - test")),
+            Error::Storage(String::from("500 Internal Server Error - test")),
             map_err(internal_server_error)
         );
     }
@@ -902,7 +902,7 @@ mod test {
         );
 
         assert_eq!(
-            Error::StorageError(String::from("Unknown")),
+            Error::Storage(String::from("Unknown")),
             map_err(not_found_error)
         );
     }
@@ -910,7 +910,7 @@ mod test {
     #[test]
     fn test_map_error_maps_generic_error_to_storage_error() {
         assert_eq!(
-            Error::StorageError(String::from("parse error")),
+            Error::Storage(String::from("parse error")),
             map_err(RusotoError::ParseError::<UploadPartError>(String::from(
                 "parse error"
             )))

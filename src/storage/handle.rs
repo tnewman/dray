@@ -85,9 +85,7 @@ impl<ReadHandle, WriteHandle, DirHandle> HandleManager<ReadHandle, WriteHandle, 
 
         match handles_len < 5 {
             true => Ok(()),
-            false => Err(Error::StorageError(
-                "The handle manager is full.".to_string(),
-            )),
+            false => Err(Error::Storage("The handle manager is full.".to_string())),
         }
     }
 }

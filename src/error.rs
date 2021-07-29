@@ -6,7 +6,7 @@ pub enum Error {
     BadMessage,
 
     #[error("Configuration error: {}", .0)]
-    ConfigurationError(String),
+    Configuration(String),
 
     #[error("{}", .0)]
     Failure(String),
@@ -18,7 +18,7 @@ pub enum Error {
     PermissionDenied,
 
     #[error("An error occurred with the storage backend: {}", .0)]
-    StorageError(String),
+    Storage(String),
 
     #[error("SFTP request not implemented.")]
     Unimplemented,
@@ -26,13 +26,13 @@ pub enum Error {
 
 impl From<envy::Error> for Error {
     fn from(envy_error: envy::Error) -> Self {
-        Error::ConfigurationError(envy_error.to_string())
+        Error::Configuration(envy_error.to_string())
     }
 }
 
 impl From<std::io::Error> for Error {
     fn from(io_error: std::io::Error) -> Self {
-        Error::StorageError(io_error.to_string())
+        Error::Storage(io_error.to_string())
     }
 }
 
