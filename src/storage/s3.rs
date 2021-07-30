@@ -15,6 +15,7 @@ use rusoto_s3::CompleteMultipartUploadRequest;
 use rusoto_s3::CompletedMultipartUpload;
 use rusoto_s3::CompletedPart;
 use rusoto_s3::CopyObjectRequest;
+use rusoto_s3::CreateBucketRequest;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
 use rusoto_s3::DeleteObjectRequest;
@@ -86,6 +87,9 @@ impl S3Storage {
             handle_manager: HandleManager::new(),
         }
     }
+
+    /// Creates the storage instance's bucket if it does not already exist
+    pub fn initialize_bucket() {}
 
     async fn complete_part_upload(
         &self,
@@ -174,6 +178,30 @@ impl S3Storage {
 
 #[async_trait]
 impl Storage for S3Storage {
+    async fn init(&self) -> Result<(), Error> {
+        let head_response = self
+            .s3_client
+            .head_bucket(HeadBucketRequest {
+                bucket: self.bucket.clone(),
+                ..Default::default()
+            })
+            .await;
+
+        match head_response {
+            Ok(_) => Ok(()),
+            Err(_) => {
+                self.s3_client
+                    .create_bucket(CreateBucketRequest {
+                        bucket: self.bucket.clone(),
+                        ..Default::default()
+                    })
+                    .await
+                    .map_err(map_err)?;
+                Ok(())
+            }
+        }
+    }
+
     fn get_home(&self, user: &str) -> String {
         get_home(user)
     }

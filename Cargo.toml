@@ -30,3 +30,4 @@ rusoto_s3 = "0.47"
 
 [dev-dependencies]
 http = "0.2.4"
+ssh2 = "0.9"

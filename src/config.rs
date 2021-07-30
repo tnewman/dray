@@ -10,7 +10,7 @@ pub use crate::storage::s3::S3Config;
 pub struct DrayConfig {
     pub host: String,
 
-    ssh_key_paths: String,
+    pub ssh_key_paths: String,
 
     #[serde(flatten)]
     pub s3: S3Config,

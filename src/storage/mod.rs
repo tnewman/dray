@@ -19,6 +19,10 @@ pub trait StorageFactory: Send + Sync {
 /// An implementation of a Storage backend, such as AWS S3.
 #[async_trait]
 pub trait Storage: Send + Sync {
+    /// Initializes the storage backend, such as creating a bucket in an object
+    /// storage backend if it does not already exist.
+    async fn init(&self) -> Result<(), Error>;
+
     /// Retrieves the expected home directory of a user.
     ///
     /// # Note

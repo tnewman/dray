@@ -3,7 +3,7 @@ mod error;
 mod protocol;
 mod sftp_session;
 mod ssh_keys;
-mod storage;
+pub mod storage;
 mod try_buf;
 
 use crate::config::DrayConfig;
@@ -51,7 +51,8 @@ impl DraySshServer {
     }
 
     pub async fn health_check(&self) -> Result<(), Error> {
-        self.object_storage.health_check().await
+        self.object_storage.health_check().await?;
+        Ok(())
     }
 
     pub async fn run_server(self) -> Result<(), Error> {
