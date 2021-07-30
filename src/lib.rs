@@ -65,6 +65,8 @@ impl DraySshServer {
 
         let ssh_config = Arc::new(ssh_config);
 
+        info!("Binding to Host {}", self.dray_config.host);
+
         run(ssh_config, &self.dray_config.host.clone(), self)
             .await
             .map_err(|error| Error::Failure(error.to_string()))

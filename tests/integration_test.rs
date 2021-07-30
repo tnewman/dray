@@ -31,12 +31,19 @@ fn setup() {
     runtime.block_on(dray_server.health_check()).unwrap();
     runtime.spawn(dray_server.run_server());
 
-    // Give the server time to bind to it's port
-    sleep(Duration::from_secs(1));
+    wait_for_server_listening(&dray_config);
+}
 
-    match TcpStream::connect_timeout(&dray_config.host.parse().unwrap(), Duration::from_secs(10)) {
-        Ok(_) => (),
-        Err(_) => panic!("Could not connect to Dray server. Check the log for startup errors."),
+fn wait_for_server_listening(dray_config: &DrayConfig) {
+    for count in 1..=1000 {
+        match TcpStream::connect(&dray_config.host) {
+            Ok(_) => break,
+            Err(_) => sleep(Duration::from_millis(10)),
+        }
+
+        if count == 1000 {
+            panic!("Could not connect to Dray server. Check the log for startup errors.");
+        }
     }
 }
 
