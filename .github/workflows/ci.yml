@@ -98,6 +98,9 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+      
+      - name: Generate Test Keypair
+        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
 
       - name: Run cargo test
         run: cargo test
