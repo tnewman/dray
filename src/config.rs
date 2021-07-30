@@ -19,6 +19,10 @@ pub struct DrayConfig {
 impl DrayConfig {
     pub fn new() -> Result<DrayConfig, Error> {
         let dray_config = envy::prefixed("DRAY_").from_env::<DrayConfig>()?;
+
+        // Validate SSH Key Parsing
+        dray_config.get_ssh_keys()?;
+
         Ok(dray_config)
     }
 

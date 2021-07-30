@@ -14,7 +14,7 @@ A dray is a cart used to transport heavy cargo short distances. Dray transports 
 - [Install Rust](https://rustup.rs)
 - [Install Docker Compose](https://docs.docker.com/compose/install)
 - cd to the `dray` repository
-- Generate an SSH keypair in the `dray` directory (`ssh-keygen -t ed25519 -f .ssh/id_ed25519`)
+- Generate an SSH keypair in the `dray` directory (`mkdir -p .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519`)
 
 ### Test, Build, and Run
 - Start Containers (`docker-compose up`)
