@@ -32,7 +32,7 @@ fn setup() {
     runtime.spawn(dray_server.run_server());
 
     // Give the server time to bind to it's port
-    sleep(Duration::from_millis(100));
+    sleep(Duration::from_secs(1));
 
     match runtime.block_on(TcpStream::connect(dray_config.host)) {
         Ok(_) => (),
