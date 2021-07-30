@@ -90,7 +90,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Start Backing Services
-        run: docker-compose up
+        run: docker-compose up -d
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
