@@ -2,15 +2,15 @@ use dray::{
     config::DrayConfig, storage::s3::S3StorageFactory, storage::StorageFactory, DraySshServer,
 };
 use log::LevelFilter;
-use std::{env, thread::sleep, time::Duration};
-use tokio::{net::TcpStream, runtime::Runtime};
+use std::{env, net::TcpStream, thread::sleep, time::Duration};
+use tokio::runtime::Runtime;
 
 fn setup() {
     env_logger::Builder::new()
         .filter_level(LevelFilter::Info)
         .init();
 
-    env::set_var("DRAY_HOST", "localhost:2222");
+    env::set_var("DRAY_HOST", "127.0.0.1:2222");
     env::set_var("DRAY_SSH_KEY_PATHS", ".ssh/id_ed25519");
     env::set_var("DRAY_S3_BUCKET", "integration-test");
     env::set_var("DRAY_S3_ENDPOINT_NAME", "http://localhost:9000");
@@ -34,7 +34,7 @@ fn setup() {
     // Give the server time to bind to it's port
     sleep(Duration::from_secs(1));
 
-    match runtime.block_on(TcpStream::connect(dray_config.host)) {
+    match TcpStream::connect_timeout(&dray_config.host.parse().unwrap(), Duration::from_secs(10)) {
         Ok(_) => (),
         Err(_) => panic!("Could not connect to Dray server. Check the log for startup errors."),
     }
