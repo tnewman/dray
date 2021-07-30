@@ -84,14 +84,10 @@ jobs:
       - name: Generate Test Keypair
         run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
 
-      - name: Run cargo test
-        run: cargo test
-
-      - name: Run cargo-tarpaulin
-        uses: actions-rs/tarpaulin@v0.1
-        with:
-          version: '0.16.0'
-          args: '--out Lcov'
+      - name: Run tests
+        run: |
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --out Lcov --verbose
 
       - name: Coveralls upload
         uses: coverallsapp/github-action@master
