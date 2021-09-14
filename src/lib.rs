@@ -1,5 +1,5 @@
 pub mod config;
-mod error;
+pub mod error;
 mod protocol;
 mod sftp_session;
 mod ssh_keys;
@@ -195,6 +195,13 @@ impl Handler for DraySshServer {
                 Box::pin(ready(Ok((self, session))))
             }
         }
+    }
+
+    fn channel_eof(self, channel: ChannelId, mut session: Session) -> Self::FutureUnit {
+        // Certain clients, such as sftp, will hold open the session after sending EOF until
+        // the server closes the session.
+        session.close(channel);
+        Box::pin(ready(Ok((self, session))))
     }
 
     fn finished_bool(self, b: bool, session: Session) -> Self::FutureBool {

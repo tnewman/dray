@@ -29,5 +29,6 @@ rusoto_core = "0.47"
 rusoto_s3 = "0.47"
 
 [dev-dependencies]
+async_once = "0.2.1"
 http = "0.2.4"
-ssh2 = "0.9"
+lazy_static = "1.4.0"
