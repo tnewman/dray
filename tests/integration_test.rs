@@ -54,7 +54,7 @@ lazy_static! {
 async fn execute_sftp_command(command: &str) -> Result<String, Error> {
     let mut child = Command::new("sftp")
         .arg("-b-")
-        .arg("-i/home/tnewman/repos/dray/.ssh/id_ed25519")
+        .arg(format!("-i{}/.ssh/id_ed25519", env!("CARGO_MANIFEST_DIR")))
         .arg("-oStrictHostKeyChecking=no")
         .arg("-P2222")
         .arg("test@127.0.0.1")
