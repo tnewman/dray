@@ -88,9 +88,6 @@ impl S3Storage {
         }
     }
 
-    /// Creates the storage instance's bucket if it does not already exist
-    pub fn initialize_bucket() {}
-
     async fn complete_part_upload(
         &self,
         write_handle: &mut tokio::sync::MutexGuard<'_, WriteHandle>,
