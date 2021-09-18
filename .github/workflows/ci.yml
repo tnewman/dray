@@ -86,14 +86,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo install cargo-tarpaulin
-          cargo tarpaulin --out Lcov --verbose
-
-      - name: Coveralls upload
-        uses: coverallsapp/github-action@master
-        with:
-          github-token: ${{ secrets.github_token }}
-          path-to-lcov: lcov.info
+          cargo test
       
       - name: Stop Backing Services
         if: always()
