@@ -189,7 +189,7 @@ mod test {
             id: 0x01,
             files: vec![name::File {
                 file_name: String::from("file"),
-                file_attributes: file_attributes,
+                file_attributes,
             }],
         });
 

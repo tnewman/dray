@@ -43,6 +43,6 @@ mod test {
 
         assert_eq!(0x01, attrs_bytes.get_u32());
         assert_eq!(0x0F, attrs_bytes.get_u32()); // check attributes bitmask
-        assert_eq!(true, attrs_bytes.has_remaining());
+        assert!(attrs_bytes.has_remaining());
     }
 }

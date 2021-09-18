@@ -53,7 +53,7 @@ mod test {
         path_attributes_bytes.try_put_str("/file/path").unwrap(); // filename
 
         let file_attributes = get_file_attributes();
-        path_attributes_bytes.put_slice(&mut Bytes::from(&file_attributes)); // file attributes
+        path_attributes_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
             PathAttributes::try_from(&mut path_attributes_bytes.freeze()),

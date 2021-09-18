@@ -53,7 +53,7 @@ mod test {
         handle_attributes_bytes.try_put_str("handle").unwrap(); // handle
 
         let file_attributes = get_file_attributes();
-        handle_attributes_bytes.put_slice(&mut Bytes::from(&file_attributes)); // file attributes
+        handle_attributes_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
             HandleAttributes::try_from(&mut handle_attributes_bytes.freeze()),

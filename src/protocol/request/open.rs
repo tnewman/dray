@@ -96,7 +96,7 @@ mod tests {
             ..get_file_attributes()
         };
 
-        open_bytes.put_slice(&mut Bytes::from(&file_attributes)); // file attributes
+        open_bytes.put_slice(&Bytes::from(&file_attributes)); // file attributes
 
         assert_eq!(
             Open::try_from(&mut open_bytes.freeze()),

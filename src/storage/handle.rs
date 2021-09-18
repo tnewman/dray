@@ -284,6 +284,6 @@ mod test {
     fn test_generate_handle_id_creates_uuid() {
         let handle = generate_handle_id();
 
-        assert_eq!(true, handle.len() > 0);
+        assert!(!handle.is_empty());
     }
 }

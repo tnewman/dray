@@ -268,6 +268,6 @@ mod test {
             long_name.as_bytes(),
             &file_bytes.copy_to_bytes(long_name.len())[..]
         );
-        assert_eq!(true, file_bytes.has_remaining()); // has file attributes
+        assert!(file_bytes.has_remaining()); // has file attributes
     }
 }

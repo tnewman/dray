@@ -9,7 +9,7 @@ use log::LevelFilter;
 
 use rusoto_core::{ByteStream, Region};
 use rusoto_s3::{
-    CreateBucketRequest, DeleteBucketRequest, PutObjectRequest, S3Client, StreamingBody, S3,
+    CreateBucketRequest, DeleteObjectRequest, ListObjectsV2Request, PutObjectRequest, S3Client, S3,
 };
 use tokio::{
     io::AsyncWriteExt,
@@ -19,10 +19,7 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-struct TestClient {
-    bucket: String,
-    s3_client: S3Client,
-}
+struct TestClient {}
 
 lazy_static! {
     static ref TEST_CLIENT: AsyncOnce<TestClient> = AsyncOnce::new(async {
@@ -53,10 +50,7 @@ lazy_static! {
         spawn(dray_server.run_server());
         wait_for_server_listening(&dray_config).await;
 
-        TestClient {
-            bucket: dray_config.s3.bucket,
-            s3_client,
-        }
+        TestClient {}
     });
 }
 
@@ -98,6 +92,29 @@ async fn create_s3_client(dray_config: &DrayConfig) -> S3Client {
         },
     }
     .unwrap();
+
+    let objects_to_delete = s3_client
+        .list_objects_v2(ListObjectsV2Request {
+            bucket: dray_config.s3.bucket.clone(),
+            max_keys: Some(i64::MAX),
+            ..Default::default()
+        })
+        .await
+        .unwrap()
+        .contents;
+
+    if let Some(objects_to_delete) = objects_to_delete {
+        for object in objects_to_delete {
+            s3_client
+                .delete_object(DeleteObjectRequest {
+                    bucket: dray_config.s3.bucket.clone(),
+                    key: object.key.unwrap(),
+                    ..Default::default()
+                })
+                .await
+                .unwrap();
+        }
+    }
 
     s3_client
 }
@@ -144,7 +161,7 @@ async fn wait_for_server_listening(dray_config: &DrayConfig) {
 
 #[tokio::test]
 async fn test_list_directory() {
-    let test_client = TEST_CLIENT.get().await;
+    TEST_CLIENT.get().await;
 
     execute_sftp_command("ls").await.unwrap();
 }

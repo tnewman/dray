@@ -690,7 +690,6 @@ mod test {
         let list_objects = ListObjectsV2Output {
             common_prefixes: Some(vec![CommonPrefix {
                 prefix: Some("users/test/subfolder/".to_owned()),
-                ..Default::default()
             }]),
             contents: Some(vec![Object {
                 key: Some("users/test/file.txt".to_owned()),
@@ -831,7 +830,7 @@ mod test {
     #[test]
     fn test_map_rfc3339_to_epoch_maps_valid_date() {
         assert_eq!(
-            Some(1417176009 as u32),
+            Some(1417176009),
             map_rfc3339_to_epoch(Some(String::from("2014-11-28T12:00:09Z")).as_ref())
         );
     }
@@ -844,7 +843,7 @@ mod test {
     #[test]
     fn test_map_rfc3339_to_epoch_maps_invalid_date_to_unix_epoch() {
         assert_eq!(
-            Some(0 as u32),
+            Some(0),
             map_rfc3339_to_epoch(Some(String::from("invalid")).as_ref())
         );
     }
