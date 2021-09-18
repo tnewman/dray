@@ -9,7 +9,7 @@ edition = "2018"
 [dependencies]
 async-trait = "0.1"
 base64 = "0.13"
-bytes = "1.0"
+bytes = "1.1"
 chrono = "0.4"
 dotenv = "0.15"
 env_logger = "0.9"
@@ -21,7 +21,7 @@ serde = "1.0"
 thiserror = "1.0"
 thrussh = { version = "0.33", features = ["flate2", "openssl"] }
 thrussh-keys = { version = "0.21", features = ["openssl"] }
-tokio = { version = "1.9", features = ["full"] }
+tokio = { version = "1.11", features = ["full"] }
 uuid = { version = "0.8", features = ["v4"], default-features = false }
 
 # S3 Dependencies
