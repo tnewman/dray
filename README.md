@@ -9,6 +9,9 @@ Dray aims to tackle the undifferentiated heavy lifting of handling SFTP integrat
 ## What's With the Name
 A dray is a cart used to transport heavy cargo short distances. Dray transports files of any size to the storage backend.
 
+## Demo
+[![Demo](https://asciinema.org/a/Zjdni4AYhpX65GwhXBxUeaEcE.svg)](https://asciinema.org/a/Zjdni4AYhpX65GwhXBxUeaEcE)
+
 ## Hacking
 ### Prerequisites
 - [Install Rust](https://rustup.rs)
