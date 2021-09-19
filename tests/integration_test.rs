@@ -19,7 +19,10 @@ use tokio::{
     time::{sleep, Duration},
 };
 
-struct TestClient {}
+struct TestClient {
+    s3_client: S3Client,
+    bucket: String,
+}
 
 lazy_static! {
     static ref TEST_CLIENT: AsyncOnce<TestClient> = AsyncOnce::new(async {
@@ -31,18 +34,6 @@ lazy_static! {
 
         let s3_client = create_s3_client(&dray_config).await;
 
-        s3_client
-            .put_object(PutObjectRequest {
-                bucket: dray_config.s3.bucket.clone(),
-                key: ".ssh/test/authorized_keys".to_string(),
-                body: Some(ByteStream::from(
-                    include_bytes!("../.ssh/id_ed25519.pub").to_vec(),
-                )),
-                ..Default::default()
-            })
-            .await
-            .unwrap();
-
         let dray_server = DraySshServer::new(DrayConfig::new().unwrap());
 
         dray_server.health_check().await.unwrap();
@@ -50,7 +41,19 @@ lazy_static! {
         spawn(dray_server.run_server());
         wait_for_server_listening(&dray_config).await;
 
-        TestClient {}
+        let test_client = TestClient {
+            s3_client,
+            bucket: dray_config.s3.bucket,
+        };
+
+        put_object(
+            &test_client,
+            ".ssh/test/authorized_keys",
+            include_bytes!("../.ssh/id_ed25519.pub").to_vec(),
+        )
+        .await;
+
+        test_client
     });
 }
 
@@ -119,6 +122,19 @@ async fn create_s3_client(dray_config: &DrayConfig) -> S3Client {
     s3_client
 }
 
+async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
+    test_client
+        .s3_client
+        .put_object(PutObjectRequest {
+            bucket: test_client.bucket.clone(),
+            key: key.to_string(),
+            body: Some(ByteStream::from(data)),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+}
+
 async fn execute_sftp_command(command: &str) -> Result<String, Error> {
     let mut child = Command::new("sftp")
         .arg("-b-")
@@ -161,9 +177,27 @@ async fn wait_for_server_listening(dray_config: &DrayConfig) {
 
 #[tokio::test]
 async fn test_list_directory() {
-    TEST_CLIENT.get().await;
+    let test_client = TEST_CLIENT.get().await;
 
-    execute_sftp_command("ls").await.unwrap();
+    put_object(test_client, "home/test/dir1/file1", "1".as_bytes().to_vec()).await;
+    put_object(test_client, "home/test/file2", "2".as_bytes().to_vec()).await;
+
+    let sftp_output = execute_sftp_command("ls").await.unwrap();
+
+    assert!(sftp_output.contains("file2"));
+    assert!(!sftp_output.contains("file1"));
+}
+
+#[tokio::test]
+async fn test_list_directory_with_permission_error() {
+    // let test_client = TEST_CLIENT.get().await;
+
+    // put_object(test_client, "home/other/file1", "1".as_bytes().to_vec()).await;
+
+    // let sftp_output = execute_sftp_command("ls /home/other").await.unwrap();
+
+    // assert!(sftp_output.contains("file2"));
+    // assert!(!sftp_output.contains("file1"));
 }
 
 #[test]
