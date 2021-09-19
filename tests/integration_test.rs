@@ -52,7 +52,7 @@ async fn setup() -> TestClient {
     put_object(
         &test_client,
         ".ssh/test/authorized_keys",
-        include_bytes!("../.ssh/id_ed25519.pub").to_vec(),
+        include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/.ssh/id_ed25519.pub")).to_vec(),
     )
     .await;
 
