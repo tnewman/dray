@@ -168,7 +168,7 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
 }
 
 async fn execute_sftp_command(test_client: &TestClient, command: &str) -> Result<String, Error> {
-    let host_pieces: Vec<&str> = test_client.host.split(":").collect();
+    let host_pieces: Vec<&str> = test_client.host.split(':').collect();
     let host_name = host_pieces[0];
     let port = host_pieces[1];
 
