@@ -42,12 +42,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async_once"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "58f8f7a882f8fffee0bdbb0580033b01613b50781e03c02713da0599ed90b595"
-
-[[package]]
 name = "atty"
 version = "0.2.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -314,7 +308,6 @@ name = "dray"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "async_once",
  "base64",
  "bytes",
  "chrono",
@@ -324,8 +317,8 @@ dependencies = [
  "futures",
  "hex",
  "http",
- "lazy_static",
  "log",
+ "rand",
  "rusoto_core",
  "rusoto_s3",
  "serde",

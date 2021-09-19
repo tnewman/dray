@@ -39,7 +39,7 @@ impl SftpSession {
             Request::Close(close_request) => self.handle_close_request(close_request).await,
             Request::Read(read_request) => self.handle_read_request(read_request).await,
             Request::Write(write_request) => self.handle_write_request(write_request).await,
-            Request::Lstat(lstat_request) => self.handle_lstat_request(lstat_request),
+            Request::Lstat(lstat_request) => self.handle_lstat_request(lstat_request).await,
             Request::Fstat(fstat_request) => self.handle_fstat_request(fstat_request),
             Request::Setstat(setstat_request) => self.handle_setstat_request(setstat_request),
             Request::Fsetstat(fsetstat_request) => self.handle_fsetstat_request(fsetstat_request),
@@ -144,8 +144,15 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(write_request.id))
     }
 
-    fn handle_lstat_request(&self, lstat_request: request::path::Path) -> Result<Response, Error> {
-        Ok(SftpSession::build_not_supported_response(lstat_request.id))
+    async fn handle_lstat_request(
+        &self,
+        lstat_request: request::path::Path,
+    ) -> Result<Response, Error> {
+        self.check_permission(&lstat_request.path)?;
+
+        // Object storage does not have symbolic links, so stat and lstat will operate the same
+        // because there are no symbolic links to follow.
+        self.handle_stat_request(lstat_request).await
     }
 
     fn handle_fstat_request(&self, fstat_request: request::path::Path) -> Result<Response, Error> {

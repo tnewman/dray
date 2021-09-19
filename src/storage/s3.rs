@@ -32,7 +32,7 @@ use std::sync::Arc;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct S3Config {
     #[serde(rename(deserialize = "s3_endpoint_name"))]
     pub endpoint_name: Option<String>,

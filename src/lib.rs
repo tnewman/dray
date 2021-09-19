@@ -200,6 +200,7 @@ impl Handler for DraySshServer {
     fn channel_eof(self, channel: ChannelId, mut session: Session) -> Self::FutureUnit {
         // Certain clients, such as sftp, will hold open the session after sending EOF until
         // the server closes the session.
+        debug!("closing channel");
         session.close(channel);
         Box::pin(ready(Ok((self, session))))
     }

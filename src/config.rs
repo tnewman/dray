@@ -6,7 +6,7 @@ use thrussh_keys::key;
 use crate::error::Error;
 pub use crate::storage::s3::S3Config;
 
-#[derive(Deserialize, Debug)]
+#[derive(Clone, Deserialize, Debug)]
 pub struct DrayConfig {
     pub host: String,
 
