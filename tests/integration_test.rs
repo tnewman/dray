@@ -291,7 +291,7 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
         S3 is eventually consistent, so wait until the file is available before
         proceeding with the test.
     */
-    sleep(Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(250)).await;
 }
 
 async fn get_object(test_client: &TestClient, key: &str) -> Vec<u8> {
