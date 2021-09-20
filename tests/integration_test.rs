@@ -122,8 +122,10 @@ async fn test_write_file() {
     /*
         S3 is eventually consistent, so wait until the file is available before
         proceeding with the test.
+
+        TODO: Add code to poll S3 with exponential backoff (starting at 10 milliseconds)
     */
-    sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(5000)).await;
 
     let file_data = get_object(&test_client, "home/test/write-test.txt").await;
 
@@ -214,8 +216,6 @@ async fn get_free_port() -> Option<u16> {
         for _ in 0..10 {
             let port = rng.gen_range(49152..65535);
 
-            print!("PORT: {}", port);
-
             match TcpListener::bind(format!("127.0.0.1:{}", port)) {
                 Ok(_) => return Some(port),
                 Err(_) => continue,
@@ -296,8 +296,10 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
     /*
         S3 is eventually consistent, so wait until the file is available before
         proceeding with the test.
+
+        TODO: Add code to poll S3 with exponential backoff (starting at 10 milliseconds)
     */
-    sleep(Duration::from_millis(1000)).await;
+    sleep(Duration::from_millis(5000)).await;
 }
 
 async fn get_object(test_client: &TestClient, key: &str) -> Vec<u8> {
