@@ -30,4 +30,5 @@ rusoto_s3 = "0.47"
 
 [dev-dependencies]
 http = "0.2"
-rand = "0.8.4"
+rand = "0.8"
+tempfile = "3.2"

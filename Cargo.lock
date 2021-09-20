@@ -322,6 +322,7 @@ dependencies = [
  "rusoto_core",
  "rusoto_s3",
  "serde",
+ "tempfile",
  "thiserror",
  "thrussh",
  "thrussh-keys",

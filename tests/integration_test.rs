@@ -1,4 +1,10 @@
-use std::{env, net::TcpListener, process::Stdio, str::FromStr};
+use std::{
+    env,
+    io::{Read, Write},
+    net::TcpListener,
+    process::Stdio,
+    str::FromStr,
+};
 
 use dray::{
     config::{DrayConfig, S3Config},
@@ -10,16 +16,131 @@ use log::LevelFilter;
 use rand::Rng;
 use rusoto_core::{ByteStream, Region};
 use rusoto_s3::{
-    CreateBucketRequest, DeleteObjectRequest, ListObjectsV2Request, PutObjectRequest, S3Client, S3,
+    CreateBucketRequest, DeleteObjectRequest, GetObjectRequest, ListObjectsV2Request,
+    PutObjectRequest, S3Client, S3,
 };
+use tempfile::NamedTempFile;
 use tokio::{
-    io::AsyncWriteExt,
+    io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
     process::Command,
     spawn,
     task::spawn_blocking,
     time::{sleep, Duration},
 };
+
+#[tokio::test]
+async fn test_list_directory() {
+    let test_client = setup().await;
+
+    put_object(
+        &test_client,
+        "home/test/dir1/file1",
+        "1".as_bytes().to_vec(),
+    )
+    .await;
+    put_object(&test_client, "home/test/file2", "2".as_bytes().to_vec()).await;
+
+    let sftp_output = execute_sftp_command(&test_client, "ls").await.unwrap();
+
+    assert!(sftp_output.contains("file2"));
+    assert!(!sftp_output.contains("file1"));
+}
+
+#[tokio::test]
+#[should_panic(expected = "Can't ls")]
+async fn test_list_directory_with_permission_error() {
+    let test_client = setup().await;
+
+    put_object(&test_client, "home/other/file1", "1".as_bytes().to_vec()).await;
+
+    let sftp_output = execute_sftp_command(&test_client, "ls /home/other")
+        .await
+        .unwrap();
+
+    assert!(sftp_output.contains("file2"));
+    assert!(!sftp_output.contains("file1"));
+}
+
+#[tokio::test]
+async fn test_read_file() {
+    let test_client = setup().await;
+
+    put_object(
+        &test_client,
+        "home/test/read-test.txt",
+        b"Test read data!".to_vec(),
+    )
+    .await;
+
+    let mut temp_file = NamedTempFile::new().unwrap();
+
+    execute_sftp_command(
+        &test_client,
+        &format!(
+            "GET /home/test/read-test.txt {}",
+            temp_file.path().to_string_lossy()
+        ),
+    )
+    .await
+    .unwrap();
+
+    let mut file_data = String::new();
+    temp_file.read_to_string(&mut file_data).unwrap();
+
+    assert_eq!("Test read data!", &file_data);
+}
+
+#[tokio::test]
+#[should_panic]
+async fn test_read_file_with_permission_error() {
+    let test_client = setup().await;
+
+    execute_sftp_command(&test_client, "GET /home/other/test.txt /tmp/test.txt")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_write_file() {
+    let test_client = setup().await;
+
+    let mut temp_file = NamedTempFile::new().unwrap();
+    temp_file.write_all(b"Test write data!").unwrap();
+    temp_file.flush().unwrap();
+
+    execute_sftp_command(
+        &test_client,
+        &format!(
+            "PUT {} /home/test/write-test.txt",
+            temp_file.path().to_string_lossy()
+        ),
+    )
+    .await
+    .unwrap();
+
+    let file_data = get_object(&test_client, "home/test/write-test.txt").await;
+
+    assert_eq!(b"Test write data!", file_data.as_slice());
+}
+
+#[tokio::test]
+#[should_panic(expected = "Permission denied")]
+async fn test_write_file_with_permission_error() {
+    let test_client = setup().await;
+
+    let temp_file = NamedTempFile::new().unwrap();
+
+    execute_sftp_command(
+        &test_client,
+        &format!(
+            "PUT {} /home/other/write-test.txt",
+            temp_file.path().to_string_lossy()
+        ),
+    )
+    .await
+    .unwrap();
+}
 
 struct TestClient {
     host: String,
@@ -165,6 +286,35 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
         })
         .await
         .unwrap();
+
+    /*
+        S3 is eventually consistent, so wait until the file is available before
+        proceeding with the test.
+    */
+    sleep(Duration::from_millis(100)).await;
+}
+
+async fn get_object(test_client: &TestClient, key: &str) -> Vec<u8> {
+    let get_object_result = test_client
+        .s3_client
+        .get_object(GetObjectRequest {
+            bucket: test_client.bucket.clone(),
+            key: key.to_string(),
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+    let mut object_data: Vec<u8> = vec![];
+    get_object_result
+        .body
+        .unwrap()
+        .into_async_read()
+        .read_to_end(&mut object_data)
+        .await
+        .unwrap();
+
+    object_data
 }
 
 async fn execute_sftp_command(test_client: &TestClient, command: &str) -> Result<String, Error> {
@@ -210,39 +360,3 @@ async fn wait_for_server_listening(dray_config: &DrayConfig) {
         }
     }
 }
-
-#[tokio::test]
-async fn test_list_directory() {
-    let test_client = setup().await;
-
-    put_object(
-        &test_client,
-        "home/test/dir1/file1",
-        "1".as_bytes().to_vec(),
-    )
-    .await;
-    put_object(&test_client, "home/test/file2", "2".as_bytes().to_vec()).await;
-
-    let sftp_output = execute_sftp_command(&test_client, "ls").await.unwrap();
-
-    assert!(sftp_output.contains("file2"));
-    assert!(!sftp_output.contains("file1"));
-}
-
-#[tokio::test]
-#[should_panic(expected = "Can't ls")]
-async fn test_list_directory_with_permission_error() {
-    let test_client = setup().await;
-
-    put_object(&test_client, "home/other/file1", "1".as_bytes().to_vec()).await;
-
-    let sftp_output = execute_sftp_command(&test_client, "ls /home/other")
-        .await
-        .unwrap();
-
-    assert!(sftp_output.contains("file2"));
-    assert!(!sftp_output.contains("file1"));
-}
-
-#[test]
-fn test_upload_directory() {}

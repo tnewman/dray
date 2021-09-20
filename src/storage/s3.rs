@@ -21,6 +21,7 @@ use rusoto_s3::CreateMultipartUploadRequest;
 use rusoto_s3::DeleteObjectRequest;
 use rusoto_s3::HeadBucketRequest;
 use rusoto_s3::HeadObjectRequest;
+use rusoto_s3::PutObjectRequest;
 use rusoto_s3::UploadPartRequest;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
@@ -134,8 +135,8 @@ impl S3Storage {
     }
 
     async fn rename_dir(&self, current: String, new: String) -> Result<(), Error> {
-        let current_prefix = get_s3_prefix(current);
-        let new_prefix = get_s3_prefix(new);
+        let current_prefix = get_s3_prefix(&current);
+        let new_prefix = get_s3_prefix(&new);
 
         let mut continuation_token = None;
 
@@ -261,7 +262,7 @@ impl Storage for S3Storage {
             return Ok(Vec::new());
         }
 
-        let prefix = get_s3_prefix(dir_handle.prefix.clone());
+        let prefix = get_s3_prefix(&dir_handle.prefix);
 
         let objects = self
             .s3_client
@@ -281,12 +282,20 @@ impl Storage for S3Storage {
         Ok(map_list_objects_to_files(objects))
     }
 
-    async fn create_dir(&self, _prefix: String) -> Result<(), Error> {
+    async fn create_dir(&self, dir_name: String) -> Result<(), Error> {
         /*
-            S3 does not support creating empty prefixes. The prefix is created when the
-            first object is added to it. This operation is a NO-OP to allow GUI-based
-            SFTP clients to make it appear that a directory has been created.
+            S3 does not support creating empty prefixes. A marker file must be added to preserve empty
+            directories until the directories are explicitly deleted.
         */
+        self.s3_client
+            .put_object(PutObjectRequest {
+                bucket: self.bucket.clone(),
+                key: get_s3_folder_marker(&dir_name),
+                ..Default::default()
+            })
+            .await
+            .map_err(map_err)?;
+
         Ok(())
     }
 
@@ -333,17 +342,9 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err);
+            .map_err(map_err)?;
 
-        match head_object_response {
-            Ok(head_object_response) => {
-                Ok(map_head_object_to_file(&file_name, &head_object_response))
-            }
-            Err(error) => match error {
-                Error::NoSuchFile => Ok(create_file_with_directory_bit(&file_name)),
-                _ => Err(error),
-            },
-        }
+        Ok(map_head_object_to_file(&file_name, &head_object_response))
     }
 
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
@@ -486,8 +487,8 @@ fn get_home(user: &str) -> String {
     format!("/home/{}", user)
 }
 
-fn get_s3_prefix(dir_name: String) -> String {
-    let prefix = match "".eq(&dir_name) {
+fn get_s3_prefix(dir_name: &str) -> String {
+    let prefix = match "".eq(dir_name) {
         true => String::from("/"),
         false => format!("{}/", dir_name[1..dir_name.len()].to_string()),
     };
@@ -498,12 +499,20 @@ fn get_s3_copy_source(bucket: &str, key: &str) -> String {
     format!("{}/{}", bucket, key)
 }
 
+fn get_s3_folder_marker(dir_name: &str) -> String {
+    let prefix = get_s3_prefix(dir_name);
+    format!("{}_$folder$", prefix)
+}
+
 fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
     let files = list_objects.contents.unwrap_or_default();
 
     let directories = list_objects.common_prefixes.unwrap_or_default();
 
-    let mapped_files = files.iter().map(|object| map_object_to_file(object));
+    let mapped_files = files
+        .iter()
+        .map(|object| map_object_to_file(object))
+        .filter(|file| !file.file_name.ends_with("_$folder$"));
 
     let mapped_dirs = directories.iter().map(|prefix| map_prefix_to_file(prefix));
 
@@ -571,23 +580,6 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
             uid: None,
             gid: None,
             permissions: Some(0o100777),
-            atime: None,
-            mtime: None,
-        },
-    }
-}
-
-fn create_file_with_directory_bit(key: &str) -> File {
-    let mut key_pieces = key.rsplit('/');
-    let file_name = key_pieces.next().unwrap_or("");
-
-    File {
-        file_name: file_name.to_string(),
-        file_attributes: FileAttributes {
-            size: None,
-            uid: None,
-            gid: None,
-            permissions: Some(0o40777),
             atime: None,
             mtime: None,
         },
@@ -672,7 +664,7 @@ mod test {
 
     #[test]
     fn test_get_s3_prefix_converts_unix_absolute_directory() {
-        assert_eq!(String::from("test/"), get_s3_prefix(String::from("/test")))
+        assert_eq!(String::from("test/"), get_s3_prefix("/test"))
     }
 
     #[test]
@@ -682,7 +674,15 @@ mod test {
 
     #[test]
     fn test_get_s3_prefix_converts_blank_directory() {
-        assert_eq!(String::from("/"), get_s3_prefix(String::from("")))
+        assert_eq!("/", get_s3_prefix(""))
+    }
+
+    #[test]
+    fn test_get_s3_folder_marker_appends_folder_marker() {
+        assert_eq!(
+            "folder/subfolder/_$folder$",
+            get_s3_folder_marker("/folder/subfolder")
+        );
     }
 
     #[test]
@@ -732,6 +732,28 @@ mod test {
             },
             result[1]
         );
+    }
+
+    #[test]
+    fn test_map_list_objects_to_files_with_directory_marker() {
+        let list_objects = ListObjectsV2Output {
+            contents: Some(vec![
+                Object {
+                    key: Some("users/test/file.txt".to_owned()),
+                    ..Default::default()
+                },
+                Object {
+                    key: Some("users/test/_$folder$".to_owned()),
+                    ..Default::default()
+                },
+            ]),
+            ..Default::default()
+        };
+
+        let result = map_list_objects_to_files(list_objects);
+
+        assert_eq!(1, result.len());
+        assert_eq!("file.txt", &result[0].file_name);
     }
 
     #[test]
@@ -807,24 +829,6 @@ mod test {
             },
             map_head_object_to_file("file", &head_object)
         );
-    }
-
-    #[test]
-    fn test_create_file_with_directory_bit() {
-        assert_eq!(
-            File {
-                file_name: "file".to_owned(),
-                file_attributes: FileAttributes {
-                    size: None,
-                    gid: None,
-                    uid: None,
-                    permissions: Some(0o40777),
-                    atime: None,
-                    mtime: None,
-                }
-            },
-            create_file_with_directory_bit("file")
-        )
     }
 
     #[test]
