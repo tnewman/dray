@@ -92,7 +92,7 @@ jobs:
 
       - name: Run tests
         run: |
-          cargo test
+          cargo test -- --test-threads=1
       
       - name: Stop Backing Services
         if: always()
