@@ -119,6 +119,12 @@ async fn test_write_file() {
     .await
     .unwrap();
 
+    /*
+        S3 is eventually consistent, so wait until the file is available before
+        proceeding with the test.
+    */
+    sleep(Duration::from_millis(100)).await;
+
     let file_data = get_object(&test_client, "home/test/write-test.txt").await;
 
     assert_eq!(b"Test write data!", file_data.as_slice());
@@ -291,7 +297,7 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
         S3 is eventually consistent, so wait until the file is available before
         proceeding with the test.
     */
-    sleep(Duration::from_millis(250)).await;
+    sleep(Duration::from_millis(100)).await;
 }
 
 async fn get_object(test_client: &TestClient, key: &str) -> Vec<u8> {
