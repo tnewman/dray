@@ -41,6 +41,6 @@ Production usage is not recommended.
 - [x] Write file (S3-Compatible Storage Only)
 - [x] Rename file (S3-Compatible Storage Only)
 - [x] Remove file (S3-Compatible Storage Only)
-- [ ] Stat commands (S3-Compatible Storage Only)
-- [ ] No-Op/Defaults for other SFTP commands
+- [x] Stat commands (S3-Compatible Storage Only)
 - [x] Permission checks
+- [ ] Set Stat commands
