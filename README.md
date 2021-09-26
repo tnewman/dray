@@ -43,4 +43,4 @@ Production usage is not recommended.
 - [x] Remove file (S3-Compatible Storage Only)
 - [x] Stat commands (S3-Compatible Storage Only)
 - [x] Permission checks
-- [ ] Set Stat commands
+- [x] Set Stat commands return "Not Implemented"
