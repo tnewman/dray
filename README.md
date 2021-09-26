@@ -25,8 +25,8 @@ A dray is a cart used to transport heavy cargo short distances. Dray transports 
 - Run Dray (`cargo run`)
 
 ## 🚧 Work in Progress 🚧
-This project is currently not in a usable state. The project will be considered usable when 
-the MVP roadmap has been implemented.
+Dray fully implements SSH File Transfer Protocol Version 3 Draft 2; however, it has only been tested against a limited number of SFTP clients. 
+Production usage is not recommended.
 
 ## Minimum Viable Product (MVP) Roadmap
 - [x] Deserialize and Serialize SSH File Transfer Protocol Version 3 Draft 2
