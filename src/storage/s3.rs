@@ -875,25 +875,26 @@ mod test {
     fn test_map_list_objects_to_directory() {
         let directory = map_list_objects_to_directory(ListObjectsV2Output {
             prefix: Some("directory/subdirectory/".to_string()),
-            contents: Some(vec![
-                Object {
-                    ..Default::default()
-                }
-            ]),
+            contents: Some(vec![Object {
+                ..Default::default()
+            }]),
             ..Default::default()
         });
 
-        assert_eq!(Ok(File {
-            file_name: "subdirectory".to_string(),
-            file_attributes: FileAttributes {
-                size: None,
-                gid: None,
-                uid: None,
-                permissions: Some(0o40777),
-                atime: None,
-                mtime: None,
-            }
-        }), directory);
+        assert_eq!(
+            Ok(File {
+                file_name: "subdirectory".to_string(),
+                file_attributes: FileAttributes {
+                    size: None,
+                    gid: None,
+                    uid: None,
+                    permissions: Some(0o40777),
+                    atime: None,
+                    mtime: None,
+                }
+            }),
+            directory
+        );
     }
 
     #[test]
