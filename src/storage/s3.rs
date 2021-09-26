@@ -872,6 +872,64 @@ mod test {
     }
 
     #[test]
+    fn test_map_list_objects_to_directory() {
+        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+            prefix: Some("directory/subdirectory/".to_string()),
+            contents: Some(vec![
+                Object {
+                    ..Default::default()
+                }
+            ]),
+            ..Default::default()
+        });
+
+        assert_eq!(Ok(File {
+            file_name: "subdirectory".to_string(),
+            file_attributes: FileAttributes {
+                size: None,
+                gid: None,
+                uid: None,
+                permissions: Some(0o40777),
+                atime: None,
+                mtime: None,
+            }
+        }), directory);
+    }
+
+    #[test]
+    fn test_map_list_objects_to_directory_with_none_contents() {
+        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+            prefix: Some("directory/subdirectory/".to_string()),
+            contents: None,
+            ..Default::default()
+        });
+
+        assert_eq!(Err(Error::NoSuchFile), directory);
+    }
+
+    #[test]
+    fn test_map_list_objects_to_directory_with_0_contents() {
+        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+            prefix: Some("directory/subdirectory/".to_string()),
+            contents: Some(vec![]),
+            ..Default::default()
+        });
+
+        assert_eq!(Err(Error::NoSuchFile), directory);
+    }
+
+    #[test]
+    fn test_map_list_objects_to_directory_with_no_prefix() {
+        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+            prefix: None,
+            contents: Some(vec![]),
+            ..Default::default()
+        });
+
+        assert_eq!(Err(Error::NoSuchFile), directory);
+    }
+
+    #[test]
     fn test_map_prefix_to_file_with_missing_data() {
         let prefix = CommonPrefix { prefix: None };
 
