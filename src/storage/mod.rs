@@ -59,6 +59,9 @@ pub trait Storage: Send + Sync {
     /// Retrieves an file's metadata.
     async fn get_file_metadata(&self, file_name: String) -> Result<File, Error>;
 
+    /// Retrieves a handle's metadata.
+    async fn get_handle_metadata(&self, handle: &str) -> Result<File, Error>;
+
     /// Creates a read handle for a file.
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error>;
 

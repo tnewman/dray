@@ -29,7 +29,7 @@ pub enum Request {
     Read(read::Read),
     Write(write::Write),
     Lstat(path::Path),
-    Fstat(path::Path),
+    Fstat(handle::Handle),
     Setstat(path_attributes::PathAttributes),
     Fsetstat(handle_attributes::HandleAttributes),
     Opendir(path::Path),
@@ -93,7 +93,7 @@ impl TryFrom<&mut Bytes> for Request {
             5 => Request::Read(read::Read::try_from(data_payload)?),
             6 => Request::Write(write::Write::try_from(data_payload)?),
             7 => Request::Lstat(path::Path::try_from(data_payload)?),
-            8 => Request::Fstat(path::Path::try_from(data_payload)?),
+            8 => Request::Fstat(handle::Handle::try_from(data_payload)?),
             9 => Request::Setstat(path_attributes::PathAttributes::try_from(data_payload)?),
             10 => Request::Fsetstat(handle_attributes::HandleAttributes::try_from(data_payload)?),
             11 => Request::Opendir(path::Path::try_from(data_payload)?),
@@ -286,13 +286,13 @@ mod tests {
         let mut fstat_payload = BytesMut::new();
 
         fstat_payload.put_u32(1); // Id
-        fstat_payload.try_put_str("path").unwrap(); // Path
+        fstat_payload.try_put_str("handle").unwrap(); // Handle
 
         assert_eq!(
             Request::try_from(&mut build_message(8, fstat_payload)),
-            Ok(Request::Fstat(path::Path {
+            Ok(Request::Fstat(handle::Handle {
                 id: 1,
-                path: String::from("path"),
+                handle: String::from("handle"),
             }))
         )
     }
@@ -629,9 +629,9 @@ mod tests {
 
     #[test]
     fn test_fstat_get_request_id() {
-        let fstat_request = Request::Fstat(super::path::Path {
+        let fstat_request = Request::Fstat(super::handle::Handle {
             id: 1000,
-            path: String::from("path"),
+            handle: String::from("handle"),
         });
 
         assert_eq!(1000, fstat_request.get_request_id());

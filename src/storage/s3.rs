@@ -77,7 +77,7 @@ impl StorageFactory for S3StorageFactory {
 pub struct S3Storage {
     s3_client: S3Client,
     bucket: String,
-    handle_manager: HandleManager<Pin<Box<dyn AsyncRead + Send>>, WriteHandle, DirHandle>,
+    handle_manager: HandleManager<ReadHandle, WriteHandle, DirHandle>,
 }
 
 impl S3Storage {
@@ -371,12 +371,29 @@ impl Storage for S3Storage {
         }
     }
 
+    async fn get_handle_metadata(&self, handle: &str) -> Result<File, Error> {
+        let result = if let Some(read_handle) = self.handle_manager.get_read_handle(handle).await {
+            let read_handle = read_handle.lock().await;
+            self.get_file_metadata(read_handle.key.to_string()).await
+        } else if let Some(write_handle) = self.handle_manager.get_write_handle(handle).await {
+            let write_handle = write_handle.lock().await;
+            self.get_file_metadata(write_handle.key.to_string()).await
+        } else if let Some(dir_handle) = self.handle_manager.get_dir_handle(handle).await {
+            let dir_handle = dir_handle.lock().await;
+            self.get_file_metadata(dir_handle.prefix.to_string()).await
+        } else {
+            Err(Error::Failure(format!("Handle {} does not exist!", handle)))
+        };
+
+        result
+    }
+
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
         let read_response = self
             .s3_client
             .get_object(GetObjectRequest {
                 bucket: self.bucket.clone(),
-                key: file_name,
+                key: file_name.clone(),
                 ..Default::default()
             })
             .await
@@ -388,7 +405,7 @@ impl Storage for S3Storage {
             .into_async_read();
 
         self.handle_manager
-            .create_read_handle(Box::pin(read_stream))
+            .create_read_handle(ReadHandle::new(file_name, Box::pin(read_stream)))
             .await
     }
 
@@ -403,6 +420,7 @@ impl Storage for S3Storage {
         read_handle
             .lock()
             .await
+            .async_read
             .as_mut()
             .take(len as u64)
             .read_to_end(&mut buffer)
@@ -498,6 +516,17 @@ struct DirHandle {
     prefix: String,
     continuation_token: Option<String>,
     is_eof: bool,
+}
+
+struct ReadHandle {
+    key: String,
+    async_read: Pin<Box<dyn AsyncRead + Send>>,
+}
+
+impl ReadHandle {
+    fn new(key: String, async_read: Pin<Box<dyn AsyncRead + Send>>) -> ReadHandle {
+        ReadHandle { key, async_read }
+    }
 }
 
 struct WriteHandle {

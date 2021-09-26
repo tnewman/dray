@@ -40,7 +40,7 @@ impl SftpSession {
             Request::Read(read_request) => self.handle_read_request(read_request).await,
             Request::Write(write_request) => self.handle_write_request(write_request).await,
             Request::Lstat(lstat_request) => self.handle_lstat_request(lstat_request).await,
-            Request::Fstat(fstat_request) => self.handle_fstat_request(fstat_request),
+            Request::Fstat(fstat_request) => self.handle_fstat_request(fstat_request).await,
             Request::Setstat(setstat_request) => self.handle_setstat_request(setstat_request),
             Request::Fsetstat(fsetstat_request) => self.handle_fsetstat_request(fsetstat_request),
             Request::Opendir(opendir_request) => self.handle_opendir_request(opendir_request).await,
@@ -155,8 +155,20 @@ impl SftpSession {
         self.handle_stat_request(lstat_request).await
     }
 
-    fn handle_fstat_request(&self, fstat_request: request::path::Path) -> Result<Response, Error> {
-        Ok(SftpSession::build_not_supported_response(fstat_request.id))
+    async fn handle_fstat_request(
+        &self,
+        fstat_request: request::handle::Handle,
+    ) -> Result<Response, Error> {
+        let file_attributes = self
+            .object_storage
+            .get_handle_metadata(&fstat_request.handle)
+            .await?
+            .file_attributes;
+
+        Ok(Response::Attrs(response::attrs::Attrs {
+            id: fstat_request.id,
+            file_attributes,
+        }))
     }
 
     fn handle_setstat_request(
