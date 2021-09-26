@@ -119,14 +119,6 @@ async fn test_write_file() {
     .await
     .unwrap();
 
-    /*
-        S3 is eventually consistent, so wait until the file is available before
-        proceeding with the test.
-
-        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
-    */
-    sleep(Duration::from_millis(100)).await;
-
     let file_data = get_object(&test_client, "home/test/write-test.txt").await;
 
     assert_eq!(b"Test write data!", file_data.as_slice());
@@ -162,25 +154,9 @@ async fn test_remove_file() {
     )
     .await;
 
-    /*
-        S3 is eventually consistent, so wait until the file is available before
-        proceeding with the test.
-
-        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
-    */
-    sleep(Duration::from_millis(100)).await;
-
     execute_sftp_command(&test_client, "RM /home/test/test.txt")
         .await
         .unwrap();
-
-    /*
-        S3 is eventually consistent, so wait until the file is available before
-        proceeding with the test.
-
-        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
-    */
-    sleep(Duration::from_millis(100)).await;
 
     get_object(&test_client, "home/test/test.txt").await;
 }
@@ -200,31 +176,25 @@ async fn test_remove_file_with_permission_error() {
 async fn test_remove_directory() {
     let test_client = setup().await;
 
-    put_object(&test_client, "home/test/test1.txt", b"Test data!".to_vec()).await;
+    put_object(
+        &test_client,
+        "home/test/rmdir/test1.txt",
+        b"Test data!".to_vec(),
+    )
+    .await;
 
-    put_object(&test_client, "home/test/test2.txt", b"Test data!".to_vec()).await;
+    put_object(
+        &test_client,
+        "home/test/rmdir/test2.txt",
+        b"Test data!".to_vec(),
+    )
+    .await;
 
-    /*
-        S3 is eventually consistent, so wait until the file is available before
-        proceeding with the test.
-
-        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
-    */
-    sleep(Duration::from_millis(100)).await;
-
-    execute_sftp_command(&test_client, "RMDIR /home/test")
+    execute_sftp_command(&test_client, "RMDIR /home/test/rmdir")
         .await
         .unwrap();
 
-    /*
-        S3 is eventually consistent, so wait until the file is available before
-        proceeding with the test.
-
-        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
-    */
-    sleep(Duration::from_millis(100)).await;
-
-    get_object(&test_client, "home/test/test1.txt").await;
+    get_object(&test_client, "home/test/rmdir/test1.txt").await;
 }
 
 #[tokio::test]
@@ -235,6 +205,110 @@ async fn test_remove_directory_with_permission_error() {
     execute_sftp_command(&test_client, "RMDIR /home/other")
         .await
         .unwrap();
+}
+
+#[tokio::test]
+async fn test_create_directory() {
+    let test_client = setup().await;
+
+    execute_sftp_command(&test_client, "MKDIR /home/test/mkdir/new")
+        .await
+        .unwrap();
+
+    execute_sftp_command(&test_client, "LS /home/test/mkdir/new")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "Couldn't create directory: Permission denied")]
+async fn test_create_directory_with_permission_error() {
+    let test_client = setup().await;
+
+    execute_sftp_command(&test_client, "MKDIR /home/other/mkdir/new")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+async fn test_rename_file() {
+    let test_client = setup().await;
+
+    put_object(
+        &test_client,
+        "home/test/rename/test1.txt",
+        b"Test data!".to_vec(),
+    )
+    .await;
+
+    execute_sftp_command(
+        &test_client,
+        "RENAME /home/test/rename/test1.txt /home/test/rename/test2.txt",
+    )
+    .await
+    .unwrap();
+
+    get_object(&test_client, "home/test/rename/test2.txt").await;
+}
+
+#[tokio::test]
+async fn test_rename_folder() {
+    let test_client = setup().await;
+
+    put_object(
+        &test_client,
+        "home/test/rename_folder/test1.txt",
+        b"Test data!".to_vec(),
+    )
+    .await;
+
+    execute_sftp_command(
+        &test_client,
+        "RENAME /home/test/rename_folder /home/test/renamed_folder",
+    )
+    .await
+    .unwrap();
+
+    get_object(&test_client, "home/test/renamed_folder/test1.txt").await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "Permission denied")]
+async fn test_rename_file_with_permission_error_source() {
+    let test_client = setup().await;
+
+    execute_sftp_command(
+        &test_client,
+        "RENAME /home/other/rename/test1.txt /home/test/rename/test2.txt",
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "Permission denied")]
+async fn test_rename_file_with_permission_error_destination() {
+    let test_client = setup().await;
+
+    execute_sftp_command(
+        &test_client,
+        "RENAME /home/test/rename/test1.txt /home/other/rename/test2.txt",
+    )
+    .await
+    .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "Operation unsupported")]
+async fn test_symlink() {
+    let test_client = setup().await;
+
+    execute_sftp_command(
+        &test_client,
+        "LN -s /home/test/link/source /home/test/link/destination",
+    )
+    .await
+    .unwrap();
 }
 
 struct TestClient {
@@ -380,12 +454,7 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
         .await
         .unwrap();
 
-    /*
-        S3 is eventually consistent, so wait until the file is available before
-        proceeding with the test.
-
-        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
-    */
+    // S3 is eventually consistent. Allow time for changes to be visible.
     sleep(Duration::from_millis(100)).await;
 }
 
@@ -435,12 +504,17 @@ async fn execute_sftp_command(test_client: &TestClient, command: &str) -> Result
 
     let output = child.wait_with_output().await.unwrap();
 
-    match output.status.success() {
+    let result = match output.status.success() {
         true => Ok(String::from_utf8_lossy(&output.stdout).to_string()),
         false => Err(Error::Failure(
             String::from_utf8_lossy(&output.stderr).to_string(),
         )),
-    }
+    };
+
+    // S3 is eventually consistent. Allow time for changes to be visible.
+    sleep(Duration::from_millis(100)).await;
+
+    result
 }
 
 async fn wait_for_server_listening(dray_config: &DrayConfig) {

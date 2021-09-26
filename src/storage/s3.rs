@@ -118,6 +118,22 @@ impl S3Storage {
         Ok(())
     }
 
+    async fn get_directory_metadata(&self, folder_name: &str) -> Result<File, Error> {
+        let list_objects_output = self
+            .s3_client
+            .list_objects_v2(ListObjectsV2Request {
+                bucket: self.bucket.clone(),
+                prefix: Some(get_s3_prefix(folder_name)),
+                continuation_token: None,
+                delimiter: Some("/".to_owned()),
+                ..Default::default()
+            })
+            .await
+            .map_err(map_err)?;
+
+        map_list_objects_to_directory(list_objects_output)
+    }
+
     async fn rename_file(&self, current: String, new: String) -> Result<(), Error> {
         self.s3_client
             .copy_object(CopyObjectRequest {
@@ -342,9 +358,17 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_err);
 
-        Ok(map_head_object_to_file(&file_name, &head_object_response))
+        match head_object_response {
+            Ok(head_object_response) => {
+                Ok(map_head_object_to_file(&file_name, &head_object_response))
+            }
+            Err(err) => match err {
+                Error::NoSuchFile => self.get_directory_metadata(&file_name).await,
+                _ => Err(err),
+            },
+        }
     }
 
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
@@ -488,11 +512,19 @@ fn get_home(user: &str) -> String {
 }
 
 fn get_s3_prefix(dir_name: &str) -> String {
-    let prefix = match "".eq(dir_name) {
-        true => String::from("/"),
-        false => format!("{}/", dir_name[1..dir_name.len()].to_string()),
+    if "".eq(dir_name) {
+        return String::from("/");
+    }
+
+    let prefix_builder = match dir_name.starts_with('/') {
+        true => &dir_name[1..dir_name.len()],
+        false => dir_name,
     };
-    prefix
+
+    match prefix_builder.ends_with('/') {
+        true => prefix_builder.to_string(),
+        false => format!("{}/", prefix_builder),
+    }
 }
 
 fn get_s3_copy_source(bucket: &str, key: &str) -> String {
@@ -538,6 +570,22 @@ fn map_object_to_file(object: &Object) -> File {
             atime: None,
             mtime: map_rfc3339_to_epoch(object.last_modified.as_ref()),
         },
+    }
+}
+
+fn map_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Result<File, Error> {
+    let contents = list_objects.contents.unwrap_or_default();
+
+    let prefix = match list_objects.prefix {
+        Some(prefix) => prefix,
+        None => return Err(Error::NoSuchFile),
+    };
+
+    match contents.is_empty() {
+        true => Err(Error::NoSuchFile),
+        false => Ok(map_prefix_to_file(&CommonPrefix {
+            prefix: Some(prefix),
+        })),
     }
 }
 
@@ -668,13 +716,18 @@ mod test {
     }
 
     #[test]
-    fn test_get_s3_copy_source() {
-        assert_eq!("bucket/key", get_s3_copy_source("bucket", "key"))
+    fn test_get_s3_prefix_converts_unix_absolute_directory_with_trailing_slash() {
+        assert_eq!(String::from("test/"), get_s3_prefix("/test/"))
     }
 
     #[test]
     fn test_get_s3_prefix_converts_blank_directory() {
         assert_eq!("/", get_s3_prefix(""))
+    }
+
+    #[test]
+    fn test_get_s3_copy_source() {
+        assert_eq!("bucket/key", get_s3_copy_source("bucket", "key"))
     }
 
     #[test]
