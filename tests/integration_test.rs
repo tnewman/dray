@@ -150,6 +150,93 @@ async fn test_write_file_with_permission_error() {
     .unwrap();
 }
 
+#[tokio::test]
+#[should_panic(expected = "The specified key does not exist.")]
+async fn test_remove_file() {
+    let test_client = setup().await;
+
+    put_object(
+        &test_client,
+        "home/test/test.txt",
+        b"Test read data!".to_vec(),
+    )
+    .await;
+
+    /*
+        S3 is eventually consistent, so wait until the file is available before
+        proceeding with the test.
+
+        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
+    */
+    sleep(Duration::from_millis(100)).await;
+
+    execute_sftp_command(&test_client, "RM /home/test/test.txt")
+        .await
+        .unwrap();
+
+    /*
+        S3 is eventually consistent, so wait until the file is available before
+        proceeding with the test.
+
+        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
+    */
+    sleep(Duration::from_millis(100)).await;
+
+    get_object(&test_client, "home/test/test.txt").await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "Couldn't delete file: Permission denied")]
+async fn test_remove_file_with_permission_error() {
+    let test_client = setup().await;
+
+    execute_sftp_command(&test_client, "RM /home/other/test.txt")
+        .await
+        .unwrap();
+}
+
+#[tokio::test]
+#[should_panic(expected = "The specified key does not exist.")]
+async fn test_remove_directory() {
+    let test_client = setup().await;
+
+    put_object(&test_client, "home/test/test1.txt", b"Test data!".to_vec()).await;
+
+    put_object(&test_client, "home/test/test2.txt", b"Test data!".to_vec()).await;
+
+    /*
+        S3 is eventually consistent, so wait until the file is available before
+        proceeding with the test.
+
+        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
+    */
+    sleep(Duration::from_millis(100)).await;
+
+    execute_sftp_command(&test_client, "RMDIR /home/test")
+        .await
+        .unwrap();
+
+    /*
+        S3 is eventually consistent, so wait until the file is available before
+        proceeding with the test.
+
+        TODO: Replace with a good exponential backoff algorithm that checks if the file is available yet.
+    */
+    sleep(Duration::from_millis(100)).await;
+
+    get_object(&test_client, "home/test/test1.txt").await;
+}
+
+#[tokio::test]
+#[should_panic(expected = "Couldn't remove directory: Permission denied")]
+async fn test_remove_directory_with_permission_error() {
+    let test_client = setup().await;
+
+    execute_sftp_command(&test_client, "RMDIR /home/other")
+        .await
+        .unwrap();
+}
+
 struct TestClient {
     host: String,
     s3_client: S3Client,
