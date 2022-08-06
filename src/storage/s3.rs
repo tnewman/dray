@@ -572,10 +572,10 @@ fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
 
     let mapped_files = files
         .iter()
-        .map(|object| map_object_to_file(object))
+        .map(map_object_to_file)
         .filter(|file| !file.file_name.ends_with("_$folder$"));
 
-    let mapped_dirs = directories.iter().map(|prefix| map_prefix_to_file(prefix));
+    let mapped_dirs = directories.iter().map(map_prefix_to_file);
 
     mapped_dirs.chain(mapped_files).collect()
 }
@@ -712,8 +712,8 @@ fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Erro
             } else {
                 Error::Storage(format!(
                     "{} - {}",
-                    http_response.status.to_string(),
-                    http_response.body_as_str().to_string()
+                    http_response.status,
+                    http_response.body_as_str()
                 ))
             }
         }

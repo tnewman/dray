@@ -3,7 +3,7 @@ pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
         .lines()
         .into_iter()
         .filter(|line| !line.is_empty())
-        .map(|line| {
+        .filter_map(|line| {
             let mut pieces = line.split_whitespace();
 
             match (pieces.next(), pieces.next()) {
@@ -12,7 +12,6 @@ pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
                 _ => None,
             }
         })
-        .flatten()
         .map(|key| key.fingerprint())
         .collect()
 }
