@@ -162,7 +162,7 @@ async fn test_remove_file() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "Couldn't delete file: Permission denied")]
+#[should_panic(expected = "Permission denied")]
 async fn test_remove_file_with_permission_error() {
     let test_client = setup().await;
 
@@ -198,7 +198,7 @@ async fn test_remove_directory() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "Couldn't remove directory: Permission denied")]
+#[should_panic(expected = "Permission denied")]
 async fn test_remove_directory_with_permission_error() {
     let test_client = setup().await;
 
@@ -221,7 +221,7 @@ async fn test_create_directory() {
 }
 
 #[tokio::test]
-#[should_panic(expected = "Couldn't create directory: Permission denied")]
+#[should_panic(expected = "Permission denied")]
 async fn test_create_directory_with_permission_error() {
     let test_client = setup().await;
 
@@ -489,7 +489,7 @@ async fn execute_sftp_command(test_client: &TestClient, command: &str) -> Result
     let mut child = Command::new("sftp")
         .arg("-b-")
         .arg(format!("-i{}/.ssh/id_ed25519", env!("CARGO_MANIFEST_DIR")))
-        .arg("-oStrictHostKeyChecking=no")
+        .arg("-o StrictHostKeyChecking=no")
         .arg(format!("-P{}", port))
         .arg(format!("test@{}", host_name))
         .stdin(Stdio::piped())
