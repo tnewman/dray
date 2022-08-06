@@ -1,7 +1,7 @@
 version: "3"
 services:
   minio:
-    image: minio/minio
+    image: index.docker.io/minio/minio
     volumes:
       - minio-data:/data
     environment:
