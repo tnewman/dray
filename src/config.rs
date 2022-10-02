@@ -23,6 +23,9 @@ impl DrayConfig {
         // Validate SSH Key Parsing
         dray_config.get_ssh_keys()?;
 
+        // Validate Host
+        dray_config.get_host_socket_addr()?;
+
         Ok(dray_config)
     }
 
@@ -73,9 +76,27 @@ mod test {
         config.get_ssh_keys().unwrap();
     }
 
+    #[test]
+    fn test_get_host_socket_addr() {
+        let config = create_config(create_temp_key());
+
+        assert_eq!("0.0.0.0:22".parse::<SocketAddr>().unwrap(), config.get_host_socket_addr().unwrap());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_host_socket_addr_with_invalid_host() {
+        let config = DrayConfig {
+            host: String::from("missingport"),
+            ..create_config(create_temp_key())
+        };
+
+        config.get_host_socket_addr().unwrap();
+    }
+
     fn create_config(key_paths: String) -> DrayConfig {
         DrayConfig {
-            host: String::from(""),
+            host: String::from("0.0.0.0:22"),
             ssh_key_paths: key_paths,
             s3: S3Config {
                 endpoint_name: None,
