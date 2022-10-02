@@ -30,9 +30,7 @@ impl DrayConfig {
     }
 
     pub fn get_host_socket_addr(&self) -> Result<SocketAddr, Error> {
-        self.host
-            .parse::<SocketAddr>()
-            .map_err(Error::from)
+        self.host.parse::<SocketAddr>().map_err(Error::from)
     }
 
     pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>, Error> {
