@@ -7,7 +7,7 @@ use chrono::Utc;
 use std::convert::From;
 use std::convert::TryInto;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Name {
     pub id: u32,
     pub files: Vec<File>,

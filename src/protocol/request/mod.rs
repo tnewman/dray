@@ -21,7 +21,7 @@ pub mod write;
 
 const DATA_TYPE_LENGTH: u32 = 1;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum Request {
     Init(init::Init),
     Open(open::Open),
