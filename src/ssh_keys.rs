@@ -7,8 +7,8 @@ pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
             let mut pieces = line.split_whitespace();
 
             match (pieces.next(), pieces.next()) {
-                (Some(_), Some(key)) => thrussh_keys::parse_public_key_base64(key).ok(),
-                (Some(key), None) => thrussh_keys::parse_public_key_base64(key).ok(),
+                (Some(_), Some(key)) => russh_keys::parse_public_key_base64(key).ok(),
+                (Some(key), None) => russh_keys::parse_public_key_base64(key).ok(),
                 _ => None,
             }
         })

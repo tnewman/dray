@@ -1,7 +1,7 @@
-use std::path::Path;
+use std::{path::Path, net::SocketAddr};
 
 use serde::Deserialize;
-use thrussh_keys::key;
+use russh_keys::key;
 
 use crate::error::Error;
 pub use crate::storage::s3::S3Config;
@@ -26,12 +26,17 @@ impl DrayConfig {
         Ok(dray_config)
     }
 
+    pub fn get_host_socket_addr(&self) -> Result<SocketAddr, Error> {
+        self.host.parse::<SocketAddr>()
+            .map_err(|err| Error::from(err))
+    }
+
     pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>, Error> {
         let keys: Result<Vec<key::KeyPair>, _> = self
             .ssh_key_paths
             .split(',')
             .map(|key_path| key_path.trim())
-            .map(|key_path| thrussh_keys::load_secret_key(Path::new(key_path), None))
+            .map(|key_path| russh_keys::load_secret_key(Path::new(key_path), None))
             .collect();
 
         let keys = keys?;
