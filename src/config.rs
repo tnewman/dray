@@ -80,7 +80,10 @@ mod test {
     fn test_get_host_socket_addr() {
         let config = create_config(create_temp_key());
 
-        assert_eq!("0.0.0.0:22".parse::<SocketAddr>().unwrap(), config.get_host_socket_addr().unwrap());
+        assert_eq!(
+            "0.0.0.0:22".parse::<SocketAddr>().unwrap(),
+            config.get_host_socket_addr().unwrap()
+        );
     }
 
     #[test]
