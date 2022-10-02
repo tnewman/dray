@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 
 use super::RequestId;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Init {
     pub version: u8,
 }

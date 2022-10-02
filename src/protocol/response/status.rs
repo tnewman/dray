@@ -2,14 +2,14 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 use std::convert::TryInto;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Status {
     pub id: u32,
     pub status_code: StatusCode,
     pub error_message: String,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum StatusCode {
     Ok = 0,
     Eof = 1,

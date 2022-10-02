@@ -372,7 +372,9 @@ impl Storage for S3Storage {
     }
 
     async fn get_handle_metadata(&self, handle: &str) -> Result<File, Error> {
-        let result = if let Some(read_handle) = self.handle_manager.get_read_handle(handle).await {
+        
+
+        if let Some(read_handle) = self.handle_manager.get_read_handle(handle).await {
             let read_handle = read_handle.lock().await;
             self.get_file_metadata(read_handle.key.to_string()).await
         } else if let Some(write_handle) = self.handle_manager.get_write_handle(handle).await {
@@ -383,9 +385,7 @@ impl Storage for S3Storage {
             self.get_file_metadata(dir_handle.prefix.to_string()).await
         } else {
             Err(Error::Failure(format!("Handle {} does not exist!", handle)))
-        };
-
-        result
+        }
     }
 
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {

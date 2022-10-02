@@ -10,7 +10,7 @@ const UIDGID: u32 = 0x00000002;
 const PERMISSIONS: u32 = 0x00000004;
 const ACMODTIME: u32 = 0x00000008;
 
-#[derive(Debug, Default, PartialEq)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub struct FileAttributes {
     pub size: Option<u64>,
     pub uid: Option<u32>,

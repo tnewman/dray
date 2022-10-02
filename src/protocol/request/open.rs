@@ -14,7 +14,7 @@ const CREAT: u32 = 0x00000008;
 const TRUNC: u32 = 0x00000010;
 const EXCL: u32 = 0x00000020;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Open {
     pub id: u32,
     pub filename: String,
@@ -47,7 +47,7 @@ impl TryFrom<&mut Bytes> for Open {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct OpenOptions {
     pub read: bool,
     pub write: bool,

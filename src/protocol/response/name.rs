@@ -28,7 +28,7 @@ impl From<&Name> for Bytes {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct File {
     pub file_name: String,
     pub file_attributes: FileAttributes,

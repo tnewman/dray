@@ -6,7 +6,7 @@ use std::convert::TryFrom;
 
 use super::RequestId;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Handle {
     pub id: u32,
     pub handle: String,

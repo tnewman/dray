@@ -3,7 +3,7 @@ use std::convert::From;
 use std::convert::TryInto;
 use std::fmt::Debug;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub struct Data {
     pub id: u32,
     pub data: Vec<u8>,

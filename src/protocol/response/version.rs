@@ -1,7 +1,7 @@
 use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Version {
     pub version: u32,
 }

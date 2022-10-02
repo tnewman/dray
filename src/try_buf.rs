@@ -59,7 +59,7 @@ impl<T: Buf> TryBuf for T {
         let len = self.try_get_u32()?;
         let string_bytes = self.try_get_bytes(len)?;
 
-        let string = match String::from_utf8((&string_bytes).to_vec()) {
+        let string = match String::from_utf8(string_bytes.to_vec()) {
             Ok(string) => string,
             Err(_) => return Err(Error::BadMessage),
         };

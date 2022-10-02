@@ -7,7 +7,7 @@ use std::fmt::Debug;
 
 use super::RequestId;
 
-#[derive(PartialEq)]
+#[derive(PartialEq, Eq)]
 pub struct Write {
     pub id: u32,
     pub handle: String,
