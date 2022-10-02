@@ -372,8 +372,6 @@ impl Storage for S3Storage {
     }
 
     async fn get_handle_metadata(&self, handle: &str) -> Result<File, Error> {
-        
-
         if let Some(read_handle) = self.handle_manager.get_read_handle(handle).await {
             let read_handle = read_handle.lock().await;
             self.get_file_metadata(read_handle.key.to_string()).await
