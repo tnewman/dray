@@ -1,7 +1,7 @@
-use std::path::Path;
+use std::{net::SocketAddr, path::Path};
 
+use russh_keys::key;
 use serde::Deserialize;
-use thrussh_keys::key;
 
 use crate::error::Error;
 pub use crate::storage::s3::S3Config;
@@ -23,7 +23,14 @@ impl DrayConfig {
         // Validate SSH Key Parsing
         dray_config.get_ssh_keys()?;
 
+        // Validate Host
+        dray_config.get_host_socket_addr()?;
+
         Ok(dray_config)
+    }
+
+    pub fn get_host_socket_addr(&self) -> Result<SocketAddr, Error> {
+        self.host.parse::<SocketAddr>().map_err(Error::from)
     }
 
     pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>, Error> {
@@ -31,7 +38,7 @@ impl DrayConfig {
             .ssh_key_paths
             .split(',')
             .map(|key_path| key_path.trim())
-            .map(|key_path| thrussh_keys::load_secret_key(Path::new(key_path), None))
+            .map(|key_path| russh_keys::load_secret_key(Path::new(key_path), None))
             .collect();
 
         let keys = keys?;
@@ -67,9 +74,30 @@ mod test {
         config.get_ssh_keys().unwrap();
     }
 
+    #[test]
+    fn test_get_host_socket_addr() {
+        let config = create_config(create_temp_key());
+
+        assert_eq!(
+            "0.0.0.0:22".parse::<SocketAddr>().unwrap(),
+            config.get_host_socket_addr().unwrap()
+        );
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_host_socket_addr_with_invalid_host() {
+        let config = DrayConfig {
+            host: String::from("missingport"),
+            ..create_config(create_temp_key())
+        };
+
+        config.get_host_socket_addr().unwrap();
+    }
+
     fn create_config(key_paths: String) -> DrayConfig {
         DrayConfig {
-            host: String::from(""),
+            host: String::from("0.0.0.0:22"),
             ssh_key_paths: key_paths,
             s3: S3Config {
                 endpoint_name: None,

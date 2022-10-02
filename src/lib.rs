@@ -17,17 +17,17 @@ use futures::{
 use log::{debug, error, info};
 
 use protocol::request::Request;
-use sftp_session::SftpSession;
-use std::{convert::TryFrom, pin::Pin, sync::Arc};
-use storage::{s3::S3StorageFactory, Storage, StorageFactory};
-use thrussh::{
+use russh::{
     server::{run, Auth, Config, Handler, Server, Session},
     ChannelId, CryptoVec,
 };
-use thrussh_keys::{
+use russh_keys::{
     key::{self, PublicKey},
     PublicKeyBase64,
 };
+use sftp_session::SftpSession;
+use std::{convert::TryFrom, pin::Pin, sync::Arc};
+use storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use tokio::sync::RwLock;
 
 pub struct DraySshServer {
@@ -67,7 +67,7 @@ impl DraySshServer {
 
         info!("Binding to Host {}", self.dray_config.host);
 
-        run(ssh_config, &self.dray_config.host.clone(), self)
+        run(ssh_config, &self.dray_config.get_host_socket_addr()?, self)
             .await
             .map_err(|error| Error::Failure(error.to_string()))
     }
@@ -110,7 +110,12 @@ impl DraySshServer {
             }
             false => {
                 info!("Rejected public key authentication attempt from {}", user);
-                Ok((self, Auth::Reject))
+                Ok((
+                    self,
+                    Auth::Reject {
+                        proceed_with_methods: Option::None,
+                    },
+                ))
             }
         }
     }
@@ -141,7 +146,7 @@ impl DraySshServer {
 impl Server for DraySshServer {
     type Handler = Self;
 
-    fn new(&mut self, _peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
+    fn new_client(&mut self, _peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
         DraySshServer {
             dray_config: self.dray_config.clone(),
             object_storage_factory: self.object_storage_factory.clone(),
@@ -164,7 +169,8 @@ impl Handler for DraySshServer {
     type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), Error>> + Send>>;
 
     fn auth_publickey(self, user: &str, public_key: &PublicKey) -> Self::FutureAuth {
-        let public_key = key::parse_public_key(&public_key.public_key_bytes()).unwrap();
+        let public_key =
+            key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
         Box::pin(self.auth_publickey(user.to_owned(), public_key))
     }
 

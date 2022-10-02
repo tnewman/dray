@@ -36,14 +36,20 @@ impl From<std::io::Error> for Error {
     }
 }
 
-impl From<thrussh::Error> for Error {
-    fn from(thrussh_error: thrussh::Error) -> Self {
-        Error::Failure(thrussh_error.to_string())
+impl From<std::net::AddrParseError> for Error {
+    fn from(addr_parse_error: std::net::AddrParseError) -> Self {
+        Error::Configuration(addr_parse_error.to_string())
     }
 }
 
-impl From<thrussh_keys::Error> for Error {
-    fn from(thrussh_error: thrussh_keys::Error) -> Self {
-        Error::Failure(thrussh_error.to_string())
+impl From<russh::Error> for Error {
+    fn from(russh_error: russh::Error) -> Self {
+        Error::Failure(russh_error.to_string())
+    }
+}
+
+impl From<russh_keys::Error> for Error {
+    fn from(russh_error: russh_keys::Error) -> Self {
+        Error::Failure(russh_error.to_string())
     }
 }
