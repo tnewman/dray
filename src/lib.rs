@@ -17,9 +17,6 @@ use futures::{
 use log::{debug, error, info};
 
 use protocol::request::Request;
-use sftp_session::SftpSession;
-use std::{convert::TryFrom, pin::Pin, sync::Arc};
-use storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use russh::{
     server::{run, Auth, Config, Handler, Server, Session},
     ChannelId, CryptoVec,
@@ -28,6 +25,9 @@ use russh_keys::{
     key::{self, PublicKey},
     PublicKeyBase64,
 };
+use sftp_session::SftpSession;
+use std::{convert::TryFrom, pin::Pin, sync::Arc};
+use storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use tokio::sync::RwLock;
 
 pub struct DraySshServer {
@@ -110,7 +110,12 @@ impl DraySshServer {
             }
             false => {
                 info!("Rejected public key authentication attempt from {}", user);
-                Ok((self, Auth::Reject { proceed_with_methods: Option::None }))
+                Ok((
+                    self,
+                    Auth::Reject {
+                        proceed_with_methods: Option::None,
+                    },
+                ))
             }
         }
     }
@@ -164,7 +169,8 @@ impl Handler for DraySshServer {
     type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), Error>> + Send>>;
 
     fn auth_publickey(self, user: &str, public_key: &PublicKey) -> Self::FutureAuth {
-        let public_key = key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
+        let public_key =
+            key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
         Box::pin(self.auth_publickey(user.to_owned(), public_key))
     }
 

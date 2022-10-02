@@ -1,7 +1,7 @@
-use std::{path::Path, net::SocketAddr};
+use std::{net::SocketAddr, path::Path};
 
-use serde::Deserialize;
 use russh_keys::key;
+use serde::Deserialize;
 
 use crate::error::Error;
 pub use crate::storage::s3::S3Config;
@@ -27,7 +27,8 @@ impl DrayConfig {
     }
 
     pub fn get_host_socket_addr(&self) -> Result<SocketAddr, Error> {
-        self.host.parse::<SocketAddr>()
+        self.host
+            .parse::<SocketAddr>()
             .map_err(|err| Error::from(err))
     }
 
