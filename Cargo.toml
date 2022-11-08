@@ -19,8 +19,8 @@ hex = "0.4.3"
 log = "0.4"
 serde = "1.0"
 thiserror = "1.0"
-russh = { version = "0.34.0-beta.16", features = ["flate2", "openssl"] }
-russh-keys = { version = "0.22.0-beta.7", features = ["openssl"] }
+russh = { version = "0.35.0-beta.1", features = ["flate2", "openssl"] }
+russh-keys = { version = "0.22.0", features = ["openssl"] }
 tokio = { version = "1.21", features = ["full"] }
 uuid = { version = "1.2.1", features = ["v4"], default-features = false }
 
