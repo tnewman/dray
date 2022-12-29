@@ -8,6 +8,7 @@ use crate::ssh_keys;
 use async_trait::async_trait;
 use bytes::BufMut;
 use chrono::{DateTime, TimeZone, Utc};
+use log::{error, info};
 use rusoto_core::ByteStream;
 use rusoto_core::Region;
 use rusoto_core::RusotoError;
@@ -221,15 +222,26 @@ impl Storage for S3Storage {
     }
 
     async fn health_check(&self) -> Result<(), Error> {
-        self.s3_client
+        info!("Running health check for S3 Bucket {}", self.bucket);
+
+        let result = self.s3_client
             .head_bucket(HeadBucketRequest {
                 bucket: self.bucket.clone(),
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
-
-        Ok(())
+            .map_err(map_err);
+        
+        match result {
+            Ok(_) => {
+                info!("Successfully completed health check for S3 Bucket {}", self.bucket);
+                Ok(())
+            },
+            Err(error) => {
+                error!("Failed to complete health check for S3 Bucket {}: {}", self.bucket, error);
+                Err(error)
+            }
+        }
     }
 
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>, Error> {

@@ -1,5 +1,6 @@
 use std::{net::SocketAddr, path::Path};
 
+use log::info;
 use russh_keys::key;
 use serde::Deserialize;
 
@@ -18,6 +19,8 @@ pub struct DrayConfig {
 
 impl DrayConfig {
     pub fn new() -> Result<DrayConfig, Error> {
+        info!("Loading configuration");
+
         let dray_config = envy::prefixed("DRAY_").from_env::<DrayConfig>()?;
 
         // Validate SSH Key Parsing
@@ -25,6 +28,8 @@ impl DrayConfig {
 
         // Validate Host
         dray_config.get_host_socket_addr()?;
+
+        info!("Successfully loaded configuration");
 
         Ok(dray_config)
     }
@@ -34,12 +39,24 @@ impl DrayConfig {
     }
 
     pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>, Error> {
+        info!("Loading SSH keys");
+
         let keys: Result<Vec<key::KeyPair>, _> = self
             .ssh_key_paths
             .split(',')
             .map(|key_path| key_path.trim())
-            .map(|key_path| russh_keys::load_secret_key(Path::new(key_path), None))
+            .map(|key_path| {
+                info!("Loading SSH key from {}", key_path);
+                
+                russh_keys::load_secret_key(Path::new(key_path), None)
+                    .map_err(|err| {
+                        let error_message = format!("Failed to load SSH key {}: {}", key_path, err.to_string());
+                        Error::Configuration(error_message)
+                    })
+                })
             .collect();
+        
+        info!("Successfully loaded SSH keys");
 
         let keys = keys?;
         Ok(keys)
