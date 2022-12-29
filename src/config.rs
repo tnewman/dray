@@ -47,15 +47,14 @@ impl DrayConfig {
             .map(|key_path| key_path.trim())
             .map(|key_path| {
                 info!("Loading SSH key from {}", key_path);
-                
-                russh_keys::load_secret_key(Path::new(key_path), None)
-                    .map_err(|err| {
-                        let error_message = format!("Failed to load SSH key {}: {}", key_path, err.to_string());
-                        Error::Configuration(error_message)
-                    })
+
+                russh_keys::load_secret_key(Path::new(key_path), None).map_err(|err| {
+                    let error_message = format!("Failed to load SSH key {}: {}", key_path, err);
+                    Error::Configuration(error_message)
                 })
+            })
             .collect();
-        
+
         info!("Successfully loaded SSH keys");
 
         let keys = keys?;

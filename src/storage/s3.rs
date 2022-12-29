@@ -224,21 +224,28 @@ impl Storage for S3Storage {
     async fn health_check(&self) -> Result<(), Error> {
         info!("Running health check for S3 Bucket {}", self.bucket);
 
-        let result = self.s3_client
+        let result = self
+            .s3_client
             .head_bucket(HeadBucketRequest {
                 bucket: self.bucket.clone(),
                 ..Default::default()
             })
             .await
             .map_err(map_err);
-        
+
         match result {
             Ok(_) => {
-                info!("Successfully completed health check for S3 Bucket {}", self.bucket);
+                info!(
+                    "Successfully completed health check for S3 Bucket {}",
+                    self.bucket
+                );
                 Ok(())
-            },
+            }
             Err(error) => {
-                error!("Failed to complete health check for S3 Bucket {}: {}", self.bucket, error);
+                error!(
+                    "Failed to complete health check for S3 Bucket {}: {}",
+                    self.bucket, error
+                );
                 Err(error)
             }
         }
