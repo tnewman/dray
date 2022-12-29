@@ -85,12 +85,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e1b586273c5702936fe7b7d6896644d8be71e6314cfe09d3167c95f712589e8"
 
 [[package]]
-name = "base64"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
-
-[[package]]
 name = "base64ct"
 version = "1.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -441,7 +435,6 @@ name = "dray"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "base64 0.20.0",
  "bytes",
  "chrono",
  "dotenv",
@@ -1379,7 +1372,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1db30db44ea73551326269adcf7a2169428a054f14faf9e1768f2163494f2fa2"
 dependencies = [
  "async-trait",
- "base64 0.13.1",
+ "base64",
  "bytes",
  "crc32fast",
  "futures",
@@ -1434,7 +1427,7 @@ version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a5ae95491c8b4847931e291b151127eccd6ff8ca13f33603eb3d0035ecb05272"
 dependencies = [
- "base64 0.13.1",
+ "base64",
  "bytes",
  "chrono",
  "digest 0.9.0",
