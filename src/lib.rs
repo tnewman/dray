@@ -7,26 +7,21 @@ pub mod storage;
 mod try_buf;
 
 use crate::config::DrayConfig;
+use async_trait::async_trait;
 use bytes::Bytes;
 use error::Error;
-use futures::{
-    future::{ready, Ready},
-    Future,
-};
-
 use log::{debug, error, info};
-
 use protocol::request::Request;
 use russh::{
-    server::{run, Auth, Config, Handler, Server, Session},
-    ChannelId, CryptoVec,
+    server::{run, Auth, Config, Handler, Msg, Server, Session},
+    Channel, ChannelId, CryptoVec,
 };
 use russh_keys::{
     key::{self, PublicKey},
     PublicKeyBase64,
 };
 use sftp_session::SftpSession;
-use std::{convert::TryFrom, pin::Pin, sync::Arc};
+use std::{convert::TryFrom, sync::Arc};
 use storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use tokio::sync::RwLock;
 
@@ -156,34 +151,35 @@ impl Server for DraySshServer {
     }
 }
 
+#[async_trait]
 impl Handler for DraySshServer {
     type Error = Error;
 
-    #[allow(clippy::type_complexity)]
-    type FutureAuth =
-        Pin<Box<dyn Future<Output = Result<(DraySshServer, Auth), Self::Error>> + Send>>;
-
-    type FutureBool = Ready<Result<(Self, Session, bool), Error>>;
-
-    #[allow(clippy::type_complexity)]
-    type FutureUnit = Pin<Box<dyn Future<Output = Result<(Self, Session), Error>> + Send>>;
-
-    fn auth_publickey(self, user: &str, public_key: &PublicKey) -> Self::FutureAuth {
+    async fn auth_publickey(
+        self,
+        user: &str,
+        public_key: &PublicKey,
+    ) -> Result<(Self, Auth), Self::Error> {
         let public_key =
             key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
-        Box::pin(self.auth_publickey(user.to_owned(), public_key))
+
+        self.auth_publickey(user.to_owned(), public_key).await
     }
 
-    fn channel_open_session(self, _: ChannelId, session: Session) -> Self::FutureBool {
-        self.finished_bool(true, session)
+    async fn channel_open_session(
+        self,
+        _: Channel<Msg>,
+        session: Session,
+    ) -> Result<(Self, bool, Session), Self::Error> {
+        Ok((self, true, session))
     }
 
-    fn subsystem_request(
+    async fn subsystem_request(
         self,
         channel: ChannelId,
         name: &str,
         mut session: Session,
-    ) -> Self::FutureUnit {
+    ) -> Result<(Self, Session), Self::Error> {
         if "sftp" == name {
             debug!("starting sftp subsystem");
             session.channel_success(channel);
@@ -192,38 +188,35 @@ impl Handler for DraySshServer {
             session.channel_failure(channel);
         }
 
-        Box::pin(ready(Ok((self, session))))
+        Ok((self, session))
     }
 
-    fn data(self, channel: ChannelId, data: &[u8], mut session: Session) -> Self::FutureUnit {
+    async fn data(
+        self,
+        channel: ChannelId,
+        data: &[u8],
+        mut session: Session,
+    ) -> Result<(Self, Session), Self::Error> {
         match Request::try_from(data) {
-            Ok(request) => Box::pin(self.data(channel, request, session)),
+            Ok(request) => self.data(channel, request, session).await,
             Err(_) => {
                 let response_bytes =
                     Bytes::from(&SftpSession::build_invalid_request_message_response()).to_vec();
                 session.data(channel, CryptoVec::from(response_bytes));
-                Box::pin(ready(Ok((self, session))))
+                Ok((self, session))
             }
         }
     }
 
-    fn channel_eof(self, channel: ChannelId, mut session: Session) -> Self::FutureUnit {
+    async fn channel_eof(
+        self,
+        channel: ChannelId,
+        mut session: Session,
+    ) -> Result<(Self, Session), Self::Error> {
         // Certain clients, such as sftp, will hold open the session after sending EOF until
         // the server closes the session.
         debug!("closing channel");
         session.close(channel);
-        Box::pin(ready(Ok((self, session))))
-    }
-
-    fn finished_bool(self, b: bool, session: Session) -> Self::FutureBool {
-        ready(Ok((self, session, b)))
-    }
-
-    fn finished(self, session: Session) -> Self::FutureUnit {
-        Box::pin(ready(Ok((self, session))))
-    }
-
-    fn finished_auth(self, auth: Auth) -> Self::FutureAuth {
-        Box::pin(ready(Ok((self, auth))))
+        Ok((self, session))
     }
 }

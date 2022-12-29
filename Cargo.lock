@@ -1450,12 +1450,13 @@ dependencies = [
 
 [[package]]
 name = "russh"
-version = "0.34.0"
+version = "0.35.0-beta.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0aeb64c47850fd3cf76bf3f7d971400bfdf7afa06985dbf51b3a5aab91614c7"
+checksum = "704448b526df0f4b98b4ed0fa18a06f9f09b787078360b881bde881f8f911b7f"
 dependencies = [
  "aes",
  "aes-gcm",
+ "async-trait",
  "bitflags",
  "byteorder",
  "chacha20",
@@ -1495,9 +1496,9 @@ dependencies = [
 
 [[package]]
 name = "russh-keys"
-version = "0.22.0"
+version = "0.23.0-beta.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ac7f4ec55d4cecf14e2745ca944909cb34d781515627c4c80431c2a735f2dae6"
+checksum = "583adc8a2d6a70b86abb6fb9b0564b85df58198586a7665920d46ffaf7ac383d"
 dependencies = [
  "aes",
  "bcrypt-pbkdf",
