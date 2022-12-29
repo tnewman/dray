@@ -42,7 +42,8 @@ impl File {
         let gid = self.file_attributes.gid.unwrap_or(0);
 
         let datetime =
-            NaiveDateTime::from_timestamp(self.file_attributes.mtime.unwrap_or(0) as i64, 0);
+            NaiveDateTime::from_timestamp_opt(self.file_attributes.mtime.unwrap_or(0) as i64, 0)
+                .unwrap_or_default();
         let datetime: DateTime<Utc> = DateTime::from_utc(datetime, Utc);
         let datetime = datetime.format("%b %d %Y %H:%M");
 

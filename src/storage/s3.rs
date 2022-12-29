@@ -684,7 +684,10 @@ fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
     rfc3339.map(|last_modified| {
         last_modified
             .parse::<DateTime<Utc>>()
-            .unwrap_or_else(|_e| Utc.timestamp(0, 0))
+            .unwrap_or_else(|_e| match Utc.timestamp_opt(0, 0) {
+                chrono::LocalResult::Single(timestamp) => timestamp,
+                _ => DateTime::<Utc>::MIN_UTC,
+            })
             .timestamp() as u32
     })
 }
