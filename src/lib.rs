@@ -174,6 +174,10 @@ impl Handler for DraySshServer {
         Box::pin(self.auth_publickey(user.to_owned(), public_key))
     }
 
+    fn channel_open_session(self, _: ChannelId, session: Session) -> Self::FutureBool {
+        self.finished_bool(true, session)
+    }
+
     fn subsystem_request(
         self,
         channel: ChannelId,
