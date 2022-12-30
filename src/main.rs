@@ -4,7 +4,7 @@ use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::signal;
 
-use dray::{config::DrayConfig, DraySshServer};
+use dray::{config::DrayConfig, ssh_server::DraySshServer};
 
 fn main() {
     dotenv().ok();
