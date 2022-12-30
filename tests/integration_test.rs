@@ -9,7 +9,7 @@ use std::{
 use dray::{
     config::{DrayConfig, S3Config},
     error::Error,
-    DraySshServer,
+    ssh_server::DraySshServer,
 };
 use log::LevelFilter;
 
