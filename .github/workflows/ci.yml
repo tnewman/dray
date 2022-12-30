@@ -40,9 +40,9 @@ jobs:
 
       - name: Cache OCI Container layers
         uses: jpribyl/action-docker-layer-caching@v0.1.1
-      
+
       - name: Build OCI Container image
-        run: docker build .
+        run: docker build -f Containerfile .
 
   lints:
     name: Lints
