@@ -31,17 +31,17 @@ jobs:
         run: |
           cargo check --tests
   
-  docker:
-    name: Docker
+  container:
+    name: OCI Container
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: Cache Docker layers
+      - name: Cache OCI Container layers
         uses: jpribyl/action-docker-layer-caching@v0.1.1
       
-      - name: Build Docker image
+      - name: Build OCI Container image
         run: docker build .
 
   lints:
