@@ -25,6 +25,9 @@ jobs:
           override: true
           components: rustfmt, clippy
 
+      - name: Generate Test Keypair
+        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
+
       - name: Run cargo check
         run: cargo check --tests
 
@@ -36,9 +39,6 @@ jobs:
 
       - name: Start Backing Services
         run: docker compose up -d
-
-      - name: Generate Test Keypair
-        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
       
       - name: Run cargo test
         run: cargo test
