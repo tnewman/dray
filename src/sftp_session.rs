@@ -7,13 +7,12 @@ use crate::{
         response::{self, Response},
     },
 };
-use bytes::{BufMut, Bytes, BytesMut};
+
 use log::error;
 use log::info;
-use russh::ChannelStream;
-use std::convert::TryFrom;
+
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncReadExt;
 
 pub struct SftpSession {
     object_storage: Arc<dyn Storage>,

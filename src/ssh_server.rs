@@ -1,5 +1,5 @@
 use crate::config::DrayConfig;
-use crate::error::{Error};
+use crate::error::Error;
 use crate::sftp_session::SftpSession;
 use crate::sftp_stream::SftpStream;
 use crate::storage::{s3::S3StorageFactory, Storage, StorageFactory};
@@ -14,7 +14,7 @@ use russh_keys::{
     PublicKeyBase64,
 };
 use std::collections::HashMap;
-use std::{convert::TryFrom, sync::Arc};
+use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
 
 pub struct DraySshServer {
@@ -228,7 +228,7 @@ impl Handler for DraySshServer {
 
         Ok((self, session))
     }
-    
+
     async fn channel_eof(
         self,
         channel: ChannelId,

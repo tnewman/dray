@@ -1,10 +1,14 @@
-use std::{convert::TryFrom, io::{ErrorKind, Cursor}, mem};
+use std::{
+    convert::TryFrom,
+    io::{Cursor, ErrorKind},
+    mem,
+};
 
-use bytes::{Bytes, BytesMut, Buf};
+use bytes::{Bytes, BytesMut};
 use russh::ChannelStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{error::Error, protocol::{request::Request, response::data}, sftp_session::SftpSession, try_buf::TryBuf};
+use crate::{error::Error, protocol::request::Request, sftp_session::SftpSession, try_buf::TryBuf};
 
 pub struct SftpStream {
     sftp_session: SftpSession,
@@ -58,7 +62,7 @@ fn parse_request_frame(buffer: &mut BytesMut) -> Option<Bytes> {
         Ok(data_length) => data_length,
         Err(_) => return None,
     };
-    
+
     let frame_length = data_length + length_field_size as u32;
 
     match buffer.try_get_bytes(frame_length) {
