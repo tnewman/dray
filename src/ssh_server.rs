@@ -212,33 +212,28 @@ impl Handler for DraySshServer {
 
         session.channel_success(channel_id);
 
-        let stream = channel.into_stream();
-
+        let handle = session.handle();
         let sftp_session = SftpSession::new(self.object_storage.clone(), user);
         let sftp_stream = SftpStream::new(sftp_session);
 
         tokio::spawn(async move {
             debug!("Sftp subsystem starting");
 
+            let stream = channel.into_stream();
+
             match sftp_stream.process_stream(stream).await {
                 Ok(_) => debug!("Sftp subsystem session finished"),
-                // TODO: Do not mark EOF as failure - refactor stream code
                 Err(error) => error!("Sftp subsystem failed: {}", error),
+            };
+
+            debug!("Closing channel");
+
+            match handle.close(channel_id).await {
+                Ok(_) => debug!("Successfully closed channel"),
+                Err(_) => error!("Failed to close channel"),
             };
         });
 
-        Ok((self, session))
-    }
-
-    async fn channel_eof(
-        self,
-        channel: ChannelId,
-        mut session: Session,
-    ) -> Result<(Self, Session), Self::Error> {
-        // Certain clients, such as sftp, will hold open the session after sending EOF until
-        // the server closes the session.
-        debug!("closing channel");
-        session.close(channel);
         Ok((self, session))
     }
 }

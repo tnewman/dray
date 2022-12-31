@@ -1,14 +1,11 @@
-use std::{
-    convert::TryFrom,
-    io::{Cursor, ErrorKind},
-    mem,
-};
+use std::{convert::TryFrom, mem};
 
-use bytes::{Bytes, BytesMut};
+use bytes::{BufMut, Bytes};
+use log::info;
 use russh::ChannelStream;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-use crate::{error::Error, protocol::request::Request, sftp_session::SftpSession, try_buf::TryBuf};
+use crate::{error::Error, protocol::request::Request, sftp_session::SftpSession};
 
 pub struct SftpStream {
     sftp_session: SftpSession,
@@ -20,54 +17,42 @@ impl SftpStream {
     }
 
     pub async fn process_stream(&self, mut stream: ChannelStream) -> Result<(), Error> {
-        let mut buffer = BytesMut::with_capacity(4096);
-
         loop {
-            if let Some(mut frame) = parse_request_frame(&mut buffer) {
-                let response = match Request::try_from(&mut frame) {
-                    Ok(request) => self.sftp_session.handle_request(request).await,
-                    Err(_) => SftpSession::build_invalid_request_message_response(),
-                };
-
-                let response_bytes = Bytes::from(&response);
-
-                match stream.write_all(&response_bytes).await {
-                    Ok(_) => {}
-                    Err(error) => return Err(Error::Failure(error.to_string())),
-                }
-            }
-
-            let bytes_read = match stream.read_buf(&mut buffer).await {
-                Ok(bytes_read) => bytes_read,
-                Err(error) => return Err(Error::Failure(error.to_string())),
-            };
-
-            if 0 == bytes_read {
-                if buffer.is_empty() {
-                    return Ok(());
-                } else {
-                    return Err(Error::Failure(ErrorKind::ConnectionReset.to_string()));
-                }
+            match self.process_request(&mut stream).await {
+                Ok(_) => {}
+                Err(error) => match error {
+                    Error::EndOfFile => break Ok(()),
+                    _ => break Err(error),
+                },
             }
         }
     }
-}
 
-fn parse_request_frame(buffer: &mut BytesMut) -> Option<Bytes> {
-    // TODO: Add unit tests
-    let length_field_size = mem::size_of::<u32>();
+    async fn process_request(&self, stream: &mut ChannelStream) -> Result<(), Error> {
+        let request_data_size = stream.read_u32().await?;
+        let request_size = request_data_size as usize + mem::size_of::<u32>();
 
-    let mut peeker = Cursor::new(&buffer[..]);
+        let mut request_buffer: Vec<u8> = Vec::with_capacity(request_size);
+        request_buffer.put_u32(request_data_size);
 
-    let data_length = match peeker.try_get_u32() {
-        Ok(data_length) => data_length,
-        Err(_) => return None,
-    };
+        let mut request_data_buffer = vec![0; request_data_size as usize];
+        stream.read_exact(&mut request_data_buffer).await?;
+        request_buffer.put_slice(&request_data_buffer);
 
-    let frame_length = data_length + length_field_size as u32;
+        let request = Request::try_from(&mut Bytes::from(request_buffer));
 
-    match buffer.try_get_bytes(frame_length) {
-        Ok(frame) => Some(frame),
-        Err(_) => None,
+        let response = match request {
+            Ok(request) => self.sftp_session.handle_request(request).await,
+            Err(_) => {
+                let response = SftpSession::build_invalid_request_message_response();
+                info!("Sending error response: {:?}", response);
+                response
+            }
+        };
+
+        let mut response_bytes = Bytes::from(&response);
+        stream.write_all_buf(&mut response_bytes).await?;
+
+        Ok(())
     }
 }

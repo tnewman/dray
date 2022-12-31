@@ -1,3 +1,5 @@
+use std::io::ErrorKind;
+
 use thiserror::Error;
 
 #[derive(Error, Debug, PartialEq, Eq)]
@@ -8,8 +10,14 @@ pub enum Error {
     #[error("Configuration error: {}", .0)]
     Configuration(String),
 
+    #[error("End of file.")]
+    EndOfFile,
+
     #[error("{}", .0)]
     Failure(String),
+
+    #[error("IO Error: {}", .0)]
+    IOError(std::io::ErrorKind),
 
     #[error("File not found.")]
     NoSuchFile,
@@ -32,7 +40,10 @@ impl From<envy::Error> for Error {
 
 impl From<std::io::Error> for Error {
     fn from(io_error: std::io::Error) -> Self {
-        Error::Storage(io_error.to_string())
+        match io_error.kind() {
+            ErrorKind::UnexpectedEof => Error::EndOfFile,
+            _ => Error::IOError(io_error.kind()),
+        }
     }
 }
 
