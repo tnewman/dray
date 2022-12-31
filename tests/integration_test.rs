@@ -1,10 +1,4 @@
-use std::{
-    env,
-    io::{Read, Write},
-    net::TcpListener,
-    process::Stdio,
-    str::FromStr,
-};
+use std::{env, net::TcpListener, process::Stdio, str::FromStr};
 
 use dray::{
     config::{DrayConfig, S3Config},
@@ -21,6 +15,7 @@ use rusoto_s3::{
 };
 use tempfile::NamedTempFile;
 use tokio::{
+    fs,
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
     process::Command,
@@ -73,20 +68,19 @@ async fn test_read_file() {
     )
     .await;
 
-    let mut temp_file = NamedTempFile::new().unwrap();
+    let temp_file = NamedTempFile::new().unwrap().into_temp_path();
 
     execute_sftp_command(
         &test_client,
         &format!(
             "GET /home/test/read-test.txt {}",
-            temp_file.path().to_string_lossy()
+            temp_file.to_string_lossy()
         ),
     )
     .await
     .unwrap();
 
-    let mut file_data = String::new();
-    temp_file.read_to_string(&mut file_data).unwrap();
+    let file_data = fs::read_to_string(temp_file).await.unwrap();
 
     assert_eq!("Test read data!", &file_data);
 }
@@ -105,15 +99,15 @@ async fn test_read_file_with_permission_error() {
 async fn test_write_file() {
     let test_client = setup().await;
 
-    let mut temp_file = NamedTempFile::new().unwrap();
-    temp_file.write_all(b"Test write data!").unwrap();
-    temp_file.flush().unwrap();
+    let temp_file = NamedTempFile::new().unwrap().into_temp_path();
+
+    fs::write(&temp_file, b"Test write data!").await.unwrap();
 
     execute_sftp_command(
         &test_client,
         &format!(
             "PUT {} /home/test/write-test.txt",
-            temp_file.path().to_string_lossy()
+            temp_file.to_string_lossy()
         ),
     )
     .await
@@ -129,13 +123,13 @@ async fn test_write_file() {
 async fn test_write_file_with_permission_error() {
     let test_client = setup().await;
 
-    let temp_file = NamedTempFile::new().unwrap();
+    let temp_file = NamedTempFile::new().unwrap().into_temp_path();
 
     execute_sftp_command(
         &test_client,
         &format!(
             "PUT {} /home/other/write-test.txt",
-            temp_file.path().to_string_lossy()
+            temp_file.to_string_lossy()
         ),
     )
     .await

@@ -1,27 +1,28 @@
 use crate::config::DrayConfig;
 use crate::error::Error;
-use crate::protocol::request::Request;
 use crate::sftp_session::SftpSession;
+use crate::sftp_stream::SftpStream;
 use crate::storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use async_trait::async_trait;
-use bytes::Bytes;
 use log::{debug, error, info};
 use russh::{
     server::{run, Auth, Config, Handler, Msg, Server, Session},
-    Channel, ChannelId, CryptoVec,
+    Channel, ChannelId,
 };
 use russh_keys::{
     key::{self, PublicKey},
     PublicKeyBase64,
 };
-use std::{convert::TryFrom, sync::Arc};
-use tokio::sync::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::{Mutex, RwLock};
 
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,
     object_storage_factory: Arc<dyn StorageFactory>,
     object_storage: Arc<dyn Storage>,
-    sftp_session: RwLock<Option<SftpSession>>,
+    channels: Arc<Mutex<HashMap<ChannelId, Channel<Msg>>>>,
+    user: RwLock<Option<String>>,
 }
 
 impl DraySshServer {
@@ -33,7 +34,8 @@ impl DraySshServer {
             dray_config: Arc::from(dray_config),
             object_storage_factory,
             object_storage,
-            sftp_session: RwLock::from(Option::None),
+            channels: Arc::from(Mutex::from(HashMap::new())),
+            user: RwLock::from(Option::None),
         }
     }
 
@@ -89,8 +91,8 @@ impl DraySshServer {
                 );
 
                 {
-                    let mut sftp_session = self.sftp_session.write().await;
-                    *sftp_session = Some(SftpSession::new(self.object_storage.clone(), user));
+                    let mut self_user = self.user.write().await;
+                    *self_user = Some(user);
                 }
 
                 Ok((self, Auth::Accept))
@@ -106,28 +108,6 @@ impl DraySshServer {
             }
         }
     }
-
-    async fn data(
-        self,
-        channel: ChannelId,
-        request: Request,
-        mut session: Session,
-    ) -> Result<(DraySshServer, Session), Error> {
-        {
-            let sftp_session = &*self.sftp_session.read().await;
-
-            let sftp_session = match sftp_session {
-                Some(sftp_session) => sftp_session,
-                None => return Err(Error::Failure("Missing SFTP session!".to_string())),
-            };
-
-            let response = sftp_session.handle_request(request).await;
-            let response_bytes = Bytes::from(&response).to_vec();
-            session.data(channel, CryptoVec::from(response_bytes));
-        }
-
-        Ok((self, session))
-    }
 }
 
 impl Server for DraySshServer {
@@ -138,7 +118,8 @@ impl Server for DraySshServer {
             dray_config: self.dray_config.clone(),
             object_storage_factory: self.object_storage_factory.clone(),
             object_storage: self.object_storage_factory.create_storage(),
-            sftp_session: RwLock::from(Option::None),
+            channels: Arc::from(Mutex::from(HashMap::new())),
+            user: RwLock::from(None),
         }
     }
 }
@@ -160,55 +141,99 @@ impl Handler for DraySshServer {
 
     async fn channel_open_session(
         self,
-        _: Channel<Msg>,
+        channel: Channel<Msg>,
         session: Session,
     ) -> Result<(Self, bool, Session), Self::Error> {
+        {
+            let mut channels = self.channels.lock().await;
+            channels.insert(channel.id(), channel);
+        }
+
         Ok((self, true, session))
     }
 
-    async fn subsystem_request(
+    async fn channel_close(
         self,
         channel: ChannelId,
-        name: &str,
-        mut session: Session,
+        session: Session,
     ) -> Result<(Self, Session), Self::Error> {
-        if "sftp" == name {
-            debug!("starting sftp subsystem");
-            session.channel_success(channel);
-        } else {
-            debug!("failed to start unsupported subsystem {}", name);
-            session.channel_failure(channel);
+        {
+            let mut channels = self.channels.lock().await;
+            channels.remove(&channel);
         }
 
         Ok((self, session))
     }
 
-    async fn data(
+    async fn subsystem_request(
         self,
-        channel: ChannelId,
-        data: &[u8],
+        channel_id: ChannelId,
+        name: &str,
         mut session: Session,
     ) -> Result<(Self, Session), Self::Error> {
-        match Request::try_from(data) {
-            Ok(request) => self.data(channel, request, session).await,
-            Err(_) => {
-                let response_bytes =
-                    Bytes::from(&SftpSession::build_invalid_request_message_response()).to_vec();
-                session.data(channel, CryptoVec::from(response_bytes));
-                Ok((self, session))
-            }
+        if name != "sftp" {
+            error!("Failed to start unsupported subsystem {}", name);
+            session.channel_failure(channel_id);
+            return Ok((self, session));
         }
-    }
 
-    async fn channel_eof(
-        self,
-        channel: ChannelId,
-        mut session: Session,
-    ) -> Result<(Self, Session), Self::Error> {
-        // Certain clients, such as sftp, will hold open the session after sending EOF until
-        // the server closes the session.
-        debug!("closing channel");
-        session.close(channel);
+        let user = {
+            let user = self.user.read().await;
+            user.clone()
+        };
+
+        let user = match user {
+            Some(user) => user,
+            None => {
+                error!(
+                    "Failed to start sftp subsystem because a user was not found on the channel"
+                );
+                session.channel_failure(channel_id);
+                return Ok((self, session));
+            }
+        };
+
+        let channel = {
+            let mut channels = self.channels.lock().await;
+            channels.remove(&channel_id)
+        };
+
+        let channel = match channel {
+            Some(channel) => channel,
+            None => {
+                error!(
+                    "Failed to start sftp subsystem because the requested channel {} was not found",
+                    channel_id
+                );
+                session.channel_failure(channel_id);
+                return Ok((self, session));
+            }
+        };
+
+        session.channel_success(channel_id);
+
+        let handle = session.handle();
+        let sftp_session = SftpSession::new(self.object_storage.clone(), user);
+        let sftp_stream = SftpStream::new(sftp_session);
+
+        tokio::spawn(async move {
+            info!("Sftp subsystem starting");
+
+            let stream = channel.into_stream();
+
+            match sftp_stream.process_stream(stream).await {
+                Ok(_) => info!("Sftp subsystem finished"),
+                Err(error) => error!("Sftp subsystem failed: {}", error),
+            };
+
+            debug!("Closing channel");
+
+            match handle.close(channel_id).await {
+                Ok(_) => debug!("Successfully closed channel"),
+                Err(_) => error!("Failed to close channel"),
+            };
+        });
+
         Ok((self, session))
     }
 }
