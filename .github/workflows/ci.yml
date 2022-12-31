@@ -8,44 +8,7 @@ name: CI
 
 jobs:
   check:
-    name: Check
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-
-      - name: Generate Test Keypair
-        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
-
-      - name: Run cargo check
-        run: |
-          cargo check --tests
-  
-  container:
-    name: OCI Container
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
-
-      - name: Cache OCI Container layers
-        uses: jpribyl/action-docker-layer-caching@v0.1.1
-
-      - name: Build OCI Container image
-        run: docker build -f Containerfile .
-
-  lints:
-    name: Lints
+    name: Check:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
@@ -62,8 +25,8 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      - name: Generate Test Keypair
-        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
+      - name: Run cargo check
+        run: cargo check --tests
 
       - name: Run cargo fmt
         run: cargo fmt --all -- --check
@@ -71,18 +34,29 @@ jobs:
       - name: Run cargo clippy
         run: cargo clippy --tests -- -Dwarnings
 
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
+      - name: Start Backing Services
+        run: docker compose up -d
 
+      - name: Generate Test Keypair
+        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
+      
+      - name: Run cargo test
+        run: cargo test
+      
+      - name: Stop Backing Services
+        if: always()
+        run: docker compose down
+
+  release-build:
+    name: Release Build
+    needs: check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
+    steps:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
-      
-      - name: Start Backing Services
-        run: docker-compose up -d
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -90,14 +64,21 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
-      
-      - name: Generate Test Keypair
-        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
+          components: rustfmt, clippy
 
-      - name: Run tests
-        run: |
-          cargo test -- --test-threads=1
-      
-      - name: Stop Backing Services
-        if: always()
-        run: docker-compose down
+      - name: Run cargo build
+        run: cargo build --release
+
+  container-build:
+    name: Container Build
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
+      - name: Cache OCI Container layers
+        uses: jpribyl/action-docker-layer-caching@v0.1.1
+
+      - name: Build OCI Container image
+        run: docker build -f Containerfile .
