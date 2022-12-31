@@ -12,7 +12,6 @@ use log::error;
 use log::info;
 
 use std::sync::Arc;
-use tokio::io::AsyncReadExt;
 
 pub struct SftpSession {
     object_storage: Arc<dyn Storage>,
