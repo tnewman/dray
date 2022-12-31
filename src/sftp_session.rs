@@ -32,28 +32,6 @@ impl SftpSession {
         }
     }
 
-    pub async fn process_stream(&self, mut stream: ChannelStream) {
-        loop {
-            // TODO: Modify the protocol to act on the stream instead of the Byte object
-
-            let message_size = stream.read_u32().await.unwrap();
-            let mut buf = BytesMut::with_capacity(message_size as usize + 4);
-
-            // Hack: Existing parser expects the message size
-            buf.put_u32(message_size);
-
-            stream.read_buf(&mut buf).await.unwrap();
-
-            let mut buf = buf.freeze();
-
-            let request = Request::try_from(&mut buf).unwrap();
-            let response = self.handle_request(request).await;
-            let response_bytes = Bytes::from(&response).to_vec();
-
-            stream.write_all(&response_bytes).await.unwrap();
-        }
-    }
-
     pub async fn handle_request(&self, request: Request) -> Response {
         info!("Received request: {:?}", request);
 
