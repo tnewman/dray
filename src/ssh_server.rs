@@ -217,12 +217,12 @@ impl Handler for DraySshServer {
         let sftp_stream = SftpStream::new(sftp_session);
 
         tokio::spawn(async move {
-            debug!("Sftp subsystem starting");
+            info!("Sftp subsystem starting");
 
             let stream = channel.into_stream();
 
             match sftp_stream.process_stream(stream).await {
-                Ok(_) => debug!("Sftp subsystem session finished"),
+                Ok(_) => info!("Sftp subsystem finished"),
                 Err(error) => error!("Sftp subsystem failed: {}", error),
             };
 
