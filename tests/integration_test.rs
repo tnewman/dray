@@ -449,7 +449,7 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
         .unwrap();
 
     // S3 is eventually consistent. Allow time for changes to be visible.
-    sleep(Duration::from_millis(250)).await;
+    sleep(Duration::from_millis(100)).await;
 }
 
 async fn get_object(test_client: &TestClient, key: &str) -> Vec<u8> {
@@ -506,7 +506,7 @@ async fn execute_sftp_command(test_client: &TestClient, command: &str) -> Result
     };
 
     // S3 is eventually consistent. Allow time for changes to be visible.
-    sleep(Duration::from_millis(250)).await;
+    sleep(Duration::from_millis(100)).await;
 
     result
 }
