@@ -21,12 +21,13 @@ use rusoto_s3::{
 };
 use tempfile::NamedTempFile;
 use tokio::{
+    fs,
     io::{AsyncReadExt, AsyncWriteExt},
     net::TcpStream,
     process::Command,
     spawn,
     task::spawn_blocking,
-    time::{sleep, Duration}, fs,
+    time::{sleep, Duration},
 };
 
 #[tokio::test]
@@ -74,7 +75,7 @@ async fn test_read_file() {
     .await;
 
     let temp_file = NamedTempFile::new().unwrap().into_temp_path();
-    
+
     execute_sftp_command(
         &test_client,
         &format!(
