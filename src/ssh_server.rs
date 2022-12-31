@@ -5,6 +5,7 @@ use crate::sftp_stream::SftpStream;
 use crate::storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use async_trait::async_trait;
 use log::{debug, error, info};
+use russh::SshId;
 use russh::{
     server::{run, Auth, Config, Handler, Msg, Server, Session},
     Channel, ChannelId,
@@ -46,6 +47,11 @@ impl DraySshServer {
 
     pub async fn run_server(self) -> Result<(), Error> {
         let ssh_config = Config {
+            server_id: SshId::Standard(format!(
+                "SSH-2.0-{}_{}",
+                env!("CARGO_PKG_NAME"),
+                env!("CARGO_PKG_VERSION")
+            )),
             keys: self.dray_config.get_ssh_keys()?,
             window_size: 16777216,
             maximum_packet_size: 32768,
