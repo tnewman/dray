@@ -54,6 +54,7 @@ impl SftpStream {
 }
 
 fn parse_request_frame(buffer: &mut BytesMut) -> Option<Bytes> {
+    // TODO: Add unit tests
     let length_field_size = mem::size_of::<u32>();
 
     let mut peeker = Cursor::new(&buffer[..]);

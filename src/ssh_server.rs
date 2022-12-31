@@ -222,6 +222,7 @@ impl Handler for DraySshServer {
 
             match sftp_stream.process_stream(stream).await {
                 Ok(_) => debug!("Sftp subsystem session finished"),
+                // TODO: Do not mark EOF as failure - refactor stream code
                 Err(error) => error!("Sftp subsystem failed: {}", error),
             };
         });
