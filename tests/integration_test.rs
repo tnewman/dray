@@ -1,9 +1,4 @@
-use std::{
-    env,
-    net::TcpListener,
-    process::Stdio,
-    str::FromStr,
-};
+use std::{env, net::TcpListener, process::Stdio, str::FromStr};
 
 use dray::{
     config::{DrayConfig, S3Config},
