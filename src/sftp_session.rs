@@ -7,9 +7,13 @@ use crate::{
         response::{self, Response},
     },
 };
+use bytes::{BufMut, Bytes, BytesMut};
 use log::error;
 use log::info;
+use russh::ChannelStream;
+use std::convert::TryFrom;
 use std::sync::Arc;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 pub struct SftpSession {
     object_storage: Arc<dyn Storage>,
@@ -25,6 +29,28 @@ impl SftpSession {
             object_storage,
             user,
             user_home,
+        }
+    }
+
+    pub async fn process_stream(&self, mut stream: ChannelStream) {
+        loop {
+            // TODO: Modify the protocol to act on the stream instead of the Byte object
+
+            let message_size = stream.read_u32().await.unwrap();
+            let mut buf = BytesMut::with_capacity(message_size as usize + 4);
+
+            // Hack: Existing parser expects the message size
+            buf.put_u32(message_size);
+
+            stream.read_buf(&mut buf).await.unwrap();
+
+            let mut buf = buf.freeze();
+
+            let request = Request::try_from(&mut buf).unwrap();
+            let response = self.handle_request(request).await;
+            let response_bytes = Bytes::from(&response).to_vec();
+
+            stream.write_all(&response_bytes).await.unwrap();
         }
     }
 
