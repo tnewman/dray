@@ -69,6 +69,10 @@ jobs:
           override: true
           components: rustfmt, clippy
 
+      - name: Install openssl
+        run: choco install openssl
+        if: runner.os == 'Windows'
+
       - name: Run cargo build
         run: cargo build --release
 
