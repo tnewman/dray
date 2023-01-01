@@ -23,30 +23,37 @@ jobs:
           profile: minimal
           toolchain: stable
           override: true
+          components: rustfmt, clippy
 
       - name: Generate Test Keypair
         run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
 
       - name: Run cargo check
-        run: |
-          cargo check --tests
-  
-  container:
-    name: OCI Container
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout sources
-        uses: actions/checkout@v3
+        run: cargo check --tests
 
-      - name: Cache OCI Container layers
-        uses: jpribyl/action-docker-layer-caching@v0.1.1
+      - name: Run cargo fmt
+        run: cargo fmt --all -- --check
 
-      - name: Build OCI Container image
-        run: docker build -f Containerfile .
+      - name: Run cargo clippy
+        run: cargo clippy --tests -- -Dwarnings
 
-  lints:
-    name: Lints
-    runs-on: ubuntu-latest
+      - name: Start Backing Services
+        run: docker compose up -d
+      
+      - name: Run cargo test
+        run: cargo test -- --test-threads=1
+      
+      - name: Stop Backing Services
+        if: always()
+        run: docker compose down
+
+  release-build:
+    name: Release Build
+    needs: check
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest, windows-latest]
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -62,42 +69,25 @@ jobs:
           override: true
           components: rustfmt, clippy
 
-      - name: Generate Test Keypair
-        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
+      - name: Install openssl
+        run: |
+          choco install openssl
+          Add-Content "$env:GITHUB_ENV" "OPENSSL_DIR=C:/Program Files/OpenSSL-Win64" 
+        if: runner.os == 'Windows'
 
-      - name: Run cargo fmt
-        run: cargo fmt --all -- --check
+      - name: Run cargo build
+        run: cargo build --release
 
-      - name: Run cargo clippy
-        run: cargo clippy --tests -- -Dwarnings
-
-  test:
-    name: Test Suite
+  container-build:
+    name: Container Build
+    needs: check
     runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
 
-      - name: Cache dependencies
-        uses: Swatinem/rust-cache@v2
-      
-      - name: Start Backing Services
-        run: docker-compose up -d
+      - name: Cache OCI Container layers
+        uses: jpribyl/action-docker-layer-caching@v0.1.1
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-      
-      - name: Generate Test Keypair
-        run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
-
-      - name: Run tests
-        run: |
-          cargo test -- --test-threads=1
-      
-      - name: Stop Backing Services
-        if: always()
-        run: docker-compose down
+      - name: Build OCI Container image
+        run: docker build -f Containerfile .
