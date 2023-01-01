@@ -70,7 +70,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Install openssl
-        run: choco install openssl
+        run: vcpkg install openssl-windows:x64-windows
         if: runner.os == 'Windows'
 
       - name: Run cargo build
