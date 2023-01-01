@@ -70,7 +70,9 @@ jobs:
           components: rustfmt, clippy
 
       - name: Install openssl
-        run: vcpkg install openssl-windows:x64-windows
+        run: |
+          choco install openssl
+          Add-Content "$env:GITHUB_ENV" "OPENSSL_DIR=C:/Program Files/OpenSSL-Win64" 
         if: runner.os == 'Windows'
 
       - name: Run cargo build
