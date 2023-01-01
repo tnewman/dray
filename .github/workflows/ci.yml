@@ -55,6 +55,9 @@ jobs:
       matrix:
         os: [macos-latest, ubuntu-latest, windows-latest]
     steps:
+      - name: Checkout sources
+        uses: actions/checkout@v3
+
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
