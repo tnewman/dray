@@ -16,6 +16,8 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ runner.os }}
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
@@ -60,6 +62,8 @@ jobs:
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ runner.os }}
 
       - name: Install stable toolchain
         uses: actions-rs/toolchain@v1
