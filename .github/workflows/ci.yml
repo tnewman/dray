@@ -15,7 +15,7 @@ jobs:
         uses: actions/checkout@v3
 
       - name: Validate Release Version
-        uses: tnewman/cargo-release-validator@740b1d558f6552cabf080c4e344ca9a0be282704
+        uses: tnewman/cargo-release-validator@0.1.0-alpha.0
 
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
