@@ -85,11 +85,6 @@ jobs:
       - name: Run cargo build
         run: cargo build --release
 
-      - uses: actions/upload-artifact@v3
-        with:
-          name: my-artifact
-          path: path/to/artifact/world.txt
-
   container-build:
     name: Container Build
     needs: check
