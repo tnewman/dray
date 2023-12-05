@@ -1,7 +1,6 @@
 pub fn parse_authorized_keys(authorized_keys: &str) -> Vec<String> {
     authorized_keys
         .lines()
-        .into_iter()
         .filter(|line| !line.is_empty())
         .filter_map(|line| {
             let mut pieces = line.split_whitespace();

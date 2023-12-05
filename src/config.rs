@@ -77,7 +77,7 @@ mod test {
     #[test]
     fn test_get_ssh_keys_with_multiple_keys() {
         let temp_key = create_temp_key();
-        let config = create_config(vec![temp_key.clone(), temp_key].join(","));
+        let config = create_config([temp_key.clone(), temp_key].join(","));
 
         assert_eq!(2, config.get_ssh_keys().unwrap().len())
     }
