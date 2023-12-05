@@ -276,9 +276,11 @@ impl Storage for S3Storage {
     }
 
     async fn open_dir_handle(&self, dir_name: String) -> Result<String, Error> {
+        let prefix = get_s3_prefix(&dir_name);
+
         self.handle_manager
             .create_dir_handle(DirHandle {
-                prefix: dir_name,
+                prefix,
                 continuation_token: None,
                 is_eof: false,
             })
@@ -334,7 +336,8 @@ impl Storage for S3Storage {
         Ok(())
     }
 
-    async fn remove_dir(&self, prefix: String) -> Result<(), Error> {
+    async fn remove_dir(&self, dir_name: String) -> Result<(), Error> {
+        let prefix = get_s3_prefix(&dir_name);
         let mut continuation_token = None;
 
         loop {
