@@ -320,7 +320,7 @@ async fn setup() -> TestClient {
 
     let s3_client = create_s3_client(&dray_config).await;
 
-    let dray_server = DraySshServer::new(dray_config.clone());
+    let dray_server = DraySshServer::new(dray_config.clone()).await;
 
     dray_server.health_check().await.unwrap();
 

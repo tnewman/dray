@@ -6,6 +6,7 @@ use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
 use async_trait::async_trait;
+use aws_config::BehaviorVersion;
 use bytes::BufMut;
 use chrono::{DateTime, TimeZone, Utc};
 use log::{error, info};
@@ -47,13 +48,14 @@ pub struct S3Config {
 }
 
 pub struct S3StorageFactory {
-    s3_client: S3Client,
+    legacy_s3_client: S3Client,
+    s3_client: aws_sdk_s3::Client,
     bucket: String,
 }
 
 impl S3StorageFactory {
-    pub fn new(s3_config: &S3Config) -> S3StorageFactory {
-        let region = match &s3_config.endpoint_name {
+    pub async fn new(s3_config: &S3Config) -> S3StorageFactory {
+        let legacy_region = match &s3_config.endpoint_name {
             Some(endpoint_name) => Region::Custom {
                 name: s3_config.endpoint_region.clone(),
                 endpoint: endpoint_name.clone(),
@@ -61,8 +63,17 @@ impl S3StorageFactory {
             None => Region::default(),
         };
 
+        let mut config_loader = aws_config::defaults(BehaviorVersion::latest());
+
+        if let Some(endpoint_name) = &s3_config.endpoint_name {
+            config_loader = config_loader.endpoint_url(endpoint_name);
+        };
+
+        let config = config_loader.load().await;
+
         S3StorageFactory {
-            s3_client: S3Client::new(region),
+            s3_client: aws_sdk_s3::Client::new(&config),
+            legacy_s3_client: S3Client::new(legacy_region),
             bucket: s3_config.bucket.clone(),
         }
     }
@@ -71,20 +82,30 @@ impl S3StorageFactory {
 #[async_trait]
 impl StorageFactory for S3StorageFactory {
     fn create_storage(&self) -> Arc<dyn Storage> {
-        Arc::new(S3Storage::new(self.s3_client.clone(), self.bucket.clone()))
+        Arc::new(S3Storage::new(
+            self.s3_client.clone(),
+            self.legacy_s3_client.clone(),
+            self.bucket.clone(),
+        ))
     }
 }
 
 pub struct S3Storage {
-    s3_client: S3Client,
+    s3_client: aws_sdk_s3::Client,
+    legacy_s3_client: S3Client,
     bucket: String,
     handle_manager: HandleManager<ReadHandle, WriteHandle, DirHandle>,
 }
 
 impl S3Storage {
-    pub fn new(s3_client: S3Client, bucket: String) -> S3Storage {
+    pub fn new(
+        s3_client: aws_sdk_s3::Client,
+        legacy_s3_client: S3Client,
+        bucket: String,
+    ) -> S3Storage {
         S3Storage {
             s3_client,
+            legacy_s3_client,
             bucket,
             handle_manager: HandleManager::new(),
         }
@@ -97,7 +118,7 @@ impl S3Storage {
         let part_number = (write_handle.completed_parts.len() as i64) + 1;
 
         let upload_part_response = self
-            .s3_client
+            .legacy_s3_client
             .upload_part(UploadPartRequest {
                 bucket: self.bucket.clone(),
                 key: write_handle.key.clone(),
@@ -121,7 +142,7 @@ impl S3Storage {
 
     async fn get_directory_metadata(&self, folder_name: &str) -> Result<File, Error> {
         let list_objects_output = self
-            .s3_client
+            .legacy_s3_client
             .list_objects_v2(ListObjectsV2Request {
                 bucket: self.bucket.clone(),
                 prefix: Some(get_s3_prefix(folder_name)),
@@ -136,7 +157,7 @@ impl S3Storage {
     }
 
     async fn rename_file(&self, current: String, new: String) -> Result<(), Error> {
-        self.s3_client
+        self.legacy_s3_client
             .copy_object(CopyObjectRequest {
                 bucket: self.bucket.clone(),
                 copy_source: get_s3_copy_source(&self.bucket, &current),
@@ -159,7 +180,7 @@ impl S3Storage {
 
         loop {
             let objects = self
-                .s3_client
+                .legacy_s3_client
                 .list_objects_v2(ListObjectsV2Request {
                     bucket: self.bucket.clone(),
                     prefix: Some(current_prefix.clone()),
@@ -195,7 +216,7 @@ impl S3Storage {
 impl Storage for S3Storage {
     async fn init(&self) -> Result<(), Error> {
         let head_response = self
-            .s3_client
+            .legacy_s3_client
             .head_bucket(HeadBucketRequest {
                 bucket: self.bucket.clone(),
                 ..Default::default()
@@ -205,7 +226,7 @@ impl Storage for S3Storage {
         match head_response {
             Ok(_) => Ok(()),
             Err(_) => {
-                self.s3_client
+                self.legacy_s3_client
                     .create_bucket(CreateBucketRequest {
                         bucket: self.bucket.clone(),
                         ..Default::default()
@@ -225,7 +246,7 @@ impl Storage for S3Storage {
         info!("Running health check for S3 Bucket {}", self.bucket);
 
         let result = self
-            .s3_client
+            .legacy_s3_client
             .head_bucket(HeadBucketRequest {
                 bucket: self.bucket.clone(),
                 ..Default::default()
@@ -255,7 +276,7 @@ impl Storage for S3Storage {
         let authorized_keys_key = format!(".ssh/{}/authorized_keys", user);
 
         let object = self
-            .s3_client
+            .legacy_s3_client
             .get_object(GetObjectRequest {
                 bucket: self.bucket.clone(),
                 key: authorized_keys_key,
@@ -302,7 +323,7 @@ impl Storage for S3Storage {
         let prefix = get_s3_prefix(&dir_handle.prefix);
 
         let objects = self
-            .s3_client
+            .legacy_s3_client
             .list_objects_v2(ListObjectsV2Request {
                 bucket: self.bucket.clone(),
                 prefix: Some(prefix),
@@ -324,7 +345,7 @@ impl Storage for S3Storage {
             S3 does not support creating empty prefixes. A marker file must be added to preserve empty
             directories until the directories are explicitly deleted.
         */
-        self.s3_client
+        self.legacy_s3_client
             .put_object(PutObjectRequest {
                 bucket: self.bucket.clone(),
                 key: get_s3_folder_marker(&dir_name),
@@ -342,7 +363,7 @@ impl Storage for S3Storage {
 
         loop {
             let objects = self
-                .s3_client
+                .legacy_s3_client
                 .list_objects_v2(ListObjectsV2Request {
                     bucket: self.bucket.clone(),
                     prefix: Some(prefix.clone()),
@@ -373,7 +394,7 @@ impl Storage for S3Storage {
 
     async fn get_file_metadata(&self, file_name: String) -> Result<File, Error> {
         let head_object_response = self
-            .s3_client
+            .legacy_s3_client
             .head_object(HeadObjectRequest {
                 bucket: self.bucket.clone(),
                 key: file_name.clone(),
@@ -410,7 +431,7 @@ impl Storage for S3Storage {
 
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
         let read_response = self
-            .s3_client
+            .legacy_s3_client
             .get_object(GetObjectRequest {
                 bucket: self.bucket.clone(),
                 key: file_name.clone(),
@@ -451,7 +472,7 @@ impl Storage for S3Storage {
 
     async fn open_write_handle(&self, file_name: String) -> Result<String, Error> {
         let multipart_response = self
-            .s3_client
+            .legacy_s3_client
             .create_multipart_upload(CreateMultipartUploadRequest {
                 bucket: self.bucket.clone(),
                 key: file_name,
@@ -489,7 +510,7 @@ impl Storage for S3Storage {
 
             self.complete_part_upload(&mut write_handle).await?;
 
-            self.s3_client
+            self.legacy_s3_client
                 .complete_multipart_upload(CompleteMultipartUploadRequest {
                     bucket: self.bucket.clone(),
                     key: write_handle.key.clone(),
@@ -508,7 +529,7 @@ impl Storage for S3Storage {
     }
 
     async fn remove_file(&self, file_name: String) -> Result<(), Error> {
-        self.s3_client
+        self.legacy_s3_client
             .delete_object(DeleteObjectRequest {
                 bucket: self.bucket.clone(),
                 key: file_name,
