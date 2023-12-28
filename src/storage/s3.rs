@@ -7,15 +7,14 @@ use crate::protocol::response::name::File;
 use crate::ssh_keys;
 use async_trait::async_trait;
 use aws_config::BehaviorVersion;
+use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::CompletedMultipartUpload;
+use aws_sdk_s3::types::CompletedPart;
 use bytes::BufMut;
 use chrono::{DateTime, TimeZone, Utc};
 use log::{error, info};
-use rusoto_core::ByteStream;
 use rusoto_core::Region;
 use rusoto_core::RusotoError;
-use rusoto_s3::CompleteMultipartUploadRequest;
-use rusoto_s3::CompletedMultipartUpload;
-use rusoto_s3::CompletedPart;
 use rusoto_s3::CopyObjectRequest;
 use rusoto_s3::CreateBucketRequest;
 use rusoto_s3::CreateMultipartUploadOutput;
@@ -24,7 +23,6 @@ use rusoto_s3::DeleteObjectRequest;
 use rusoto_s3::HeadBucketRequest;
 use rusoto_s3::HeadObjectRequest;
 use rusoto_s3::PutObjectRequest;
-use rusoto_s3::UploadPartRequest;
 use rusoto_s3::{
     CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
     Object, S3Client, S3,
@@ -71,8 +69,22 @@ impl S3StorageFactory {
 
         let config = config_loader.load().await;
 
+        let s3_client_builder = aws_sdk_s3::config::Builder::new();
+
+        if config.endpoint_url().is_some() {
+            s3_client_builder.force_path_style(true);
+        }
+
+        let mut s3_sdk_config = aws_sdk_s3::config::Builder::from(&config);
+
+        if config.endpoint_url().is_some() {
+            s3_sdk_config = s3_sdk_config.force_path_style(true);
+        }
+
+        let s3_client = aws_sdk_s3::Client::from_conf(s3_sdk_config.build());
+
         S3StorageFactory {
-            s3_client: aws_sdk_s3::Client::new(&config),
+            s3_client,
             legacy_s3_client: S3Client::new(legacy_region),
             bucket: s3_config.bucket.clone(),
         }
@@ -115,25 +127,27 @@ impl S3Storage {
         &self,
         write_handle: &mut tokio::sync::MutexGuard<'_, WriteHandle>,
     ) -> Result<(), Error> {
-        let part_number = (write_handle.completed_parts.len() as i64) + 1;
+        let part_number = (write_handle.completed_parts.len() as i32) + 1;
 
         let upload_part_response = self
-            .legacy_s3_client
-            .upload_part(UploadPartRequest {
-                bucket: self.bucket.clone(),
-                key: write_handle.key.clone(),
-                upload_id: write_handle.upload_id.clone(),
-                part_number,
-                body: Some(ByteStream::from(write_handle.buffer.clone())),
-                ..Default::default()
-            })
+            .s3_client
+            .upload_part()
+            .bucket(&self.bucket)
+            .key(&write_handle.key)
+            .upload_id(&write_handle.upload_id)
+            .part_number(part_number)
+            .body(ByteStream::from(write_handle.buffer.clone()))
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
-        write_handle.completed_parts.push(CompletedPart {
-            e_tag: upload_part_response.e_tag,
-            part_number: Some(part_number),
-        });
+        write_handle.completed_parts.push(
+            CompletedPart::builder()
+                .e_tag(upload_part_response.e_tag().unwrap_or_default())
+                .part_number(part_number)
+                .build(),
+        );
 
         write_handle.buffer.clear();
 
@@ -151,7 +165,7 @@ impl S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         map_list_objects_to_directory(list_objects_output)
     }
@@ -165,7 +179,7 @@ impl S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         self.remove_file(current).await?;
 
@@ -189,7 +203,7 @@ impl S3Storage {
                     ..Default::default()
                 })
                 .await
-                .map_err(map_err)?;
+                .map_err(map_legacy_err)?;
 
             continuation_token = objects.continuation_token;
 
@@ -232,7 +246,7 @@ impl Storage for S3Storage {
                         ..Default::default()
                     })
                     .await
-                    .map_err(map_err)?;
+                    .map_err(map_legacy_err)?;
                 Ok(())
             }
         }
@@ -252,7 +266,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err);
+            .map_err(map_legacy_err);
 
         match result {
             Ok(_) => {
@@ -283,7 +297,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         let body = match object.body {
             Some(body) => body,
@@ -332,7 +346,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         dir_handle.continuation_token = objects.next_continuation_token.clone();
         dir_handle.is_eof = objects.next_continuation_token.is_none();
@@ -352,7 +366,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         Ok(())
     }
@@ -372,7 +386,7 @@ impl Storage for S3Storage {
                     ..Default::default()
                 })
                 .await
-                .map_err(map_err)?;
+                .map_err(map_legacy_err)?;
 
             continuation_token = objects.continuation_token;
 
@@ -401,7 +415,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err);
+            .map_err(map_legacy_err);
 
         match head_object_response {
             Ok(head_object_response) => {
@@ -438,7 +452,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         let read_stream = read_response
             .body
@@ -479,7 +493,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         let write_handle = map_create_multipart_response_to_write_handle(multipart_response)?;
 
@@ -510,17 +524,19 @@ impl Storage for S3Storage {
 
             self.complete_part_upload(&mut write_handle).await?;
 
-            self.legacy_s3_client
-                .complete_multipart_upload(CompleteMultipartUploadRequest {
-                    bucket: self.bucket.clone(),
-                    key: write_handle.key.clone(),
-                    upload_id: write_handle.upload_id.clone(),
-                    multipart_upload: Some(CompletedMultipartUpload {
-                        parts: Some(write_handle.completed_parts.clone()),
-                    }),
-                    ..Default::default()
-                })
+            let complete_multipart_upload = CompletedMultipartUpload::builder()
+                .set_parts(Some(write_handle.completed_parts.clone()))
+                .build();
+
+            self.s3_client
+                .complete_multipart_upload()
+                .bucket(&self.bucket)
+                .key(&write_handle.key)
+                .multipart_upload(complete_multipart_upload)
+                .upload_id(&write_handle.upload_id)
+                .send()
                 .await
+                .map_err(aws_sdk_s3::Error::from)
                 .map_err(map_err)?;
         }
 
@@ -536,7 +552,7 @@ impl Storage for S3Storage {
                 ..Default::default()
             })
             .await
-            .map_err(map_err)?;
+            .map_err(map_legacy_err)?;
 
         Ok(())
     }
@@ -741,7 +757,14 @@ fn get_default_endpoint_region() -> String {
     String::from("custom")
 }
 
-fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
+fn map_err(s3_sdk_error: aws_sdk_s3::Error) -> Error {
+    match s3_sdk_error {
+        aws_sdk_s3::Error::NoSuchKey(_) => Error::NoSuchFile,
+        _ => Error::Storage(s3_sdk_error.to_string()),
+    }
+}
+
+fn map_legacy_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
     match rusoto_error {
         rusoto_core::RusotoError::Service(error) => {
             if "The specified key does not exist." == error.to_string() {
@@ -1082,7 +1105,7 @@ mod test {
             headers: http::HeaderMap::<String>::with_capacity(0),
         });
 
-        assert_eq!(Error::NoSuchFile, map_err(not_found_error));
+        assert_eq!(Error::NoSuchFile, map_legacy_err(not_found_error));
     }
 
     #[test]
@@ -1091,7 +1114,7 @@ mod test {
             "The specified key does not exist.".to_string(),
         ));
 
-        assert_eq!(Error::NoSuchFile, map_err(not_found_error));
+        assert_eq!(Error::NoSuchFile, map_legacy_err(not_found_error));
     }
 
     #[test]
@@ -1104,7 +1127,7 @@ mod test {
 
         assert_eq!(
             Error::Storage(String::from("500 Internal Server Error - test")),
-            map_err(internal_server_error)
+            map_legacy_err(internal_server_error)
         );
     }
 
@@ -1116,7 +1139,7 @@ mod test {
 
         assert_eq!(
             Error::Storage(String::from("Unknown")),
-            map_err(not_found_error)
+            map_legacy_err(not_found_error)
         );
     }
 
@@ -1124,7 +1147,7 @@ mod test {
     fn test_map_error_maps_generic_error_to_storage_error() {
         assert_eq!(
             Error::Storage(String::from("parse error")),
-            map_err(RusotoError::ParseError::<UploadPartError>(String::from(
+            map_legacy_err(RusotoError::ParseError::<UploadPartError>(String::from(
                 "parse error"
             )))
         );

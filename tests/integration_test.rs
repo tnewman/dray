@@ -403,8 +403,6 @@ async fn create_s3_client(dray_config: &DrayConfig) -> aws_sdk_s3::Client {
 
     let s3_client = aws_sdk_s3::Client::from_conf(s3_config.build());
 
-    log::info!("ENDPOINT: {}", &config.endpoint_url().unwrap());
-
     let head_bucket_result = s3_client
         .head_bucket()
         .bucket(&dray_config.s3.bucket)
