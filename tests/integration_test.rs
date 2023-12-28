@@ -1,5 +1,7 @@
-use std::{env, net::TcpListener, process::Stdio, str::FromStr};
+use std::{env, net::TcpListener, process::Stdio};
 
+use aws_config::BehaviorVersion;
+use aws_sdk_s3::primitives::ByteStream;
 use dray::{
     config::{DrayConfig, S3Config},
     error::Error,
@@ -8,11 +10,6 @@ use dray::{
 use log::LevelFilter;
 
 use rand::Rng;
-use rusoto_core::{ByteStream, Region};
-use rusoto_s3::{
-    CreateBucketRequest, DeleteObjectRequest, GetObjectRequest, ListObjectsV2Request,
-    PutObjectRequest, S3Client, S3,
-};
 use tempfile::NamedTempFile;
 use tokio::{
     fs,
@@ -307,7 +304,7 @@ async fn test_symlink() {
 
 struct TestClient {
     host: String,
-    s3_client: S3Client,
+    s3_client: aws_sdk_s3::Client,
     bucket: String,
 }
 
@@ -383,39 +380,60 @@ async fn get_free_port() -> Option<u16> {
     .unwrap()
 }
 
-async fn create_s3_client(dray_config: &DrayConfig) -> S3Client {
-    let region = match &dray_config.s3.endpoint_name {
-        Some(endpoint_name) => Region::Custom {
-            endpoint: endpoint_name.clone(),
-            name: dray_config.s3.endpoint_region.clone(),
-        },
-        None => Region::from_str(&dray_config.s3.endpoint_region).unwrap(),
+async fn create_s3_client(dray_config: &DrayConfig) -> aws_sdk_s3::Client {
+    let mut config_loader = aws_config::defaults(BehaviorVersion::latest());
+
+    if let Some(endpoint_name) = &dray_config.s3.endpoint_name {
+        config_loader = config_loader.endpoint_url(endpoint_name);
     };
 
-    let s3_client = S3Client::new(region);
+    let config = config_loader.load().await;
 
-    let create_bucket_result = s3_client
-        .create_bucket(CreateBucketRequest {
-            bucket: dray_config.s3.bucket.clone(),
-            ..Default::default()
-        })
+    let s3_client_builder = aws_sdk_s3::config::Builder::new();
+
+    if config.endpoint_url().is_some() {
+        s3_client_builder.force_path_style(true);
+    }
+
+    let mut s3_config = aws_sdk_s3::config::Builder::from(&config);
+
+    if config.endpoint_url().is_some() {
+        s3_config = s3_config.force_path_style(true);
+    }
+
+    let s3_client = aws_sdk_s3::Client::from_conf(s3_config.build());
+
+    log::info!("ENDPOINT: {}", &config.endpoint_url().unwrap());
+
+    let head_bucket_result = s3_client
+        .head_bucket()
+        .bucket(&dray_config.s3.bucket)
+        .send()
         .await;
 
-    match create_bucket_result {
-        Ok(_) => Ok(()),
-        Err(create_bucket_error) => match create_bucket_error.to_string().contains("succeeded") {
-            true => Ok(()),
-            false => Err(create_bucket_error),
-        },
+    if head_bucket_result.is_err() {
+        let create_bucket_result = s3_client
+            .create_bucket()
+            .bucket(&dray_config.s3.bucket)
+            .send()
+            .await;
+
+        match create_bucket_result {
+            Ok(_) => Ok(()),
+            Err(create_bucket_error) => match create_bucket_error.to_string().contains("succeeded")
+            {
+                true => Ok(()),
+                false => Err(create_bucket_error),
+            },
+        }
+        .unwrap();
     }
-    .unwrap();
 
     let objects_to_delete = s3_client
-        .list_objects_v2(ListObjectsV2Request {
-            bucket: dray_config.s3.bucket.clone(),
-            max_keys: Some(i64::MAX),
-            ..Default::default()
-        })
+        .list_objects_v2()
+        .bucket(&dray_config.s3.bucket)
+        .max_keys(i32::MAX)
+        .send()
         .await
         .unwrap()
         .contents;
@@ -423,11 +441,10 @@ async fn create_s3_client(dray_config: &DrayConfig) -> S3Client {
     if let Some(objects_to_delete) = objects_to_delete {
         for object in objects_to_delete {
             s3_client
-                .delete_object(DeleteObjectRequest {
-                    bucket: dray_config.s3.bucket.clone(),
-                    key: object.key.unwrap(),
-                    ..Default::default()
-                })
+                .delete_object()
+                .bucket(&dray_config.s3.bucket)
+                .key(object.key.unwrap())
+                .send()
                 .await
                 .unwrap();
         }
@@ -439,12 +456,11 @@ async fn create_s3_client(dray_config: &DrayConfig) -> S3Client {
 async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
     test_client
         .s3_client
-        .put_object(PutObjectRequest {
-            bucket: test_client.bucket.clone(),
-            key: key.to_string(),
-            body: Some(ByteStream::from(data)),
-            ..Default::default()
-        })
+        .put_object()
+        .bucket(&test_client.bucket)
+        .key(key)
+        .body(ByteStream::from(data))
+        .send()
         .await
         .unwrap();
 
@@ -455,18 +471,16 @@ async fn put_object(test_client: &TestClient, key: &str, data: Vec<u8>) {
 async fn get_object(test_client: &TestClient, key: &str) -> Vec<u8> {
     let get_object_result = test_client
         .s3_client
-        .get_object(GetObjectRequest {
-            bucket: test_client.bucket.clone(),
-            key: key.to_string(),
-            ..Default::default()
-        })
+        .get_object()
+        .bucket(&test_client.bucket)
+        .key(key)
+        .send()
         .await
         .unwrap();
 
     let mut object_data: Vec<u8> = vec![];
     get_object_result
         .body
-        .unwrap()
         .into_async_read()
         .read_to_end(&mut object_data)
         .await
