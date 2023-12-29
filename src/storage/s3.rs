@@ -16,11 +16,7 @@ use log::{error, info};
 use rusoto_core::Region;
 use rusoto_core::RusotoError;
 use rusoto_s3::CreateMultipartUploadOutput;
-use rusoto_s3::CreateMultipartUploadRequest;
-use rusoto_s3::HeadObjectRequest;
-use rusoto_s3::{
-    CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, Object, S3Client, S3,
-};
+use rusoto_s3::{CommonPrefix, HeadObjectOutput, ListObjectsV2Output, Object, S3Client};
 use serde::Deserialize;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -387,14 +383,14 @@ impl Storage for S3Storage {
 
     async fn get_file_metadata(&self, file_name: String) -> Result<File, Error> {
         let head_object_response = self
-            .legacy_s3_client
-            .head_object(HeadObjectRequest {
-                bucket: self.bucket.clone(),
-                key: file_name.clone(),
-                ..Default::default()
-            })
+            .s3_client
+            .head_object()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
-            .map_err(map_legacy_err);
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err);
 
         match head_object_response {
             Ok(head_object_response) => {
@@ -763,7 +759,29 @@ fn map_legacy_prefix_to_file(prefix: &CommonPrefix) -> File {
     }
 }
 
-fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
+fn map_head_object_to_file(
+    key: &str,
+    head_object: &aws_sdk_s3::operation::head_object::HeadObjectOutput,
+) -> File {
+    let mut key_pieces = key.rsplit('/');
+    let file_name = key_pieces.next().unwrap_or("");
+
+    File {
+        file_name: file_name.to_string(),
+        file_attributes: FileAttributes {
+            size: head_object
+                .content_length
+                .map(|content_length| content_length as u64),
+            uid: None,
+            gid: None,
+            permissions: Some(0o100777),
+            atime: None,
+            mtime: None,
+        },
+    }
+}
+
+fn map_legacy_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
     let mut key_pieces = key.rsplit('/');
     let file_name = key_pieces.next().unwrap_or("");
 
@@ -842,7 +860,7 @@ fn get_default_endpoint_region() -> String {
 
 fn map_err(s3_sdk_error: aws_sdk_s3::Error) -> Error {
     match s3_sdk_error {
-        aws_sdk_s3::Error::NoSuchKey(_) => Error::NoSuchFile,
+        aws_sdk_s3::Error::NotFound(_) => Error::NoSuchFile,
         _ => Error::Storage(s3_sdk_error.to_string()),
     }
 }
@@ -1118,7 +1136,7 @@ mod test {
                     mtime: None,
                 }
             },
-            map_head_object_to_file("file", &head_object)
+            map_legacy_head_object_to_file("file", &head_object)
         );
     }
 
