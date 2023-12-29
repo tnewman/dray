@@ -191,16 +191,16 @@ impl S3Storage {
 
         loop {
             let objects = self
-                .legacy_s3_client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(current_prefix.clone()),
-                    continuation_token: continuation_token.clone(),
-                    delimiter: None,
-                    ..Default::default()
-                })
+                .s3_client
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&current_prefix)
+                .set_continuation_token(continuation_token.clone())
+                .set_delimiter(None)
+                .send()
                 .await
-                .map_err(map_legacy_err)?;
+                .map_err(aws_sdk_s3::Error::from)
+                .map_err(map_err)?;
 
             continuation_token = objects.continuation_token;
 
@@ -226,8 +226,7 @@ impl S3Storage {
 #[async_trait]
 impl Storage for S3Storage {
     async fn init(&self) -> Result<(), Error> {
-        self
-            .s3_client
+        self.s3_client
             .head_bucket()
             .bucket(&self.bucket)
             .send()
