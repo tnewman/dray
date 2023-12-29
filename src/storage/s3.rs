@@ -15,7 +15,6 @@ use chrono::{DateTime, TimeZone, Utc};
 use log::{error, info};
 use rusoto_core::Region;
 use rusoto_core::RusotoError;
-use rusoto_s3::CopyObjectRequest;
 use rusoto_s3::CreateBucketRequest;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
@@ -169,15 +168,15 @@ impl S3Storage {
     }
 
     async fn rename_file(&self, current: String, new: String) -> Result<(), Error> {
-        self.legacy_s3_client
-            .copy_object(CopyObjectRequest {
-                bucket: self.bucket.clone(),
-                copy_source: get_s3_copy_source(&self.bucket, &current),
-                key: new,
-                ..Default::default()
-            })
+        self.s3_client
+            .copy_object()
+            .bucket(&self.bucket)
+            .copy_source(get_s3_copy_source(&self.bucket, &current))
+            .key(&new)
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         self.remove_file(current).await?;
 
