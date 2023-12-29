@@ -33,7 +33,7 @@ struct TestClient {
 }
 
 static DOCKER_CLI: Lazy<testcontainers::clients::Cli> =
-    Lazy::new(|| testcontainers::clients::Cli::default());
+    Lazy::new(testcontainers::clients::Cli::default);
 
 static MINIO: Lazy<Container<'_, MinIO>> =
     Lazy::new(|| DOCKER_CLI.run(testcontainers_modules::minio::MinIO::default()));
