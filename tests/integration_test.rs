@@ -310,7 +310,7 @@ struct TestClient {
 
 async fn setup() -> TestClient {
     let _ = env_logger::Builder::new()
-        .filter_level(LevelFilter::Info)
+        .filter_level(LevelFilter::Debug)
         .try_init();
 
     let dray_config = get_config().await;
