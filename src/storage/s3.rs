@@ -462,14 +462,14 @@ impl Storage for S3Storage {
 
     async fn open_write_handle(&self, file_name: String) -> Result<String, Error> {
         let multipart_response = self
-            .legacy_s3_client
-            .create_multipart_upload(CreateMultipartUploadRequest {
-                bucket: self.bucket.clone(),
-                key: file_name,
-                ..Default::default()
-            })
+            .s3_client
+            .create_multipart_upload()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         let write_handle = map_create_multipart_response_to_write_handle(multipart_response)?;
 
@@ -795,6 +795,27 @@ fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
 }
 
 fn map_create_multipart_response_to_write_handle(
+    create_multipart_response: aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadOutput,
+) -> Result<WriteHandle, Error> {
+    let upload_id = match create_multipart_response.upload_id {
+        Some(upload_id) => Ok(upload_id),
+        None => Err(Error::Storage("Missing upload id.".to_string())),
+    }?;
+
+    let key = match create_multipart_response.key {
+        Some(key) => Ok(key),
+        None => Err(Error::Storage("Missing key.".to_string())),
+    }?;
+
+    Ok(WriteHandle {
+        key,
+        upload_id,
+        completed_parts: Vec::new(),
+        buffer: Vec::with_capacity(5000000),
+    })
+}
+
+fn map_legacy_create_multipart_response_to_write_handle(
     create_multipart_response: CreateMultipartUploadOutput,
 ) -> Result<WriteHandle, Error> {
     let upload_id = match create_multipart_response.upload_id {
@@ -1131,7 +1152,7 @@ mod test {
         };
 
         let write_handle =
-            map_create_multipart_response_to_write_handle(multipart_response).unwrap();
+            map_legacy_create_multipart_response_to_write_handle(multipart_response).unwrap();
 
         assert_eq!("id", &write_handle.upload_id);
         assert_eq!("key", &write_handle.key);
@@ -1146,7 +1167,7 @@ mod test {
             ..Default::default()
         };
 
-        assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
+        assert!(map_legacy_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 
     #[test]
@@ -1156,7 +1177,7 @@ mod test {
             ..Default::default()
         };
 
-        assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
+        assert!(map_legacy_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 
     #[test]
