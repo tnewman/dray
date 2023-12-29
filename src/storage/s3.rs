@@ -15,10 +15,8 @@ use chrono::{DateTime, TimeZone, Utc};
 use log::{error, info};
 use rusoto_core::Region;
 use rusoto_core::RusotoError;
-use rusoto_s3::CreateBucketRequest;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
-use rusoto_s3::HeadBucketRequest;
 use rusoto_s3::HeadObjectRequest;
 use rusoto_s3::PutObjectRequest;
 use rusoto_s3::{
@@ -319,18 +317,17 @@ impl Storage for S3Storage {
         }
 
         let prefix = get_s3_prefix(&dir_handle.prefix);
-
         let objects = self
-            .legacy_s3_client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(prefix),
-                continuation_token: dir_handle.continuation_token.clone(),
-                delimiter: Some("/".to_owned()),
-                ..Default::default()
-            })
+            .s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(&prefix)
+            .set_continuation_token(dir_handle.continuation_token.clone())
+            .delimiter("/")
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         dir_handle.continuation_token = objects.next_continuation_token.clone();
         dir_handle.is_eof = objects.next_continuation_token.is_none();
@@ -606,7 +603,9 @@ fn get_s3_folder_marker(dir_name: &str) -> String {
     format!("{}_$folder$", prefix)
 }
 
-fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
+fn map_list_objects_to_files(
+    list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output,
+) -> Vec<File> {
     let files = list_objects.contents.unwrap_or_default();
 
     let directories = list_objects.common_prefixes.unwrap_or_default();
@@ -621,7 +620,46 @@ fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
     mapped_dirs.chain(mapped_files).collect()
 }
 
-fn map_object_to_file(object: &Object) -> File {
+fn map_legacy_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
+    let files = list_objects.contents.unwrap_or_default();
+
+    let directories = list_objects.common_prefixes.unwrap_or_default();
+
+    let mapped_files = files
+        .iter()
+        .map(map_legacy_object_to_file)
+        .filter(|file| !file.file_name.ends_with("_$folder$"));
+
+    let mapped_dirs = directories.iter().map(map_legacy_prefix_to_file);
+
+    mapped_dirs.chain(mapped_files).collect()
+}
+
+fn map_object_to_file(object: &aws_sdk_s3::types::Object) -> File {
+    let key = match &object.key {
+        Some(key) => key,
+        None => "",
+    };
+
+    let mut key_pieces = key.rsplit('/');
+    let file_name = key_pieces.next().unwrap_or("");
+
+    File {
+        file_name: file_name.to_string(),
+        file_attributes: FileAttributes {
+            size: object.size.map(|size| size as u64),
+            uid: None,
+            gid: None,
+            permissions: Some(0o100777),
+            atime: None,
+            mtime: object
+                .last_modified
+                .map(|last_modified| (last_modified.to_millis().unwrap_or_default() / 1000) as u32),
+        },
+    }
+}
+
+fn map_legacy_object_to_file(object: &Object) -> File {
     let key = match &object.key {
         Some(key) => key,
         None => "",
@@ -656,7 +694,7 @@ fn map_list_objects_to_directory(
     if contents.is_empty() {
         Err(Error::NoSuchFile)
     } else {
-        Ok(map_prefix_to_file(&CommonPrefix {
+        Ok(map_legacy_prefix_to_file(&CommonPrefix {
             prefix: Some(prefix),
         }))
     }
@@ -672,13 +710,39 @@ fn map_legacy_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Re
 
     match contents.is_empty() {
         true => Err(Error::NoSuchFile),
-        false => Ok(map_prefix_to_file(&CommonPrefix {
+        false => Ok(map_legacy_prefix_to_file(&CommonPrefix {
             prefix: Some(prefix),
         })),
     }
 }
 
-fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
+fn map_prefix_to_file(prefix: &aws_sdk_s3::types::CommonPrefix) -> File {
+    let prefix = match prefix.prefix {
+        Some(ref prefix) => {
+            let mut prefix = prefix.to_string();
+            prefix.pop(); // strip trailing /
+            format!("/{}", prefix)
+        }
+        None => "".to_owned(),
+    };
+
+    let mut prefix_pieces = prefix.rsplit('/');
+    let file_name = prefix_pieces.next().unwrap_or("");
+
+    File {
+        file_name: file_name.to_string(),
+        file_attributes: FileAttributes {
+            size: None,
+            uid: None,
+            gid: None,
+            permissions: Some(0o40777),
+            atime: None,
+            mtime: None,
+        },
+    }
+}
+
+fn map_legacy_prefix_to_file(prefix: &CommonPrefix) -> File {
     let prefix = match prefix.prefix {
         Some(ref prefix) => {
             let mut prefix = prefix.to_string();
@@ -853,7 +917,7 @@ mod test {
             ..Default::default()
         };
 
-        let result = map_list_objects_to_files(list_objects);
+        let result = map_legacy_list_objects_to_files(list_objects);
 
         assert_eq!(2, result.len());
         assert_eq!(
@@ -902,7 +966,7 @@ mod test {
             ..Default::default()
         };
 
-        let result = map_list_objects_to_files(list_objects);
+        let result = map_legacy_list_objects_to_files(list_objects);
 
         assert_eq!(1, result.len());
         assert_eq!("file.txt", &result[0].file_name);
@@ -914,7 +978,7 @@ mod test {
             ..Default::default()
         };
 
-        let result = map_list_objects_to_files(list_objects);
+        let result = map_legacy_list_objects_to_files(list_objects);
 
         assert_eq!(0, result.len());
     }
@@ -937,7 +1001,7 @@ mod test {
                     mtime: None,
                 }
             },
-            map_object_to_file(&object)
+            map_legacy_object_to_file(&object)
         );
     }
 
@@ -1016,7 +1080,7 @@ mod test {
                     mtime: None,
                 }
             },
-            map_prefix_to_file(&prefix)
+            map_legacy_prefix_to_file(&prefix)
         );
     }
 
