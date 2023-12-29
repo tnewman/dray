@@ -424,19 +424,16 @@ impl Storage for S3Storage {
 
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
         let read_response = self
-            .legacy_s3_client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key: file_name.clone(),
-                ..Default::default()
-            })
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
-        let read_stream = read_response
-            .body
-            .ok_or_else(|| Error::Storage("Read stream body is not available.".to_string()))?
-            .into_async_read();
+        let read_stream = read_response.body.into_async_read();
 
         self.handle_manager
             .create_read_handle(ReadHandle::new(file_name, Box::pin(read_stream)))
