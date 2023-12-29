@@ -1,6 +1,6 @@
 use std::{env, net::TcpListener, process::Stdio};
 
-use aws_config::BehaviorVersion;
+use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::primitives::ByteStream;
 use dray::{
     config::{DrayConfig, S3Config},
@@ -310,7 +310,7 @@ struct TestClient {
 
 async fn setup() -> TestClient {
     let _ = env_logger::Builder::new()
-        .filter_level(LevelFilter::Debug)
+        .filter_level(LevelFilter::Info)
         .try_init();
 
     let dray_config = get_config().await;
@@ -400,6 +400,8 @@ async fn create_s3_client(dray_config: &DrayConfig) -> aws_sdk_s3::Client {
     if config.endpoint_url().is_some() {
         s3_config = s3_config.force_path_style(true);
     }
+
+    s3_config = s3_config.region(Region::new(dray_config.s3.endpoint_region.clone()));
 
     let s3_client = aws_sdk_s3::Client::from_conf(s3_config.build());
 
