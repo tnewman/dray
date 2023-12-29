@@ -18,10 +18,8 @@ use rusoto_core::RusotoError;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
 use rusoto_s3::HeadObjectRequest;
-use rusoto_s3::PutObjectRequest;
 use rusoto_s3::{
-    CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
-    Object, S3Client, S3,
+    CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, Object, S3Client, S3,
 };
 use serde::Deserialize;
 use std::pin::Pin;
@@ -358,16 +356,16 @@ impl Storage for S3Storage {
 
         loop {
             let objects = self
-                .legacy_s3_client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(prefix.clone()),
-                    continuation_token: continuation_token.clone(),
-                    delimiter: None,
-                    ..Default::default()
-                })
+                .s3_client
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&prefix)
+                .set_continuation_token(continuation_token.clone())
+                .set_delimiter(None)
+                .send()
                 .await
-                .map_err(map_legacy_err)?;
+                .map_err(aws_sdk_s3::Error::from)
+                .map_err(map_err)?;
 
             continuation_token = objects.continuation_token;
 
