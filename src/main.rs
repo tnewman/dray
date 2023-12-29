@@ -18,7 +18,7 @@ fn main() {
     let runtime = Runtime::new().unwrap();
 
     let dray_config = DrayConfig::new().unwrap();
-    let dray_server = DraySshServer::new(dray_config);
+    let dray_server = runtime.block_on(DraySshServer::new(dray_config));
 
     runtime.block_on(dray_server.health_check()).unwrap();
     runtime.spawn(dray_server.run_server());

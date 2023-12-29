@@ -27,8 +27,8 @@ pub struct DraySshServer {
 }
 
 impl DraySshServer {
-    pub fn new(dray_config: DrayConfig) -> DraySshServer {
-        let object_storage_factory = Arc::from(S3StorageFactory::new(&dray_config.s3));
+    pub async fn new(dray_config: DrayConfig) -> DraySshServer {
+        let object_storage_factory = Arc::from(S3StorageFactory::new(&dray_config.s3).await);
         let object_storage = object_storage_factory.create_storage();
 
         DraySshServer {

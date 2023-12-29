@@ -6,28 +6,15 @@ use crate::protocol::file_attributes::FileAttributes;
 use crate::protocol::response::name::File;
 use crate::ssh_keys;
 use async_trait::async_trait;
+use aws_config::BehaviorVersion;
+use aws_config::Region;
+use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::CommonPrefix;
+use aws_sdk_s3::types::CompletedMultipartUpload;
+use aws_sdk_s3::types::CompletedPart;
+use aws_sdk_s3::types::Object;
 use bytes::BufMut;
-use chrono::{DateTime, TimeZone, Utc};
 use log::{error, info};
-use rusoto_core::ByteStream;
-use rusoto_core::Region;
-use rusoto_core::RusotoError;
-use rusoto_s3::CompleteMultipartUploadRequest;
-use rusoto_s3::CompletedMultipartUpload;
-use rusoto_s3::CompletedPart;
-use rusoto_s3::CopyObjectRequest;
-use rusoto_s3::CreateBucketRequest;
-use rusoto_s3::CreateMultipartUploadOutput;
-use rusoto_s3::CreateMultipartUploadRequest;
-use rusoto_s3::DeleteObjectRequest;
-use rusoto_s3::HeadBucketRequest;
-use rusoto_s3::HeadObjectRequest;
-use rusoto_s3::PutObjectRequest;
-use rusoto_s3::UploadPartRequest;
-use rusoto_s3::{
-    CommonPrefix, GetObjectRequest, HeadObjectOutput, ListObjectsV2Output, ListObjectsV2Request,
-    Object, S3Client, S3,
-};
 use serde::Deserialize;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -47,22 +34,38 @@ pub struct S3Config {
 }
 
 pub struct S3StorageFactory {
-    s3_client: S3Client,
+    s3_client: aws_sdk_s3::Client,
     bucket: String,
 }
 
 impl S3StorageFactory {
-    pub fn new(s3_config: &S3Config) -> S3StorageFactory {
-        let region = match &s3_config.endpoint_name {
-            Some(endpoint_name) => Region::Custom {
-                name: s3_config.endpoint_region.clone(),
-                endpoint: endpoint_name.clone(),
-            },
-            None => Region::default(),
+    pub async fn new(s3_config: &S3Config) -> S3StorageFactory {
+        let mut config_loader = aws_config::defaults(BehaviorVersion::latest());
+
+        if let Some(endpoint_name) = &s3_config.endpoint_name {
+            config_loader = config_loader.endpoint_url(endpoint_name);
         };
 
+        let config = config_loader.load().await;
+
+        let s3_client_builder = aws_sdk_s3::config::Builder::new();
+
+        if config.endpoint_url().is_some() {
+            s3_client_builder.force_path_style(true);
+        }
+
+        let mut s3_sdk_config = aws_sdk_s3::config::Builder::from(&config);
+
+        if config.endpoint_url().is_some() {
+            s3_sdk_config = s3_sdk_config.force_path_style(true);
+        }
+
+        s3_sdk_config = s3_sdk_config.region(Region::new(s3_config.endpoint_region.clone()));
+
+        let s3_client = aws_sdk_s3::Client::from_conf(s3_sdk_config.build());
+
         S3StorageFactory {
-            s3_client: S3Client::new(region),
+            s3_client,
             bucket: s3_config.bucket.clone(),
         }
     }
@@ -76,13 +79,13 @@ impl StorageFactory for S3StorageFactory {
 }
 
 pub struct S3Storage {
-    s3_client: S3Client,
+    s3_client: aws_sdk_s3::Client,
     bucket: String,
     handle_manager: HandleManager<ReadHandle, WriteHandle, DirHandle>,
 }
 
 impl S3Storage {
-    pub fn new(s3_client: S3Client, bucket: String) -> S3Storage {
+    pub fn new(s3_client: aws_sdk_s3::Client, bucket: String) -> S3Storage {
         S3Storage {
             s3_client,
             bucket,
@@ -94,25 +97,27 @@ impl S3Storage {
         &self,
         write_handle: &mut tokio::sync::MutexGuard<'_, WriteHandle>,
     ) -> Result<(), Error> {
-        let part_number = (write_handle.completed_parts.len() as i64) + 1;
+        let part_number = (write_handle.completed_parts.len() as i32) + 1;
 
         let upload_part_response = self
             .s3_client
-            .upload_part(UploadPartRequest {
-                bucket: self.bucket.clone(),
-                key: write_handle.key.clone(),
-                upload_id: write_handle.upload_id.clone(),
-                part_number,
-                body: Some(ByteStream::from(write_handle.buffer.clone())),
-                ..Default::default()
-            })
+            .upload_part()
+            .bucket(&self.bucket)
+            .key(&write_handle.key)
+            .upload_id(&write_handle.upload_id)
+            .part_number(part_number)
+            .body(ByteStream::from(write_handle.buffer.clone()))
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
-        write_handle.completed_parts.push(CompletedPart {
-            e_tag: upload_part_response.e_tag,
-            part_number: Some(part_number),
-        });
+        write_handle.completed_parts.push(
+            CompletedPart::builder()
+                .e_tag(upload_part_response.e_tag().unwrap_or_default())
+                .part_number(part_number)
+                .build(),
+        );
 
         write_handle.buffer.clear();
 
@@ -122,14 +127,13 @@ impl S3Storage {
     async fn get_directory_metadata(&self, folder_name: &str) -> Result<File, Error> {
         let list_objects_output = self
             .s3_client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(get_s3_prefix(folder_name)),
-                continuation_token: None,
-                delimiter: Some("/".to_owned()),
-                ..Default::default()
-            })
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(get_s3_prefix(folder_name))
+            .delimiter("/")
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
         map_list_objects_to_directory(list_objects_output)
@@ -137,13 +141,13 @@ impl S3Storage {
 
     async fn rename_file(&self, current: String, new: String) -> Result<(), Error> {
         self.s3_client
-            .copy_object(CopyObjectRequest {
-                bucket: self.bucket.clone(),
-                copy_source: get_s3_copy_source(&self.bucket, &current),
-                key: new,
-                ..Default::default()
-            })
+            .copy_object()
+            .bucket(&self.bucket)
+            .copy_source(get_s3_copy_source(&self.bucket, &current))
+            .key(&new)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
         self.remove_file(current).await?;
@@ -160,14 +164,14 @@ impl S3Storage {
         loop {
             let objects = self
                 .s3_client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(current_prefix.clone()),
-                    continuation_token: continuation_token.clone(),
-                    delimiter: None,
-                    ..Default::default()
-                })
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&current_prefix)
+                .set_continuation_token(continuation_token.clone())
+                .set_delimiter(None)
+                .send()
                 .await
+                .map_err(aws_sdk_s3::Error::from)
                 .map_err(map_err)?;
 
             continuation_token = objects.continuation_token;
@@ -194,27 +198,15 @@ impl S3Storage {
 #[async_trait]
 impl Storage for S3Storage {
     async fn init(&self) -> Result<(), Error> {
-        let head_response = self
-            .s3_client
-            .head_bucket(HeadBucketRequest {
-                bucket: self.bucket.clone(),
-                ..Default::default()
-            })
-            .await;
+        self.s3_client
+            .head_bucket()
+            .bucket(&self.bucket)
+            .send()
+            .await
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
-        match head_response {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                self.s3_client
-                    .create_bucket(CreateBucketRequest {
-                        bucket: self.bucket.clone(),
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(map_err)?;
-                Ok(())
-            }
-        }
+        Ok(())
     }
 
     fn get_home(&self, user: &str) -> String {
@@ -226,11 +218,11 @@ impl Storage for S3Storage {
 
         let result = self
             .s3_client
-            .head_bucket(HeadBucketRequest {
-                bucket: self.bucket.clone(),
-                ..Default::default()
-            })
+            .head_bucket()
+            .bucket(&self.bucket)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err);
 
         match result {
@@ -256,21 +248,20 @@ impl Storage for S3Storage {
 
         let object = self
             .s3_client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key: authorized_keys_key,
-                ..Default::default()
-            })
+            .get_object()
+            .bucket(&self.bucket)
+            .key(authorized_keys_key)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
-        let body = match object.body {
-            Some(body) => body,
-            None => return Ok(vec![]),
-        };
-
         let mut buffer = String::new();
-        body.into_async_read().read_to_string(&mut buffer).await?;
+        object
+            .body
+            .into_async_read()
+            .read_to_string(&mut buffer)
+            .await?;
 
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
@@ -300,17 +291,16 @@ impl Storage for S3Storage {
         }
 
         let prefix = get_s3_prefix(&dir_handle.prefix);
-
         let objects = self
             .s3_client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(prefix),
-                continuation_token: dir_handle.continuation_token.clone(),
-                delimiter: Some("/".to_owned()),
-                ..Default::default()
-            })
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(&prefix)
+            .set_continuation_token(dir_handle.continuation_token.clone())
+            .delimiter("/")
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
         dir_handle.continuation_token = objects.next_continuation_token.clone();
@@ -325,12 +315,12 @@ impl Storage for S3Storage {
             directories until the directories are explicitly deleted.
         */
         self.s3_client
-            .put_object(PutObjectRequest {
-                bucket: self.bucket.clone(),
-                key: get_s3_folder_marker(&dir_name),
-                ..Default::default()
-            })
+            .put_object()
+            .bucket(&self.bucket)
+            .key(get_s3_folder_marker(&dir_name))
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
         Ok(())
@@ -343,14 +333,14 @@ impl Storage for S3Storage {
         loop {
             let objects = self
                 .s3_client
-                .list_objects_v2(ListObjectsV2Request {
-                    bucket: self.bucket.clone(),
-                    prefix: Some(prefix.clone()),
-                    continuation_token: continuation_token.clone(),
-                    delimiter: None,
-                    ..Default::default()
-                })
+                .list_objects_v2()
+                .bucket(&self.bucket)
+                .prefix(&prefix)
+                .set_continuation_token(continuation_token.clone())
+                .set_delimiter(None)
+                .send()
                 .await
+                .map_err(aws_sdk_s3::Error::from)
                 .map_err(map_err)?;
 
             continuation_token = objects.continuation_token;
@@ -374,12 +364,12 @@ impl Storage for S3Storage {
     async fn get_file_metadata(&self, file_name: String) -> Result<File, Error> {
         let head_object_response = self
             .s3_client
-            .head_object(HeadObjectRequest {
-                bucket: self.bucket.clone(),
-                key: file_name.clone(),
-                ..Default::default()
-            })
+            .head_object()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err);
 
         match head_object_response {
@@ -411,18 +401,15 @@ impl Storage for S3Storage {
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
         let read_response = self
             .s3_client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key: file_name.clone(),
-                ..Default::default()
-            })
+            .get_object()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
-        let read_stream = read_response
-            .body
-            .ok_or_else(|| Error::Storage("Read stream body is not available.".to_string()))?
-            .into_async_read();
+        let read_stream = read_response.body.into_async_read();
 
         self.handle_manager
             .create_read_handle(ReadHandle::new(file_name, Box::pin(read_stream)))
@@ -452,12 +439,12 @@ impl Storage for S3Storage {
     async fn open_write_handle(&self, file_name: String) -> Result<String, Error> {
         let multipart_response = self
             .s3_client
-            .create_multipart_upload(CreateMultipartUploadRequest {
-                bucket: self.bucket.clone(),
-                key: file_name,
-                ..Default::default()
-            })
+            .create_multipart_upload()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
         let write_handle = map_create_multipart_response_to_write_handle(multipart_response)?;
@@ -489,17 +476,19 @@ impl Storage for S3Storage {
 
             self.complete_part_upload(&mut write_handle).await?;
 
+            let complete_multipart_upload = CompletedMultipartUpload::builder()
+                .set_parts(Some(write_handle.completed_parts.clone()))
+                .build();
+
             self.s3_client
-                .complete_multipart_upload(CompleteMultipartUploadRequest {
-                    bucket: self.bucket.clone(),
-                    key: write_handle.key.clone(),
-                    upload_id: write_handle.upload_id.clone(),
-                    multipart_upload: Some(CompletedMultipartUpload {
-                        parts: Some(write_handle.completed_parts.clone()),
-                    }),
-                    ..Default::default()
-                })
+                .complete_multipart_upload()
+                .bucket(&self.bucket)
+                .key(&write_handle.key)
+                .multipart_upload(complete_multipart_upload)
+                .upload_id(&write_handle.upload_id)
+                .send()
                 .await
+                .map_err(aws_sdk_s3::Error::from)
                 .map_err(map_err)?;
         }
 
@@ -509,12 +498,12 @@ impl Storage for S3Storage {
 
     async fn remove_file(&self, file_name: String) -> Result<(), Error> {
         self.s3_client
-            .delete_object(DeleteObjectRequest {
-                bucket: self.bucket.clone(),
-                key: file_name,
-                ..Default::default()
-            })
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
+            .map_err(aws_sdk_s3::Error::from)
             .map_err(map_err)?;
 
         Ok(())
@@ -585,7 +574,9 @@ fn get_s3_folder_marker(dir_name: &str) -> String {
     format!("{}_$folder$", prefix)
 }
 
-fn map_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
+fn map_list_objects_to_files(
+    list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output,
+) -> Vec<File> {
     let files = list_objects.contents.unwrap_or_default();
 
     let directories = list_objects.common_prefixes.unwrap_or_default();
@@ -617,12 +608,16 @@ fn map_object_to_file(object: &Object) -> File {
             gid: None,
             permissions: Some(0o100777),
             atime: None,
-            mtime: map_rfc3339_to_epoch(object.last_modified.as_ref()),
+            mtime: object
+                .last_modified
+                .map(|last_modified| (last_modified.to_millis().unwrap_or_default() / 1000) as u32),
         },
     }
 }
 
-fn map_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Result<File, Error> {
+fn map_list_objects_to_directory(
+    list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output,
+) -> Result<File, Error> {
     let contents = list_objects.contents.unwrap_or_default();
 
     let prefix = match list_objects.prefix {
@@ -630,11 +625,12 @@ fn map_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Result<Fi
         None => return Err(Error::NoSuchFile),
     };
 
-    match contents.is_empty() {
-        true => Err(Error::NoSuchFile),
-        false => Ok(map_prefix_to_file(&CommonPrefix {
-            prefix: Some(prefix),
-        })),
+    if contents.is_empty() {
+        Err(Error::NoSuchFile)
+    } else {
+        Ok(map_prefix_to_file(
+            &CommonPrefix::builder().prefix(prefix).build(),
+        ))
     }
 }
 
@@ -664,7 +660,10 @@ fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
     }
 }
 
-fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
+fn map_head_object_to_file(
+    key: &str,
+    head_object: &aws_sdk_s3::operation::head_object::HeadObjectOutput,
+) -> File {
     let mut key_pieces = key.rsplit('/');
     let file_name = key_pieces.next().unwrap_or("");
 
@@ -683,20 +682,8 @@ fn map_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
     }
 }
 
-fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
-    rfc3339.map(|last_modified| {
-        last_modified
-            .parse::<DateTime<Utc>>()
-            .unwrap_or_else(|_e| match Utc.timestamp_opt(0, 0) {
-                chrono::LocalResult::Single(timestamp) => timestamp,
-                _ => DateTime::<Utc>::MIN_UTC,
-            })
-            .timestamp() as u32
-    })
-}
-
 fn map_create_multipart_response_to_write_handle(
-    create_multipart_response: CreateMultipartUploadOutput,
+    create_multipart_response: aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadOutput,
 ) -> Result<WriteHandle, Error> {
     let upload_id = match create_multipart_response.upload_id {
         Some(upload_id) => Ok(upload_id),
@@ -720,35 +707,24 @@ fn get_default_endpoint_region() -> String {
     String::from("custom")
 }
 
-fn map_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
-    match rusoto_error {
-        rusoto_core::RusotoError::Service(error) => {
-            if "The specified key does not exist." == error.to_string() {
-                Error::NoSuchFile
-            } else {
-                Error::Storage(error.to_string())
-            }
-        }
-        rusoto_core::RusotoError::Unknown(http_response) => {
-            if 404 == http_response.status.as_u16() {
-                Error::NoSuchFile
-            } else {
-                Error::Storage(format!(
-                    "{} - {}",
-                    http_response.status,
-                    http_response.body_as_str()
-                ))
-            }
-        }
-        _ => Error::Storage(rusoto_error.to_string()),
+fn map_err(s3_sdk_error: aws_sdk_s3::Error) -> Error {
+    match s3_sdk_error {
+        aws_sdk_s3::Error::NoSuchKey(_) => Error::NoSuchFile,
+        aws_sdk_s3::Error::NotFound(_) => Error::NoSuchFile,
+        _ => Error::Storage(s3_sdk_error.to_string()),
     }
 }
 
 #[cfg(test)]
 mod test {
-    use bytes::Bytes;
-    use rusoto_core::request::BufferedHttpResponse;
-    use rusoto_s3::{GetObjectError, UploadPartError};
+    use aws_sdk_s3::{
+        operation::{
+            create_multipart_upload::CreateMultipartUploadOutput, head_object::HeadObjectOutput,
+            list_objects_v2::ListObjectsV2Output,
+        },
+        primitives::DateTime,
+        types::error::{BucketAlreadyOwnedByYou, NoSuchKey, NotFound},
+    };
 
     use super::*;
 
@@ -792,19 +768,21 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_files() {
-        let list_objects = ListObjectsV2Output {
-            common_prefixes: Some(vec![CommonPrefix {
-                prefix: Some("users/test/subfolder/".to_owned()),
-            }]),
-            contents: Some(vec![Object {
-                key: Some("users/test/file.txt".to_owned()),
-                size: Some(1),
-                last_modified: Some(String::from("2014-11-28T12:00:09Z")),
-                ..Default::default()
-            }]),
-            continuation_token: Some(String::from("token")),
-            ..Default::default()
-        };
+        let list_objects = ListObjectsV2Output::builder()
+            .common_prefixes(
+                CommonPrefix::builder()
+                    .prefix("users/test/subfolder/")
+                    .build(),
+            )
+            .contents(
+                Object::builder()
+                    .key("users/test/file.txt")
+                    .size(1)
+                    .last_modified(DateTime::from_millis(1417176009000))
+                    .build(),
+            )
+            .continuation_token("token")
+            .build();
 
         let result = map_list_objects_to_files(list_objects);
 
@@ -841,19 +819,10 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_files_with_directory_marker() {
-        let list_objects = ListObjectsV2Output {
-            contents: Some(vec![
-                Object {
-                    key: Some("users/test/file.txt".to_owned()),
-                    ..Default::default()
-                },
-                Object {
-                    key: Some("users/test/_$folder$".to_owned()),
-                    ..Default::default()
-                },
-            ]),
-            ..Default::default()
-        };
+        let list_objects = ListObjectsV2Output::builder()
+            .contents(Object::builder().key("users/test/file.txt").build())
+            .contents(Object::builder().key("users/test/_$folder$").build())
+            .build();
 
         let result = map_list_objects_to_files(list_objects);
 
@@ -863,9 +832,7 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_files_with_missing_data() {
-        let list_objects = ListObjectsV2Output {
-            ..Default::default()
-        };
+        let list_objects = ListObjectsV2Output::builder().build();
 
         let result = map_list_objects_to_files(list_objects);
 
@@ -874,9 +841,7 @@ mod test {
 
     #[test]
     fn test_map_object_to_file_with_missing_data() {
-        let object = Object {
-            ..Default::default()
-        };
+        let object = Object::builder().build();
 
         assert_eq!(
             File {
@@ -896,13 +861,12 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
-            prefix: Some("directory/subdirectory/".to_string()),
-            contents: Some(vec![Object {
-                ..Default::default()
-            }]),
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .prefix("directory/subdirectory/")
+            .contents(Object::builder().build())
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(
             Ok(File {
@@ -922,40 +886,43 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory_with_none_contents() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
-            prefix: Some("directory/subdirectory/".to_string()),
-            contents: None,
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .prefix("directory/subdirectory/")
+            .set_contents(None)
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(Err(Error::NoSuchFile), directory);
     }
 
     #[test]
     fn test_map_list_objects_to_directory_with_0_contents() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
-            prefix: Some("directory/subdirectory/".to_string()),
-            contents: Some(vec![]),
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .prefix("directory/subdirectory/")
+            .set_contents(Some(vec![]))
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(Err(Error::NoSuchFile), directory);
     }
 
     #[test]
     fn test_map_list_objects_to_directory_with_no_prefix() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
-            prefix: None,
-            contents: Some(vec![]),
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .set_prefix(None)
+            .set_contents(Some(vec![]))
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(Err(Error::NoSuchFile), directory);
     }
 
     #[test]
     fn test_map_prefix_to_file_with_missing_data() {
-        let prefix = CommonPrefix { prefix: None };
+        let prefix = CommonPrefix::builder().build();
 
         assert_eq!(
             File {
@@ -975,9 +942,7 @@ mod test {
 
     #[test]
     fn test_map_head_object_to_file() {
-        let head_object = HeadObjectOutput {
-            ..Default::default()
-        };
+        let head_object = HeadObjectOutput::builder().build();
 
         assert_eq!(
             File {
@@ -996,33 +961,11 @@ mod test {
     }
 
     #[test]
-    fn test_map_rfc3339_to_epoch_maps_valid_date() {
-        assert_eq!(
-            Some(1417176009),
-            map_rfc3339_to_epoch(Some(String::from("2014-11-28T12:00:09Z")).as_ref())
-        );
-    }
-
-    #[test]
-    fn test_map_rfc3339_to_epoch_maps_none_to_unix_epoch() {
-        assert_eq!(None, map_rfc3339_to_epoch(None));
-    }
-
-    #[test]
-    fn test_map_rfc3339_to_epoch_maps_invalid_date_to_unix_epoch() {
-        assert_eq!(
-            Some(0),
-            map_rfc3339_to_epoch(Some(String::from("invalid")).as_ref())
-        );
-    }
-
-    #[test]
     fn test_map_create_multipart_response_to_write_handle() {
-        let multipart_response = CreateMultipartUploadOutput {
-            upload_id: Some(String::from("id")),
-            key: Some(String::from("key")),
-            ..Default::default()
-        };
+        let multipart_response = CreateMultipartUploadOutput::builder()
+            .upload_id("id")
+            .key("key")
+            .build();
 
         let write_handle =
             map_create_multipart_response_to_write_handle(multipart_response).unwrap();
@@ -1035,77 +978,43 @@ mod test {
 
     #[test]
     fn test_map_create_multipart_response_to_write_handle_with_missing_multipart_id() {
-        let multipart_response = CreateMultipartUploadOutput {
-            key: Some(String::from("key")),
-            ..Default::default()
-        };
+        let multipart_response = CreateMultipartUploadOutput::builder().key("key").build();
 
         assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 
     #[test]
     fn test_map_create_multipart_response_to_write_handle_with_missing_key() {
-        let multipart_response = CreateMultipartUploadOutput {
-            upload_id: Some(String::from("id")),
-            ..Default::default()
-        };
+        let multipart_response = CreateMultipartUploadOutput::builder()
+            .upload_id("id")
+            .build();
 
         assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 
     #[test]
-    fn test_map_err_maps_404_to_no_such_file() {
-        let not_found_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
-            status: http::StatusCode::NOT_FOUND,
-            body: Bytes::from(&b"test"[..]),
-            headers: http::HeaderMap::<String>::with_capacity(0),
-        });
-
-        assert_eq!(Error::NoSuchFile, map_err(not_found_error));
+    fn test_map_err_maps_not_found_to_no_such_file() {
+        assert_eq!(
+            Error::NoSuchFile,
+            map_err(aws_sdk_s3::Error::NotFound(NotFound::builder().build()))
+        );
     }
 
     #[test]
     fn test_map_err_maps_missing_key_to_no_such_file() {
-        let not_found_error = RusotoError::Service::<GetObjectError>(GetObjectError::NoSuchKey(
-            "The specified key does not exist.".to_string(),
-        ));
-
-        assert_eq!(Error::NoSuchFile, map_err(not_found_error));
-    }
-
-    #[test]
-    fn test_map_error_maps_error_code_to_storage_error() {
-        let internal_server_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
-            status: http::StatusCode::INTERNAL_SERVER_ERROR,
-            body: Bytes::from(&b"test"[..]),
-            headers: http::HeaderMap::<String>::with_capacity(0),
-        });
-
         assert_eq!(
-            Error::Storage(String::from("500 Internal Server Error - test")),
-            map_err(internal_server_error)
-        );
-    }
-
-    #[test]
-    fn test_map_err_maps_unknown_service_error_to_storage_error() {
-        let not_found_error = RusotoError::Service::<GetObjectError>(
-            GetObjectError::InvalidObjectState("Unknown".to_string()),
-        );
-
-        assert_eq!(
-            Error::Storage(String::from("Unknown")),
-            map_err(not_found_error)
+            Error::NoSuchFile,
+            map_err(aws_sdk_s3::Error::NoSuchKey(NoSuchKey::builder().build()))
         );
     }
 
     #[test]
     fn test_map_error_maps_generic_error_to_storage_error() {
         assert_eq!(
-            Error::Storage(String::from("parse error")),
-            map_err(RusotoError::ParseError::<UploadPartError>(String::from(
-                "parse error"
-            )))
+            Error::Storage("BucketAlreadyOwnedByYou".to_string()),
+            map_err(aws_sdk_s3::Error::BucketAlreadyOwnedByYou(
+                BucketAlreadyOwnedByYou::builder().build()
+            ))
         );
     }
 }
