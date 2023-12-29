@@ -275,22 +275,21 @@ impl Storage for S3Storage {
         let authorized_keys_key = format!(".ssh/{}/authorized_keys", user);
 
         let object = self
-            .legacy_s3_client
-            .get_object(GetObjectRequest {
-                bucket: self.bucket.clone(),
-                key: authorized_keys_key,
-                ..Default::default()
-            })
+            .s3_client
+            .get_object()
+            .bucket(&self.bucket)
+            .key(authorized_keys_key)
+            .send()
             .await
-            .map_err(map_legacy_err)?;
-
-        let body = match object.body {
-            Some(body) => body,
-            None => return Ok(vec![]),
-        };
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         let mut buffer = String::new();
-        body.into_async_read().read_to_string(&mut buffer).await?;
+        object
+            .body
+            .into_async_read()
+            .read_to_string(&mut buffer)
+            .await?;
 
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
