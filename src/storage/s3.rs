@@ -7,6 +7,7 @@ use crate::protocol::response::name::File;
 use crate::ssh_keys;
 use async_trait::async_trait;
 use aws_config::BehaviorVersion;
+use aws_config::Region;
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::CommonPrefix;
 use aws_sdk_s3::types::CompletedMultipartUpload;
@@ -58,6 +59,8 @@ impl S3StorageFactory {
         if config.endpoint_url().is_some() {
             s3_sdk_config = s3_sdk_config.force_path_style(true);
         }
+
+        s3_sdk_config = s3_sdk_config.region(Region::new(s3_config.endpoint_region.clone()));
 
         let s3_client = aws_sdk_s3::Client::from_conf(s3_sdk_config.build());
 
