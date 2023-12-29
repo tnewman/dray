@@ -34,16 +34,9 @@ jobs:
 
       - name: Run cargo clippy
         run: cargo clippy --tests -- -Dwarnings
-
-      - name: Start Backing Services
-        run: docker compose up -d
       
       - name: Run cargo test
         run: cargo test -- --test-threads=1
-      
-      - name: Stop Backing Services
-        if: always()
-        run: docker compose down
 
   release-build:
     name: Release Build
