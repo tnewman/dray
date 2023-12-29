@@ -340,14 +340,14 @@ impl Storage for S3Storage {
             S3 does not support creating empty prefixes. A marker file must be added to preserve empty
             directories until the directories are explicitly deleted.
         */
-        self.legacy_s3_client
-            .put_object(PutObjectRequest {
-                bucket: self.bucket.clone(),
-                key: get_s3_folder_marker(&dir_name),
-                ..Default::default()
-            })
+        self.s3_client
+            .put_object()
+            .bucket(&self.bucket)
+            .key(get_s3_folder_marker(&dir_name))
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         Ok(())
     }
