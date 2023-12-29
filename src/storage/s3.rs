@@ -155,17 +155,15 @@ impl S3Storage {
     }
 
     async fn get_directory_metadata(&self, folder_name: &str) -> Result<File, Error> {
-        let list_objects_output = self
-            .legacy_s3_client
-            .list_objects_v2(ListObjectsV2Request {
-                bucket: self.bucket.clone(),
-                prefix: Some(get_s3_prefix(folder_name)),
-                continuation_token: None,
-                delimiter: Some("/".to_owned()),
-                ..Default::default()
-            })
+        let list_objects_output = self.s3_client
+            .list_objects_v2()
+            .bucket(&self.bucket)
+            .prefix(get_s3_prefix(folder_name))
+            .delimiter("/")
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         map_list_objects_to_directory(list_objects_output)
     }
@@ -659,7 +657,24 @@ fn map_object_to_file(object: &Object) -> File {
     }
 }
 
-fn map_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Result<File, Error> {
+fn map_list_objects_to_directory(list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output) -> Result<File, Error> {
+    let contents = list_objects.contents.unwrap_or_default();
+
+    let prefix = match list_objects.prefix {
+        Some(prefix) => prefix,
+        None => return Err(Error::NoSuchFile),
+    };
+
+    if contents.is_empty() {
+        Err(Error::NoSuchFile)
+    } else {
+        Ok(map_prefix_to_file(&CommonPrefix {
+            prefix: Some(prefix),
+        }))
+    }
+}
+
+fn map_legacy_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Result<File, Error> {
     let contents = list_objects.contents.unwrap_or_default();
 
     let prefix = match list_objects.prefix {
@@ -940,7 +955,7 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
             prefix: Some("directory/subdirectory/".to_string()),
             contents: Some(vec![Object {
                 ..Default::default()
@@ -966,7 +981,7 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory_with_none_contents() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
             prefix: Some("directory/subdirectory/".to_string()),
             contents: None,
             ..Default::default()
@@ -977,7 +992,7 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory_with_0_contents() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
             prefix: Some("directory/subdirectory/".to_string()),
             contents: Some(vec![]),
             ..Default::default()
@@ -988,7 +1003,7 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory_with_no_prefix() {
-        let directory = map_list_objects_to_directory(ListObjectsV2Output {
+        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
             prefix: None,
             contents: Some(vec![]),
             ..Default::default()
