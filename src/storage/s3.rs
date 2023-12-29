@@ -226,27 +226,16 @@ impl S3Storage {
 #[async_trait]
 impl Storage for S3Storage {
     async fn init(&self) -> Result<(), Error> {
-        let head_response = self
-            .legacy_s3_client
-            .head_bucket(HeadBucketRequest {
-                bucket: self.bucket.clone(),
-                ..Default::default()
-            })
-            .await;
+        self
+            .s3_client
+            .head_bucket()
+            .bucket(&self.bucket)
+            .send()
+            .await
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
-        match head_response {
-            Ok(_) => Ok(()),
-            Err(_) => {
-                self.legacy_s3_client
-                    .create_bucket(CreateBucketRequest {
-                        bucket: self.bucket.clone(),
-                        ..Default::default()
-                    })
-                    .await
-                    .map_err(map_legacy_err)?;
-                Ok(())
-            }
-        }
+        Ok(())
     }
 
     fn get_home(&self, user: &str) -> String {
@@ -257,13 +246,13 @@ impl Storage for S3Storage {
         info!("Running health check for S3 Bucket {}", self.bucket);
 
         let result = self
-            .legacy_s3_client
-            .head_bucket(HeadBucketRequest {
-                bucket: self.bucket.clone(),
-                ..Default::default()
-            })
+            .s3_client
+            .head_bucket()
+            .bucket(&self.bucket)
+            .send()
             .await
-            .map_err(map_legacy_err);
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err);
 
         match result {
             Ok(_) => {
