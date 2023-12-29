@@ -18,7 +18,6 @@ use rusoto_core::RusotoError;
 use rusoto_s3::CreateBucketRequest;
 use rusoto_s3::CreateMultipartUploadOutput;
 use rusoto_s3::CreateMultipartUploadRequest;
-use rusoto_s3::DeleteObjectRequest;
 use rusoto_s3::HeadBucketRequest;
 use rusoto_s3::HeadObjectRequest;
 use rusoto_s3::PutObjectRequest;
@@ -154,7 +153,8 @@ impl S3Storage {
     }
 
     async fn get_directory_metadata(&self, folder_name: &str) -> Result<File, Error> {
-        let list_objects_output = self.s3_client
+        let list_objects_output = self
+            .s3_client
             .list_objects_v2()
             .bucket(&self.bucket)
             .prefix(get_s3_prefix(folder_name))
@@ -542,14 +542,14 @@ impl Storage for S3Storage {
     }
 
     async fn remove_file(&self, file_name: String) -> Result<(), Error> {
-        self.legacy_s3_client
-            .delete_object(DeleteObjectRequest {
-                bucket: self.bucket.clone(),
-                key: file_name,
-                ..Default::default()
-            })
+        self.s3_client
+            .delete_object()
+            .bucket(&self.bucket)
+            .key(&file_name)
+            .send()
             .await
-            .map_err(map_legacy_err)?;
+            .map_err(aws_sdk_s3::Error::from)
+            .map_err(map_err)?;
 
         Ok(())
     }
@@ -656,7 +656,9 @@ fn map_object_to_file(object: &Object) -> File {
     }
 }
 
-fn map_list_objects_to_directory(list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output) -> Result<File, Error> {
+fn map_list_objects_to_directory(
+    list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output,
+) -> Result<File, Error> {
     let contents = list_objects.contents.unwrap_or_default();
 
     let prefix = match list_objects.prefix {
