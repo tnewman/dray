@@ -8,15 +8,12 @@ use crate::ssh_keys;
 use async_trait::async_trait;
 use aws_config::BehaviorVersion;
 use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::CommonPrefix;
 use aws_sdk_s3::types::CompletedMultipartUpload;
 use aws_sdk_s3::types::CompletedPart;
+use aws_sdk_s3::types::Object;
 use bytes::BufMut;
-use chrono::{DateTime, TimeZone, Utc};
 use log::{error, info};
-use rusoto_core::Region;
-use rusoto_core::RusotoError;
-use rusoto_s3::CreateMultipartUploadOutput;
-use rusoto_s3::{CommonPrefix, HeadObjectOutput, ListObjectsV2Output, Object, S3Client};
 use serde::Deserialize;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -36,21 +33,12 @@ pub struct S3Config {
 }
 
 pub struct S3StorageFactory {
-    legacy_s3_client: S3Client,
     s3_client: aws_sdk_s3::Client,
     bucket: String,
 }
 
 impl S3StorageFactory {
     pub async fn new(s3_config: &S3Config) -> S3StorageFactory {
-        let legacy_region = match &s3_config.endpoint_name {
-            Some(endpoint_name) => Region::Custom {
-                name: s3_config.endpoint_region.clone(),
-                endpoint: endpoint_name.clone(),
-            },
-            None => Region::default(),
-        };
-
         let mut config_loader = aws_config::defaults(BehaviorVersion::latest());
 
         if let Some(endpoint_name) = &s3_config.endpoint_name {
@@ -75,7 +63,6 @@ impl S3StorageFactory {
 
         S3StorageFactory {
             s3_client,
-            legacy_s3_client: S3Client::new(legacy_region),
             bucket: s3_config.bucket.clone(),
         }
     }
@@ -84,30 +71,20 @@ impl S3StorageFactory {
 #[async_trait]
 impl StorageFactory for S3StorageFactory {
     fn create_storage(&self) -> Arc<dyn Storage> {
-        Arc::new(S3Storage::new(
-            self.s3_client.clone(),
-            self.legacy_s3_client.clone(),
-            self.bucket.clone(),
-        ))
+        Arc::new(S3Storage::new(self.s3_client.clone(), self.bucket.clone()))
     }
 }
 
 pub struct S3Storage {
     s3_client: aws_sdk_s3::Client,
-    legacy_s3_client: S3Client,
     bucket: String,
     handle_manager: HandleManager<ReadHandle, WriteHandle, DirHandle>,
 }
 
 impl S3Storage {
-    pub fn new(
-        s3_client: aws_sdk_s3::Client,
-        legacy_s3_client: S3Client,
-        bucket: String,
-    ) -> S3Storage {
+    pub fn new(s3_client: aws_sdk_s3::Client, bucket: String) -> S3Storage {
         S3Storage {
             s3_client,
-            legacy_s3_client,
             bucket,
             handle_manager: HandleManager::new(),
         }
@@ -611,22 +588,7 @@ fn map_list_objects_to_files(
     mapped_dirs.chain(mapped_files).collect()
 }
 
-fn map_legacy_list_objects_to_files(list_objects: ListObjectsV2Output) -> Vec<File> {
-    let files = list_objects.contents.unwrap_or_default();
-
-    let directories = list_objects.common_prefixes.unwrap_or_default();
-
-    let mapped_files = files
-        .iter()
-        .map(map_legacy_object_to_file)
-        .filter(|file| !file.file_name.ends_with("_$folder$"));
-
-    let mapped_dirs = directories.iter().map(map_legacy_prefix_to_file);
-
-    mapped_dirs.chain(mapped_files).collect()
-}
-
-fn map_object_to_file(object: &aws_sdk_s3::types::Object) -> File {
+fn map_object_to_file(object: &Object) -> File {
     let key = match &object.key {
         Some(key) => key,
         None => "",
@@ -650,28 +612,6 @@ fn map_object_to_file(object: &aws_sdk_s3::types::Object) -> File {
     }
 }
 
-fn map_legacy_object_to_file(object: &Object) -> File {
-    let key = match &object.key {
-        Some(key) => key,
-        None => "",
-    };
-
-    let mut key_pieces = key.rsplit('/');
-    let file_name = key_pieces.next().unwrap_or("");
-
-    File {
-        file_name: file_name.to_string(),
-        file_attributes: FileAttributes {
-            size: object.size.map(|size| size as u64),
-            uid: None,
-            gid: None,
-            permissions: Some(0o100777),
-            atime: None,
-            mtime: map_rfc3339_to_epoch(object.last_modified.as_ref()),
-        },
-    }
-}
-
 fn map_list_objects_to_directory(
     list_objects: aws_sdk_s3::operation::list_objects_v2::ListObjectsV2Output,
 ) -> Result<File, Error> {
@@ -685,55 +625,13 @@ fn map_list_objects_to_directory(
     if contents.is_empty() {
         Err(Error::NoSuchFile)
     } else {
-        Ok(map_legacy_prefix_to_file(&CommonPrefix {
-            prefix: Some(prefix),
-        }))
+        Ok(map_prefix_to_file(
+            &CommonPrefix::builder().prefix(prefix).build(),
+        ))
     }
 }
 
-fn map_legacy_list_objects_to_directory(list_objects: ListObjectsV2Output) -> Result<File, Error> {
-    let contents = list_objects.contents.unwrap_or_default();
-
-    let prefix = match list_objects.prefix {
-        Some(prefix) => prefix,
-        None => return Err(Error::NoSuchFile),
-    };
-
-    match contents.is_empty() {
-        true => Err(Error::NoSuchFile),
-        false => Ok(map_legacy_prefix_to_file(&CommonPrefix {
-            prefix: Some(prefix),
-        })),
-    }
-}
-
-fn map_prefix_to_file(prefix: &aws_sdk_s3::types::CommonPrefix) -> File {
-    let prefix = match prefix.prefix {
-        Some(ref prefix) => {
-            let mut prefix = prefix.to_string();
-            prefix.pop(); // strip trailing /
-            format!("/{}", prefix)
-        }
-        None => "".to_owned(),
-    };
-
-    let mut prefix_pieces = prefix.rsplit('/');
-    let file_name = prefix_pieces.next().unwrap_or("");
-
-    File {
-        file_name: file_name.to_string(),
-        file_attributes: FileAttributes {
-            size: None,
-            uid: None,
-            gid: None,
-            permissions: Some(0o40777),
-            atime: None,
-            mtime: None,
-        },
-    }
-}
-
-fn map_legacy_prefix_to_file(prefix: &CommonPrefix) -> File {
+fn map_prefix_to_file(prefix: &CommonPrefix) -> File {
     let prefix = match prefix.prefix {
         Some(ref prefix) => {
             let mut prefix = prefix.to_string();
@@ -781,60 +679,8 @@ fn map_head_object_to_file(
     }
 }
 
-fn map_legacy_head_object_to_file(key: &str, head_object: &HeadObjectOutput) -> File {
-    let mut key_pieces = key.rsplit('/');
-    let file_name = key_pieces.next().unwrap_or("");
-
-    File {
-        file_name: file_name.to_string(),
-        file_attributes: FileAttributes {
-            size: head_object
-                .content_length
-                .map(|content_length| content_length as u64),
-            uid: None,
-            gid: None,
-            permissions: Some(0o100777),
-            atime: None,
-            mtime: None,
-        },
-    }
-}
-
-fn map_rfc3339_to_epoch(rfc3339: Option<&String>) -> Option<u32> {
-    rfc3339.map(|last_modified| {
-        last_modified
-            .parse::<DateTime<Utc>>()
-            .unwrap_or_else(|_e| match Utc.timestamp_opt(0, 0) {
-                chrono::LocalResult::Single(timestamp) => timestamp,
-                _ => DateTime::<Utc>::MIN_UTC,
-            })
-            .timestamp() as u32
-    })
-}
-
 fn map_create_multipart_response_to_write_handle(
     create_multipart_response: aws_sdk_s3::operation::create_multipart_upload::CreateMultipartUploadOutput,
-) -> Result<WriteHandle, Error> {
-    let upload_id = match create_multipart_response.upload_id {
-        Some(upload_id) => Ok(upload_id),
-        None => Err(Error::Storage("Missing upload id.".to_string())),
-    }?;
-
-    let key = match create_multipart_response.key {
-        Some(key) => Ok(key),
-        None => Err(Error::Storage("Missing key.".to_string())),
-    }?;
-
-    Ok(WriteHandle {
-        key,
-        upload_id,
-        completed_parts: Vec::new(),
-        buffer: Vec::with_capacity(5000000),
-    })
-}
-
-fn map_legacy_create_multipart_response_to_write_handle(
-    create_multipart_response: CreateMultipartUploadOutput,
 ) -> Result<WriteHandle, Error> {
     let upload_id = match create_multipart_response.upload_id {
         Some(upload_id) => Ok(upload_id),
@@ -860,40 +706,22 @@ fn get_default_endpoint_region() -> String {
 
 fn map_err(s3_sdk_error: aws_sdk_s3::Error) -> Error {
     match s3_sdk_error {
+        aws_sdk_s3::Error::NoSuchKey(_) => Error::NoSuchFile,
         aws_sdk_s3::Error::NotFound(_) => Error::NoSuchFile,
         _ => Error::Storage(s3_sdk_error.to_string()),
     }
 }
 
-fn map_legacy_err<E: std::error::Error + 'static>(rusoto_error: RusotoError<E>) -> Error {
-    match rusoto_error {
-        rusoto_core::RusotoError::Service(error) => {
-            if "The specified key does not exist." == error.to_string() {
-                Error::NoSuchFile
-            } else {
-                Error::Storage(error.to_string())
-            }
-        }
-        rusoto_core::RusotoError::Unknown(http_response) => {
-            if 404 == http_response.status.as_u16() {
-                Error::NoSuchFile
-            } else {
-                Error::Storage(format!(
-                    "{} - {}",
-                    http_response.status,
-                    http_response.body_as_str()
-                ))
-            }
-        }
-        _ => Error::Storage(rusoto_error.to_string()),
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use bytes::Bytes;
-    use rusoto_core::request::BufferedHttpResponse;
-    use rusoto_s3::{GetObjectError, UploadPartError};
+    use aws_sdk_s3::{
+        operation::{
+            create_multipart_upload::CreateMultipartUploadOutput, head_object::HeadObjectOutput,
+            list_objects_v2::ListObjectsV2Output,
+        },
+        primitives::DateTime,
+        types::error::{BucketAlreadyOwnedByYou, NoSuchKey, NotFound},
+    };
 
     use super::*;
 
@@ -937,21 +765,23 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_files() {
-        let list_objects = ListObjectsV2Output {
-            common_prefixes: Some(vec![CommonPrefix {
-                prefix: Some("users/test/subfolder/".to_owned()),
-            }]),
-            contents: Some(vec![Object {
-                key: Some("users/test/file.txt".to_owned()),
-                size: Some(1),
-                last_modified: Some(String::from("2014-11-28T12:00:09Z")),
-                ..Default::default()
-            }]),
-            continuation_token: Some(String::from("token")),
-            ..Default::default()
-        };
+        let list_objects = ListObjectsV2Output::builder()
+            .common_prefixes(
+                CommonPrefix::builder()
+                    .prefix("users/test/subfolder/")
+                    .build(),
+            )
+            .contents(
+                Object::builder()
+                    .key("users/test/file.txt")
+                    .size(1)
+                    .last_modified(DateTime::from_millis(1417176009000))
+                    .build(),
+            )
+            .continuation_token("token")
+            .build();
 
-        let result = map_legacy_list_objects_to_files(list_objects);
+        let result = map_list_objects_to_files(list_objects);
 
         assert_eq!(2, result.len());
         assert_eq!(
@@ -986,21 +816,12 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_files_with_directory_marker() {
-        let list_objects = ListObjectsV2Output {
-            contents: Some(vec![
-                Object {
-                    key: Some("users/test/file.txt".to_owned()),
-                    ..Default::default()
-                },
-                Object {
-                    key: Some("users/test/_$folder$".to_owned()),
-                    ..Default::default()
-                },
-            ]),
-            ..Default::default()
-        };
+        let list_objects = ListObjectsV2Output::builder()
+            .contents(Object::builder().key("users/test/file.txt").build())
+            .contents(Object::builder().key("users/test/_$folder$").build())
+            .build();
 
-        let result = map_legacy_list_objects_to_files(list_objects);
+        let result = map_list_objects_to_files(list_objects);
 
         assert_eq!(1, result.len());
         assert_eq!("file.txt", &result[0].file_name);
@@ -1008,20 +829,16 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_files_with_missing_data() {
-        let list_objects = ListObjectsV2Output {
-            ..Default::default()
-        };
+        let list_objects = ListObjectsV2Output::builder().build();
 
-        let result = map_legacy_list_objects_to_files(list_objects);
+        let result = map_list_objects_to_files(list_objects);
 
         assert_eq!(0, result.len());
     }
 
     #[test]
     fn test_map_object_to_file_with_missing_data() {
-        let object = Object {
-            ..Default::default()
-        };
+        let object = Object::builder().build();
 
         assert_eq!(
             File {
@@ -1035,19 +852,18 @@ mod test {
                     mtime: None,
                 }
             },
-            map_legacy_object_to_file(&object)
+            map_object_to_file(&object)
         );
     }
 
     #[test]
     fn test_map_list_objects_to_directory() {
-        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
-            prefix: Some("directory/subdirectory/".to_string()),
-            contents: Some(vec![Object {
-                ..Default::default()
-            }]),
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .prefix("directory/subdirectory/")
+            .contents(Object::builder().build())
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(
             Ok(File {
@@ -1067,40 +883,43 @@ mod test {
 
     #[test]
     fn test_map_list_objects_to_directory_with_none_contents() {
-        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
-            prefix: Some("directory/subdirectory/".to_string()),
-            contents: None,
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .prefix("directory/subdirectory/")
+            .set_contents(None)
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(Err(Error::NoSuchFile), directory);
     }
 
     #[test]
     fn test_map_list_objects_to_directory_with_0_contents() {
-        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
-            prefix: Some("directory/subdirectory/".to_string()),
-            contents: Some(vec![]),
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .prefix("directory/subdirectory/")
+            .set_contents(Some(vec![]))
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(Err(Error::NoSuchFile), directory);
     }
 
     #[test]
     fn test_map_list_objects_to_directory_with_no_prefix() {
-        let directory = map_legacy_list_objects_to_directory(ListObjectsV2Output {
-            prefix: None,
-            contents: Some(vec![]),
-            ..Default::default()
-        });
+        let list_objects = ListObjectsV2Output::builder()
+            .set_prefix(None)
+            .set_contents(Some(vec![]))
+            .build();
+
+        let directory = map_list_objects_to_directory(list_objects);
 
         assert_eq!(Err(Error::NoSuchFile), directory);
     }
 
     #[test]
     fn test_map_prefix_to_file_with_missing_data() {
-        let prefix = CommonPrefix { prefix: None };
+        let prefix = CommonPrefix::builder().build();
 
         assert_eq!(
             File {
@@ -1114,15 +933,13 @@ mod test {
                     mtime: None,
                 }
             },
-            map_legacy_prefix_to_file(&prefix)
+            map_prefix_to_file(&prefix)
         );
     }
 
     #[test]
     fn test_map_head_object_to_file() {
-        let head_object = HeadObjectOutput {
-            ..Default::default()
-        };
+        let head_object = HeadObjectOutput::builder().build();
 
         assert_eq!(
             File {
@@ -1136,41 +953,19 @@ mod test {
                     mtime: None,
                 }
             },
-            map_legacy_head_object_to_file("file", &head_object)
-        );
-    }
-
-    #[test]
-    fn test_map_rfc3339_to_epoch_maps_valid_date() {
-        assert_eq!(
-            Some(1417176009),
-            map_rfc3339_to_epoch(Some(String::from("2014-11-28T12:00:09Z")).as_ref())
-        );
-    }
-
-    #[test]
-    fn test_map_rfc3339_to_epoch_maps_none_to_unix_epoch() {
-        assert_eq!(None, map_rfc3339_to_epoch(None));
-    }
-
-    #[test]
-    fn test_map_rfc3339_to_epoch_maps_invalid_date_to_unix_epoch() {
-        assert_eq!(
-            Some(0),
-            map_rfc3339_to_epoch(Some(String::from("invalid")).as_ref())
+            map_head_object_to_file("file", &head_object)
         );
     }
 
     #[test]
     fn test_map_create_multipart_response_to_write_handle() {
-        let multipart_response = CreateMultipartUploadOutput {
-            upload_id: Some(String::from("id")),
-            key: Some(String::from("key")),
-            ..Default::default()
-        };
+        let multipart_response = CreateMultipartUploadOutput::builder()
+            .upload_id("id")
+            .key("key")
+            .build();
 
         let write_handle =
-            map_legacy_create_multipart_response_to_write_handle(multipart_response).unwrap();
+            map_create_multipart_response_to_write_handle(multipart_response).unwrap();
 
         assert_eq!("id", &write_handle.upload_id);
         assert_eq!("key", &write_handle.key);
@@ -1180,77 +975,43 @@ mod test {
 
     #[test]
     fn test_map_create_multipart_response_to_write_handle_with_missing_multipart_id() {
-        let multipart_response = CreateMultipartUploadOutput {
-            key: Some(String::from("key")),
-            ..Default::default()
-        };
+        let multipart_response = CreateMultipartUploadOutput::builder().key("key").build();
 
-        assert!(map_legacy_create_multipart_response_to_write_handle(multipart_response).is_err());
+        assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 
     #[test]
     fn test_map_create_multipart_response_to_write_handle_with_missing_key() {
-        let multipart_response = CreateMultipartUploadOutput {
-            upload_id: Some(String::from("id")),
-            ..Default::default()
-        };
+        let multipart_response = CreateMultipartUploadOutput::builder()
+            .upload_id("id")
+            .build();
 
-        assert!(map_legacy_create_multipart_response_to_write_handle(multipart_response).is_err());
+        assert!(map_create_multipart_response_to_write_handle(multipart_response).is_err());
     }
 
     #[test]
-    fn test_map_err_maps_404_to_no_such_file() {
-        let not_found_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
-            status: http::StatusCode::NOT_FOUND,
-            body: Bytes::from(&b"test"[..]),
-            headers: http::HeaderMap::<String>::with_capacity(0),
-        });
-
-        assert_eq!(Error::NoSuchFile, map_legacy_err(not_found_error));
+    fn test_map_err_maps_not_found_to_no_such_file() {
+        assert_eq!(
+            Error::NoSuchFile,
+            map_err(aws_sdk_s3::Error::NotFound(NotFound::builder().build()))
+        );
     }
 
     #[test]
     fn test_map_err_maps_missing_key_to_no_such_file() {
-        let not_found_error = RusotoError::Service::<GetObjectError>(GetObjectError::NoSuchKey(
-            "The specified key does not exist.".to_string(),
-        ));
-
-        assert_eq!(Error::NoSuchFile, map_legacy_err(not_found_error));
-    }
-
-    #[test]
-    fn test_map_error_maps_error_code_to_storage_error() {
-        let internal_server_error = RusotoError::Unknown::<UploadPartError>(BufferedHttpResponse {
-            status: http::StatusCode::INTERNAL_SERVER_ERROR,
-            body: Bytes::from(&b"test"[..]),
-            headers: http::HeaderMap::<String>::with_capacity(0),
-        });
-
         assert_eq!(
-            Error::Storage(String::from("500 Internal Server Error - test")),
-            map_legacy_err(internal_server_error)
-        );
-    }
-
-    #[test]
-    fn test_map_err_maps_unknown_service_error_to_storage_error() {
-        let not_found_error = RusotoError::Service::<GetObjectError>(
-            GetObjectError::InvalidObjectState("Unknown".to_string()),
-        );
-
-        assert_eq!(
-            Error::Storage(String::from("Unknown")),
-            map_legacy_err(not_found_error)
+            Error::NoSuchFile,
+            map_err(aws_sdk_s3::Error::NoSuchKey(NoSuchKey::builder().build()))
         );
     }
 
     #[test]
     fn test_map_error_maps_generic_error_to_storage_error() {
         assert_eq!(
-            Error::Storage(String::from("parse error")),
-            map_legacy_err(RusotoError::ParseError::<UploadPartError>(String::from(
-                "parse error"
-            )))
+            Error::Storage("BucketAlreadyOwnedByYou".to_string()),
+            map_err(aws_sdk_s3::Error::BucketAlreadyOwnedByYou(
+                BucketAlreadyOwnedByYou::builder().build()
+            ))
         );
     }
 }

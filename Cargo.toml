@@ -20,17 +20,13 @@ serde = "1.0"
 thiserror = "1.0"
 russh = { version = "0.40.0", features = ["flate2", "openssl"] }
 russh-keys = { version = "0.40.0", features = ["openssl"] }
-time = { version = "0.3", features = [] }
 tokio = { version = "1.34", features = ["full"] }
 uuid = { version = "1.6.1", features = ["v4"], default-features = false }
 
 # S3 Dependencies
-rusoto_core = "0.48.0"
-rusoto_s3 = "0.48.0"
 aws-config = "1.1.1"
 aws-sdk-s3 = "1.11.0"
 
 [dev-dependencies]
-http = "0.2"
 rand = "0.8"
 tempfile = "3.8"
