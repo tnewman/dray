@@ -1,9 +1,7 @@
 use std::convert::TryFrom;
 
 use bytes::Bytes;
-use log::debug;
-use log::log_enabled;
-use log::Level::Debug;
+use tracing::Level;
 
 use crate::error::Error;
 use crate::try_buf::TryBuf;
@@ -77,11 +75,8 @@ impl RequestId for Request {
 impl TryFrom<&mut Bytes> for Request {
     type Error = Error;
 
+    #[tracing::instrument(level = Level::DEBUG, fields(result))]
     fn try_from(request_bytes: &mut Bytes) -> Result<Self, Self::Error> {
-        if log_enabled!(Debug) {
-            debug!("Request bytes: {}", hex::encode(&request_bytes));
-        }
-
         let data_length = request_bytes.try_get_u32()?;
         let data_type = request_bytes.try_get_u8()?;
         let data_payload = &mut request_bytes.try_get_bytes(data_length - DATA_TYPE_LENGTH)?;

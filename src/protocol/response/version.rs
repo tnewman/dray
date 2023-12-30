@@ -7,6 +7,7 @@ pub struct Version {
 }
 
 impl From<&Version> for Bytes {
+    #[tracing::instrument]
     fn from(status: &Version) -> Self {
         let mut status_bytes = BytesMut::new();
 

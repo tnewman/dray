@@ -31,6 +31,7 @@ impl RequestId for Open {
 impl TryFrom<&mut Bytes> for Open {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(open_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = open_bytes.try_get_u32()?;
         let filename = open_bytes.try_get_string()?;

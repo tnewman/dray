@@ -82,6 +82,7 @@ impl File {
 }
 
 impl From<&File> for Bytes {
+    #[tracing::instrument]
     fn from(item: &File) -> Self {
         let mut file_bytes = BytesMut::new();
 

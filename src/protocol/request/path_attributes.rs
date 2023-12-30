@@ -23,6 +23,7 @@ impl RequestId for PathAttributes {
 impl TryFrom<&mut Bytes> for PathAttributes {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(path_attributes_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = path_attributes_bytes.try_get_u32()?;
         let path = path_attributes_bytes.try_get_string()?;

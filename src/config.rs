@@ -1,8 +1,8 @@
 use std::{net::SocketAddr, path::Path};
 
-use log::info;
 use russh_keys::key;
 use serde::Deserialize;
+use tracing::info;
 
 use crate::error::Error;
 pub use crate::storage::s3::S3Config;

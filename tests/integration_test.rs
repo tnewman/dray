@@ -7,7 +7,6 @@ use dray::{
     error::Error,
     ssh_server::DraySshServer,
 };
-use log::LevelFilter;
 
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -39,10 +38,6 @@ static MINIO: Lazy<Container<'_, MinIO>> =
     Lazy::new(|| DOCKER_CLI.run(testcontainers_modules::minio::MinIO::default()));
 
 async fn setup() -> TestClient {
-    let _ = env_logger::Builder::new()
-        .filter_level(LevelFilter::Info)
-        .try_init();
-
     let dray_config = get_config().await;
 
     let s3_client = create_s3_client(&dray_config).await;

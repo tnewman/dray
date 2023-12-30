@@ -22,6 +22,7 @@ impl RequestId for Symlink {
 impl TryFrom<&mut Bytes> for Symlink {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(symlink_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = symlink_bytes.try_get_u32()?;
         let link_path = symlink_bytes.try_get_string()?;
