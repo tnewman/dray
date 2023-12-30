@@ -51,6 +51,7 @@ impl RequestId for Path {
 impl TryFrom<&mut Bytes> for Path {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(path_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = path_bytes.try_get_u32()?;
         let path = path_bytes.try_get_string()?;

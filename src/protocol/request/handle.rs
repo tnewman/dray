@@ -21,6 +21,7 @@ impl RequestId for Handle {
 impl TryFrom<&mut Bytes> for Handle {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(handle_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = handle_bytes.try_get_u32()?;
         let handle = handle_bytes.try_get_string()?;

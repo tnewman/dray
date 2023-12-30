@@ -3,6 +3,7 @@ use crate::try_buf::TryBuf;
 
 use bytes::Bytes;
 use std::convert::TryFrom;
+use tracing::Level;
 
 use super::RequestId;
 
@@ -23,6 +24,7 @@ impl RequestId for Read {
 impl TryFrom<&mut Bytes> for Read {
     type Error = Error;
 
+    #[tracing::instrument(level = Level::DEBUG)]
     fn try_from(read_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = read_bytes.try_get_u32()?;
         let handle = read_bytes.try_get_string()?;

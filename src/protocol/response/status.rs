@@ -23,6 +23,7 @@ pub enum StatusCode {
 }
 
 impl From<&Status> for Bytes {
+    #[tracing::instrument]
     fn from(status: &Status) -> Self {
         let mut status_bytes = BytesMut::new();
 

@@ -22,6 +22,7 @@ impl RequestId for Rename {
 impl TryFrom<&mut Bytes> for Rename {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(rename_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = rename_bytes.try_get_u32()?;
         let old_path = rename_bytes.try_get_string()?;

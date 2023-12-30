@@ -6,10 +6,8 @@ pub mod status;
 pub mod version;
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use log::debug;
-use log::log_enabled;
-use log::Level::Debug;
 use std::convert::TryFrom;
+use tracing::Level;
 
 use crate::error::Error;
 
@@ -66,6 +64,7 @@ impl Response {
 }
 
 impl From<&Response> for Bytes {
+    #[tracing::instrument(level = Level::DEBUG, fields(result))]
     fn from(response: &Response) -> Self {
         let data_type: u8 = match response {
             Response::Version(_) => 2,
@@ -92,13 +91,7 @@ impl From<&Response> for Bytes {
         response_bytes.put_u8(data_type);
         response_bytes.put_slice(&data_payload);
 
-        let response_bytes = response_bytes.freeze();
-
-        if log_enabled!(Debug) {
-            debug!("Response bytes: {}", hex::encode(&response_bytes));
-        }
-
-        response_bytes
+        response_bytes.freeze()
     }
 }
 

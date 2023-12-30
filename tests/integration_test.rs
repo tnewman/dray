@@ -1,4 +1,4 @@
-use std::{env, net::TcpListener, process::Stdio};
+use std::{env, net::TcpListener, process::Stdio, sync::Once};
 
 use aws_config::{BehaviorVersion, Region};
 use aws_sdk_s3::primitives::ByteStream;
@@ -7,7 +7,6 @@ use dray::{
     error::Error,
     ssh_server::DraySshServer,
 };
-use log::LevelFilter;
 
 use once_cell::sync::Lazy;
 use rand::Rng;
@@ -38,10 +37,13 @@ static DOCKER_CLI: Lazy<testcontainers::clients::Cli> =
 static MINIO: Lazy<Container<'_, MinIO>> =
     Lazy::new(|| DOCKER_CLI.run(testcontainers_modules::minio::MinIO::default()));
 
+static INIT_TRACING: Once = Once::new();
+
 async fn setup() -> TestClient {
-    let _ = env_logger::Builder::new()
-        .filter_level(LevelFilter::Info)
-        .try_init();
+    INIT_TRACING.call_once(|| {
+        let subscriber = tracing_subscriber::FmtSubscriber::new();
+        tracing::subscriber::set_global_default(subscriber).unwrap();
+    });
 
     let dray_config = get_config().await;
 

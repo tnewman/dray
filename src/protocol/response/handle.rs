@@ -9,6 +9,7 @@ pub struct Handle {
 }
 
 impl From<&Handle> for Bytes {
+    #[tracing::instrument]
     fn from(handle: &Handle) -> Self {
         let mut handle_bytes = BytesMut::new();
 

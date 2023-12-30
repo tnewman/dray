@@ -7,9 +7,8 @@ use crate::{
         response::{self, Response},
     },
 };
-
-use log::error;
-use log::info;
+use tracing::error;
+use tracing::Level;
 
 use std::sync::Arc;
 
@@ -30,9 +29,8 @@ impl SftpSession {
         }
     }
 
+    #[tracing::instrument(skip(self), level = Level::DEBUG)]
     pub async fn handle_request(&self, request: Request) -> Response {
-        info!("Received request: {:?}", request);
-
         let request_id = request.get_request_id();
 
         let response = match request {
@@ -57,22 +55,20 @@ impl SftpSession {
             Request::Symlink(symlink_request) => self.handle_symlink_request(symlink_request),
         };
 
-        let response = match response {
+        match response {
             Ok(response) => response,
             Err(error) => {
                 error!("Received error while processing request: {}", error);
                 Response::build_error_response(request_id, error)
             }
-        };
-
-        info!("Sending response: {:?}", response);
-        response
+        }
     }
 
     fn handle_init_request(&self, _init_request: request::init::Init) -> Result<Response, Error> {
         Ok(Response::Version(response::version::Version { version: 3 }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_open_request(
         &self,
         open_request: request::open::Open,
@@ -101,6 +97,7 @@ impl SftpSession {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_close_request(
         &self,
         close_request: request::handle::Handle,
@@ -112,6 +109,7 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(close_request.id))
     }
 
+    #[tracing::instrument(skip(self), level = Level::DEBUG)]
     async fn handle_read_request(
         &self,
         read_request: request::read::Read,
@@ -135,6 +133,7 @@ impl SftpSession {
         }
     }
 
+    #[tracing::instrument(skip(self), level = Level::DEBUG)]
     async fn handle_write_request(
         &self,
         write_request: request::write::Write,
@@ -146,6 +145,7 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(write_request.id))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_lstat_request(
         &self,
         lstat_request: request::path::Path,
@@ -157,6 +157,7 @@ impl SftpSession {
         self.handle_stat_request(lstat_request).await
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_fstat_request(
         &self,
         fstat_request: request::handle::Handle,
@@ -173,6 +174,7 @@ impl SftpSession {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_setstat_request(
         &self,
         setstat_request: request::path_attributes::PathAttributes,
@@ -182,6 +184,7 @@ impl SftpSession {
         ))
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_fsetstat_request(
         &self,
         fsetstat_request: request::handle_attributes::HandleAttributes,
@@ -191,6 +194,7 @@ impl SftpSession {
         ))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_opendir_request(
         &self,
         opendir_request: request::path::Path,
@@ -208,6 +212,7 @@ impl SftpSession {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_readdir_request(
         &self,
         readdir_request: request::handle::Handle,
@@ -230,6 +235,7 @@ impl SftpSession {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_remove_request(
         &self,
         remove_request: request::path::Path,
@@ -241,6 +247,7 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(remove_request.id))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_mkdir_request(
         &self,
         mkdir_request: request::path_attributes::PathAttributes,
@@ -252,6 +259,7 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(mkdir_request.id))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_rmdir_request(
         &self,
         rmdir_request: request::path::Path,
@@ -263,6 +271,7 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(rmdir_request.id))
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_realpath_request(
         &self,
         realpath_request: request::path::Path,
@@ -289,6 +298,7 @@ impl SftpSession {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_stat_request(
         &self,
         stat_request: request::path::Path,
@@ -307,6 +317,7 @@ impl SftpSession {
         }))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn handle_rename_request(
         &self,
         rename_request: request::rename::Rename,
@@ -321,6 +332,7 @@ impl SftpSession {
         Ok(SftpSession::build_successful_response(rename_request.id))
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_readlink_request(
         &self,
         readlink_request: request::path::Path,
@@ -330,6 +342,7 @@ impl SftpSession {
         ))
     }
 
+    #[tracing::instrument(skip(self))]
     fn handle_symlink_request(
         &self,
         symlink_request: request::symlink::Symlink,
@@ -339,6 +352,7 @@ impl SftpSession {
         ))
     }
 
+    #[tracing::instrument]
     fn build_successful_response(id: u32) -> Response {
         Response::Status(response::status::Status {
             id,
@@ -347,6 +361,7 @@ impl SftpSession {
         })
     }
 
+    #[tracing::instrument]
     pub fn build_invalid_request_message_response() -> Response {
         Response::Status(response::status::Status {
             id: 0,
@@ -355,6 +370,7 @@ impl SftpSession {
         })
     }
 
+    #[tracing::instrument]
     fn build_not_supported_response(id: u32) -> Response {
         Response::Status(response::status::Status {
             id,

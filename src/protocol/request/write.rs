@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use tracing::Level;
 
 use crate::error::Error;
 use crate::try_buf::TryBuf;
@@ -24,6 +25,7 @@ impl RequestId for Write {
 impl TryFrom<&mut Bytes> for Write {
     type Error = Error;
 
+    #[tracing::instrument(level = Level::DEBUG)]
     fn try_from(write_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = write_bytes.try_get_u32()?;
         let handle = write_bytes.try_get_string()?;

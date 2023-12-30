@@ -23,6 +23,7 @@ impl RequestId for HandleAttributes {
 impl TryFrom<&mut Bytes> for HandleAttributes {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(handle_attributes_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         let id = handle_attributes_bytes.try_get_u32()?;
         let handle = handle_attributes_bytes.try_get_string()?;

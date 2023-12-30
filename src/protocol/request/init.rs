@@ -20,6 +20,7 @@ impl RequestId for Init {
 impl TryFrom<&mut Bytes> for Init {
     type Error = Error;
 
+    #[tracing::instrument]
     fn try_from(init_bytes: &mut Bytes) -> Result<Self, Self::Error> {
         Ok(Init {
             version: init_bytes.try_get_u8()?,

@@ -14,12 +14,13 @@ use aws_sdk_s3::types::CompletedMultipartUpload;
 use aws_sdk_s3::types::CompletedPart;
 use aws_sdk_s3::types::Object;
 use bytes::BufMut;
-use log::{error, info};
 use serde::Deserialize;
 use std::pin::Pin;
 use std::sync::Arc;
 use tokio::io::AsyncRead;
 use tokio::io::AsyncReadExt;
+use tracing::Level;
+use tracing::{error, info};
 
 #[derive(Clone, Deserialize, Debug)]
 pub struct S3Config {
@@ -93,6 +94,7 @@ impl S3Storage {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn complete_part_upload(
         &self,
         write_handle: &mut tokio::sync::MutexGuard<'_, WriteHandle>,
@@ -124,6 +126,7 @@ impl S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_directory_metadata(&self, folder_name: &str) -> Result<File, Error> {
         let list_objects_output = self
             .s3_client
@@ -139,6 +142,7 @@ impl S3Storage {
         map_list_objects_to_directory(list_objects_output)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn rename_file(&self, current: String, new: String) -> Result<(), Error> {
         self.s3_client
             .copy_object()
@@ -155,6 +159,7 @@ impl S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn rename_dir(&self, current: String, new: String) -> Result<(), Error> {
         let current_prefix = get_s3_prefix(&current);
         let new_prefix = get_s3_prefix(&new);
@@ -213,6 +218,7 @@ impl Storage for S3Storage {
         get_home(user)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn health_check(&self) -> Result<(), Error> {
         info!("Running health check for S3 Bucket {}", self.bucket);
 
@@ -243,6 +249,7 @@ impl Storage for S3Storage {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>, Error> {
         let authorized_keys_key = format!(".ssh/{}/authorized_keys", user);
 
@@ -266,6 +273,7 @@ impl Storage for S3Storage {
         Ok(ssh_keys::parse_authorized_keys(&buffer))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn open_dir_handle(&self, dir_name: String) -> Result<String, Error> {
         let prefix = get_s3_prefix(&dir_name);
 
@@ -278,6 +286,7 @@ impl Storage for S3Storage {
             .await
     }
 
+    #[tracing::instrument(skip(self))]
     async fn read_dir(&self, handle: &str) -> Result<Vec<File>, Error> {
         let dir_handle = match self.handle_manager.get_dir_handle(handle).await {
             Some(dir_handle) => dir_handle,
@@ -309,6 +318,7 @@ impl Storage for S3Storage {
         Ok(map_list_objects_to_files(objects))
     }
 
+    #[tracing::instrument(skip(self))]
     async fn create_dir(&self, dir_name: String) -> Result<(), Error> {
         /*
             S3 does not support creating empty prefixes. A marker file must be added to preserve empty
@@ -326,6 +336,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn remove_dir(&self, dir_name: String) -> Result<(), Error> {
         let prefix = get_s3_prefix(&dir_name);
         let mut continuation_token = None;
@@ -361,6 +372,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_file_metadata(&self, file_name: String) -> Result<File, Error> {
         let head_object_response = self
             .s3_client
@@ -383,6 +395,7 @@ impl Storage for S3Storage {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     async fn get_handle_metadata(&self, handle: &str) -> Result<File, Error> {
         if let Some(read_handle) = self.handle_manager.get_read_handle(handle).await {
             let read_handle = read_handle.lock().await;
@@ -398,6 +411,7 @@ impl Storage for S3Storage {
         }
     }
 
+    #[tracing::instrument(skip(self))]
     async fn open_read_handle(&self, file_name: String) -> Result<String, Error> {
         let read_response = self
             .s3_client
@@ -416,6 +430,7 @@ impl Storage for S3Storage {
             .await
     }
 
+    #[tracing::instrument(skip(self), level = Level::TRACE)]
     async fn read_data(&self, handle: &str, len: u32) -> Result<Vec<u8>, Error> {
         let read_handle = match self.handle_manager.get_read_handle(handle).await {
             Some(dir_handle) => dir_handle,
@@ -436,6 +451,7 @@ impl Storage for S3Storage {
         Ok(buffer)
     }
 
+    #[tracing::instrument(skip(self))]
     async fn open_write_handle(&self, file_name: String) -> Result<String, Error> {
         let multipart_response = self
             .s3_client
@@ -452,6 +468,7 @@ impl Storage for S3Storage {
         self.handle_manager.create_write_handle(write_handle).await
     }
 
+    #[tracing::instrument(skip(self), level = Level::TRACE)]
     async fn write_data(&self, handle: &str, data: bytes::Bytes) -> Result<(), Error> {
         let write_handle = match self.handle_manager.get_write_handle(handle).await {
             Some(dir_handle) => dir_handle,
@@ -470,6 +487,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn close_handle(&self, handle: &str) -> Result<(), Error> {
         if let Some(write_handle) = self.handle_manager.get_write_handle(handle).await {
             let mut write_handle = write_handle.lock().await;
@@ -496,6 +514,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn remove_file(&self, file_name: String) -> Result<(), Error> {
         self.s3_client
             .delete_object()
@@ -509,6 +528,7 @@ impl Storage for S3Storage {
         Ok(())
     }
 
+    #[tracing::instrument(skip(self))]
     async fn rename(&self, current: String, new: String) -> Result<(), Error> {
         let file = self.get_file_metadata(current.clone()).await?;
 

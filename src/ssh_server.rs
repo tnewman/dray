@@ -4,7 +4,6 @@ use crate::sftp_session::SftpSession;
 use crate::sftp_stream::SftpStream;
 use crate::storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use async_trait::async_trait;
-use log::{debug, error, info};
 use russh::SshId;
 use russh::{
     server::{run, Auth, Config, Handler, Msg, Server, Session},
@@ -17,6 +16,7 @@ use russh_keys::{
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{Mutex, RwLock};
+use tracing::{debug, error, info};
 
 pub struct DraySshServer {
     dray_config: Arc<DrayConfig>,

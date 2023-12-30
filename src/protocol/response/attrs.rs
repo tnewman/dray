@@ -9,6 +9,7 @@ pub struct Attrs {
 }
 
 impl From<&Attrs> for Bytes {
+    #[tracing::instrument]
     fn from(attrs: &Attrs) -> Self {
         let mut attrs_bytes = BytesMut::new();
 

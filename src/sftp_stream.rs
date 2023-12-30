@@ -1,9 +1,9 @@
 use std::{convert::TryFrom, mem};
 
 use bytes::{BufMut, Bytes};
-use log::info;
 use russh::{server::Msg, ChannelStream};
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tracing::error;
 
 use crate::{error::Error, protocol::request::Request, sftp_session::SftpSession};
 
@@ -16,6 +16,7 @@ impl SftpStream {
         SftpStream { sftp_session }
     }
 
+    #[tracing::instrument(skip_all)]
     pub async fn process_stream(&self, mut stream: ChannelStream<Msg>) -> Result<(), Error> {
         loop {
             match self.process_request(&mut stream).await {
@@ -28,6 +29,7 @@ impl SftpStream {
         }
     }
 
+    #[tracing::instrument(skip_all)]
     async fn process_request(&self, stream: &mut ChannelStream<Msg>) -> Result<(), Error> {
         let request_data_size = stream.read_u32().await?;
         let request_size = request_data_size as usize + mem::size_of::<u32>();
@@ -45,7 +47,7 @@ impl SftpStream {
             Ok(request) => self.sftp_session.handle_request(request).await,
             Err(_) => {
                 let response = SftpSession::build_invalid_request_message_response();
-                info!("Sending error response: {:?}", response);
+                error!("Sending error response: {:?}", response);
                 response
             }
         };

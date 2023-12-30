@@ -2,6 +2,7 @@ use bytes::{BufMut, Bytes, BytesMut};
 use std::convert::From;
 use std::convert::TryInto;
 use std::fmt::Debug;
+use tracing::Level;
 
 #[derive(PartialEq, Eq)]
 pub struct Data {
@@ -10,6 +11,7 @@ pub struct Data {
 }
 
 impl From<&Data> for Bytes {
+    #[tracing::instrument(level = Level::TRACE)]
     fn from(data: &Data) -> Self {
         let mut data_bytes = BytesMut::new();
 
