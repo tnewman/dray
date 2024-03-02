@@ -34,4 +34,4 @@ aws-sdk-s3 = "1.17.0"
 once_cell = "1.19.0"
 rand = "0.8"
 tempfile = "3.10"
-testcontainers-modules = { version = "0.2.1", features = ["minio"] }
+testcontainers-modules = { version = "0.3.5", features = ["minio"] }
