@@ -17,8 +17,8 @@ hex = "0.4.3"
 opentelemetry = { version = "0.17.0", features = ["rt-tokio"] }
 opentelemetry-jaeger = { version = "0.16.0", features = ["rt-tokio"] }
 serde = "1.0"
-russh = { version = "0.40.2", features = ["flate2", "openssl"] }
-russh-keys = { version = "0.40.1", features = ["openssl"] }
+russh = { version = "0.42.0", features = ["flate2", "openssl"] }
+russh-keys = { version = "0.42.0", features = ["openssl"] }
 thiserror = "1.0"
 tokio = { version = "1.36", features = ["full", "tracing"] }
 tracing = "0.1"
