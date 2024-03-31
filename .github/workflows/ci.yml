@@ -41,10 +41,7 @@ jobs:
   release-build:
     name: Release Build
     needs: check
-    runs-on: ${{ matrix.os }}
-    strategy:
-      matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout sources
         uses: actions/checkout@v3
@@ -61,12 +58,6 @@ jobs:
           toolchain: stable
           override: true
           components: rustfmt, clippy
-
-      - name: Install openssl
-        run: |
-          choco install openssl
-          Add-Content "$env:GITHUB_ENV" "OPENSSL_DIR=C:\Program Files\OpenSSL" 
-        if: runner.os == 'Windows'
 
       - name: Run cargo build
         run: cargo build --release
