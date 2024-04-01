@@ -7,9 +7,8 @@ use dray::{
     error::Error,
     ssh_server::DraySshServer,
 };
-
-use once_cell::sync::Lazy;
 use rand::Rng;
+use std::sync::OnceLock;
 use tempfile::NamedTempFile;
 use testcontainers_modules::{
     minio::MinIO,
@@ -31,11 +30,10 @@ struct TestClient {
     bucket: String,
 }
 
-static DOCKER_CLI: Lazy<testcontainers::clients::Cli> =
-    Lazy::new(testcontainers::clients::Cli::default);
+static DOCKER_CLI: OnceLock<testcontainers::clients::Cli> =
+    OnceLock::new();
 
-static MINIO: Lazy<Container<'_, MinIO>> =
-    Lazy::new(|| DOCKER_CLI.run(testcontainers_modules::minio::MinIO::default()));
+static MINIO: OnceLock<Container<'_, MinIO>> = OnceLock::new();
 
 static INIT_TRACING: Once = Once::new();
 
@@ -45,7 +43,15 @@ async fn setup() -> TestClient {
         tracing::subscriber::set_global_default(subscriber).unwrap();
     });
 
-    let dray_config = get_config().await;
+    DOCKER_CLI.get_or_init(|| {
+        testcontainers::clients::Cli::default()
+    });
+
+    let minio = MINIO.get_or_init(|| {
+        DOCKER_CLI.get().expect("Docker is initialized").run(testcontainers_modules::minio::MinIO::default())
+    });
+
+    let dray_config = get_config(&minio).await;
 
     let s3_client = create_s3_client(&dray_config).await;
 
@@ -72,7 +78,7 @@ async fn setup() -> TestClient {
     test_client
 }
 
-async fn get_config() -> DrayConfig {
+async fn get_config(minio: &Container<'_, MinIO>) -> DrayConfig {
     let port = get_free_port()
         .await
         .expect("Could not find a free port to bind!");
@@ -90,7 +96,7 @@ async fn get_config() -> DrayConfig {
         s3: S3Config {
             endpoint_name: Some(format!(
                 "http://localhost:{}",
-                MINIO.get_host_port_ipv4(9000)
+                minio.get_host_port_ipv4(9000)
             )),
             endpoint_region: "custom".to_string(),
             bucket: format!("integration-test-{}", rng.gen::<u32>()),
