@@ -6,7 +6,7 @@ use crate::storage::{s3::S3StorageFactory, Storage, StorageFactory};
 use async_trait::async_trait;
 use russh::SshId;
 use russh::{
-    server::{run, Auth, Config, Handler, Msg, Server, Session},
+    server::{Auth, Config, Handler, Msg, Server, Session},
     Channel, ChannelId,
 };
 use russh_keys::{
@@ -45,7 +45,7 @@ impl DraySshServer {
         Ok(())
     }
 
-    pub async fn run_server(self) -> Result<(), Error> {
+    pub async fn run_server(mut self) -> Result<(), Error> {
         let ssh_config = Config {
             server_id: SshId::Standard(format!(
                 "SSH-2.0-{}_{}",
@@ -59,22 +59,45 @@ impl DraySshServer {
         };
 
         let ssh_config = Arc::new(ssh_config);
+        let addr = &self.dray_config.get_host_socket_addr()?;
 
         info!("Binding to Host {}", self.dray_config.host);
 
-        run(ssh_config, &self.dray_config.get_host_socket_addr()?, self)
+        self.run_on_address(ssh_config, addr)
             .await
             .map_err(|error| Error::Failure(error.to_string()))
     }
+}
+
+impl Server for DraySshServer {
+    type Handler = Self;
+
+    fn new_client(&mut self, _peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
+        DraySshServer {
+            dray_config: self.dray_config.clone(),
+            object_storage_factory: self.object_storage_factory.clone(),
+            object_storage: self.object_storage_factory.create_storage(),
+            channels: Arc::from(Mutex::from(HashMap::new())),
+            user: RwLock::from(None),
+        }
+    }
+}
+
+#[async_trait]
+impl Handler for DraySshServer {
+    type Error = Error;
 
     async fn auth_publickey(
-        self,
-        user: String,
-        public_key: PublicKey,
-    ) -> Result<(DraySshServer, Auth), Error> {
+        &mut self,
+        user: &str,
+        public_key: &PublicKey,
+    ) -> Result<Auth, Self::Error> {
+        let public_key =
+            key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
+
         let authorized_keys = match self
             .object_storage
-            .get_authorized_keys_fingerprints(&user)
+            .get_authorized_keys_fingerprints(user)
             .await
         {
             Ok(authorized_keys) => authorized_keys,
@@ -98,89 +121,56 @@ impl DraySshServer {
 
                 {
                     let mut self_user = self.user.write().await;
-                    *self_user = Some(user);
+                    *self_user = Some(user.to_string());
                 }
 
-                Ok((self, Auth::Accept))
+                Ok(Auth::Accept)
             }
             false => {
                 info!("Rejected public key authentication attempt from {}", user);
-                Ok((
-                    self,
-                    Auth::Reject {
-                        proceed_with_methods: Option::None,
-                    },
-                ))
+                Ok(Auth::Reject {
+                    proceed_with_methods: Option::None,
+                })
             }
         }
     }
-}
-
-impl Server for DraySshServer {
-    type Handler = Self;
-
-    fn new_client(&mut self, _peer_addr: Option<std::net::SocketAddr>) -> Self::Handler {
-        DraySshServer {
-            dray_config: self.dray_config.clone(),
-            object_storage_factory: self.object_storage_factory.clone(),
-            object_storage: self.object_storage_factory.create_storage(),
-            channels: Arc::from(Mutex::from(HashMap::new())),
-            user: RwLock::from(None),
-        }
-    }
-}
-
-#[async_trait]
-impl Handler for DraySshServer {
-    type Error = Error;
-
-    async fn auth_publickey(
-        self,
-        user: &str,
-        public_key: &PublicKey,
-    ) -> Result<(Self, Auth), Self::Error> {
-        let public_key =
-            key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
-
-        self.auth_publickey(user.to_owned(), public_key).await
-    }
 
     async fn channel_open_session(
-        self,
+        &mut self,
         channel: Channel<Msg>,
-        session: Session,
-    ) -> Result<(Self, bool, Session), Self::Error> {
+        _session: &mut Session,
+    ) -> Result<bool, Self::Error> {
         {
             let mut channels = self.channels.lock().await;
             channels.insert(channel.id(), channel);
         }
 
-        Ok((self, true, session))
+        Ok(true)
     }
 
     async fn channel_close(
-        self,
+        &mut self,
         channel: ChannelId,
-        session: Session,
-    ) -> Result<(Self, Session), Self::Error> {
+        _session: &mut Session,
+    ) -> Result<(), Self::Error> {
         {
             let mut channels = self.channels.lock().await;
             channels.remove(&channel);
         }
 
-        Ok((self, session))
+        Ok(())
     }
 
     async fn subsystem_request(
-        self,
+        &mut self,
         channel_id: ChannelId,
         name: &str,
-        mut session: Session,
-    ) -> Result<(Self, Session), Self::Error> {
+        session: &mut Session,
+    ) -> Result<(), Self::Error> {
         if name != "sftp" {
             error!("Failed to start unsupported subsystem {}", name);
             session.channel_failure(channel_id);
-            return Ok((self, session));
+            return Ok(());
         }
 
         let user = {
@@ -195,7 +185,7 @@ impl Handler for DraySshServer {
                     "Failed to start sftp subsystem because a user was not found on the channel"
                 );
                 session.channel_failure(channel_id);
-                return Ok((self, session));
+                return Ok(());
             }
         };
 
@@ -212,7 +202,7 @@ impl Handler for DraySshServer {
                     channel_id
                 );
                 session.channel_failure(channel_id);
-                return Ok((self, session));
+                return Ok(());
             }
         };
 
@@ -240,6 +230,6 @@ impl Handler for DraySshServer {
             };
         });
 
-        Ok((self, session))
+        Ok(())
     }
 }
