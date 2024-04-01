@@ -2,7 +2,7 @@ use crate::protocol::file_attributes::FileAttributes;
 
 use bytes::{BufMut, Bytes, BytesMut};
 
-use chrono::NaiveDateTime;
+use chrono::DateTime;
 
 use std::convert::From;
 use std::convert::TryInto;
@@ -41,9 +41,8 @@ impl File {
         let uid = self.file_attributes.uid.unwrap_or(0);
         let gid = self.file_attributes.gid.unwrap_or(0);
 
-        let datetime =
-            NaiveDateTime::from_timestamp_opt(self.file_attributes.mtime.unwrap_or(0) as i64, 0)
-                .unwrap_or_default();
+        let datetime = DateTime::from_timestamp(self.file_attributes.mtime.unwrap_or(0) as i64, 0)
+            .unwrap_or_default();
         let datetime = datetime.format("%b %d %Y %H:%M");
 
         format!(
