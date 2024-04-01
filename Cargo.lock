@@ -1014,7 +1014,6 @@ dependencies = [
  "envy",
  "futures",
  "hex",
- "once_cell",
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry_sdk",
