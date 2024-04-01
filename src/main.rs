@@ -34,12 +34,12 @@ async fn init_tracer() {
     let tracer = opentelemetry_otlp::new_pipeline()
         .tracing()
         .with_exporter(opentelemetry_otlp::new_exporter().tonic())
-        .with_trace_config(
-            opentelemetry_sdk::trace::config()
-                .with_resource(opentelemetry_sdk::Resource::new(vec![
-                    opentelemetry::KeyValue::new("service.name", "dray")
-                ]))
-        )
+        .with_trace_config(opentelemetry_sdk::trace::config().with_resource(
+            opentelemetry_sdk::Resource::new(vec![opentelemetry::KeyValue::new(
+                "service.name",
+                "dray",
+            )]),
+        ))
         .install_batch(opentelemetry_sdk::runtime::Tokio)
         .expect("Tokio runtime should be configured");
 
