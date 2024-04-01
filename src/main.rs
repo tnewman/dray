@@ -6,16 +6,16 @@ use tracing::{info, Level};
 
 use dray::{config::DrayConfig, ssh_server::DraySshServer};
 
-use opentelemetry::global;
 use tracing_subscriber::{filter::EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
 fn main() {
     dotenv().ok();
-    init_tracer();
+
+    let runtime = Runtime::new().expect("Tokio Runtime should initialize");
+
+    runtime.spawn(init_tracer());
 
     info!("Starting Dray");
-
-    let runtime = Runtime::new().unwrap();
 
     let dray_config = DrayConfig::new().unwrap();
     let dray_server = runtime.block_on(DraySshServer::new(dray_config));
@@ -30,13 +30,18 @@ fn main() {
     runtime.shutdown_timeout(Duration::from_secs(10))
 }
 
-fn init_tracer() {
-    global::set_text_map_propagator(opentelemetry_jaeger::Propagator::new());
-
-    let tracer = opentelemetry_jaeger::new_pipeline()
-        .with_service_name("dray")
-        .install_simple()
-        .unwrap();
+async fn init_tracer() {
+    let tracer = opentelemetry_otlp::new_pipeline()
+        .tracing()
+        .with_exporter(opentelemetry_otlp::new_exporter().tonic())
+        .with_trace_config(
+            opentelemetry_sdk::trace::config()
+                .with_resource(opentelemetry_sdk::Resource::new(vec![
+                    opentelemetry::KeyValue::new("service.name", "dray")
+                ]))
+        )
+        .install_batch(opentelemetry_sdk::runtime::Tokio)
+        .expect("Tokio runtime should be configured");
 
     // Create a tracing layer with the configured tracer
     let opentelemetry = tracing_opentelemetry::layer().with_tracer(tracer);
