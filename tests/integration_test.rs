@@ -42,7 +42,7 @@ async fn setup() -> TestClient {
         tracing::subscriber::set_global_default(subscriber).unwrap();
     });
 
-    DOCKER_CLI.get_or_init(|| testcontainers::clients::Cli::default());
+    DOCKER_CLI.get_or_init(testcontainers::clients::Cli::default);
 
     let minio = MINIO.get_or_init(|| {
         DOCKER_CLI
@@ -51,7 +51,7 @@ async fn setup() -> TestClient {
             .run(testcontainers_modules::minio::MinIO::default())
     });
 
-    let dray_config = get_config(&minio).await;
+    let dray_config = get_config(minio).await;
 
     let s3_client = create_s3_client(&dray_config).await;
 
