@@ -30,8 +30,7 @@ struct TestClient {
     bucket: String,
 }
 
-static DOCKER_CLI: OnceLock<testcontainers::clients::Cli> =
-    OnceLock::new();
+static DOCKER_CLI: OnceLock<testcontainers::clients::Cli> = OnceLock::new();
 
 static MINIO: OnceLock<Container<'_, MinIO>> = OnceLock::new();
 
@@ -43,12 +42,13 @@ async fn setup() -> TestClient {
         tracing::subscriber::set_global_default(subscriber).unwrap();
     });
 
-    DOCKER_CLI.get_or_init(|| {
-        testcontainers::clients::Cli::default()
-    });
+    DOCKER_CLI.get_or_init(|| testcontainers::clients::Cli::default());
 
     let minio = MINIO.get_or_init(|| {
-        DOCKER_CLI.get().expect("Docker is initialized").run(testcontainers_modules::minio::MinIO::default())
+        DOCKER_CLI
+            .get()
+            .expect("Docker is initialized")
+            .run(testcontainers_modules::minio::MinIO::default())
     });
 
     let dray_config = get_config(&minio).await;
