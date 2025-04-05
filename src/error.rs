@@ -64,3 +64,9 @@ impl From<russh_keys::Error> for Error {
         Error::Failure(russh_error.to_string())
     }
 }
+
+impl From<bytes::TryGetError> for Error {
+    fn from(_: bytes::TryGetError) -> Self {
+        Error::BadMessage
+    }
+}

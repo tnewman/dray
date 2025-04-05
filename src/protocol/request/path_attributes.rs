@@ -2,7 +2,7 @@ use crate::error::Error;
 use crate::protocol::file_attributes::FileAttributes;
 use crate::try_buf::TryBuf;
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use std::convert::TryFrom;
 
 use super::RequestId;

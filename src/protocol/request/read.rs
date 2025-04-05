@@ -1,7 +1,7 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use std::convert::TryFrom;
 use tracing::Level;
 

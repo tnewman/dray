@@ -1,7 +1,10 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
+use bytes::Buf;
+use bytes::BufMut;
 use bytes::Bytes;
+use bytes::TryGetError;
 use std::convert::TryFrom;
 
 use super::RequestId;
