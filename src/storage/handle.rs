@@ -90,14 +90,6 @@ impl<ReadHandle, WriteHandle, DirHandle> HandleManager<ReadHandle, WriteHandle, 
     }
 }
 
-pub trait Handle {
-    fn get_handle_id(&self) -> &str;
-
-    fn get_handle_id_string(&self) -> String {
-        self.get_handle_id().to_string()
-    }
-}
-
 fn generate_handle_id() -> String {
     Uuid::new_v4().to_string()
 }
