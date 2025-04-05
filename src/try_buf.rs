@@ -1,7 +1,9 @@
 use crate::error::Error;
 use bytes::Buf;
+#[cfg(test)]
 use bytes::BufMut;
 use bytes::Bytes;
+#[cfg(test)]
 use std::convert::TryFrom;
 use std::convert::TryInto;
 
@@ -42,10 +44,12 @@ impl<T: Buf> TryBuf for T {
     }
 }
 
+#[cfg(test)]
 pub trait TryBufMut: BufMut {
     fn try_put_str(&mut self, str: &str) -> Result<(), Error>;
 }
 
+#[cfg(test)]
 impl<T: BufMut> TryBufMut for T {
     fn try_put_str(&mut self, str: &str) -> Result<(), Error> {
         let len = str.len();
