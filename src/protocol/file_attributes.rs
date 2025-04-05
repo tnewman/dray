@@ -1,5 +1,4 @@
 use crate::error::Error;
-use crate::try_buf::TryBuf;
 
 use bytes::Buf;
 use bytes::{BufMut, Bytes, BytesMut};
