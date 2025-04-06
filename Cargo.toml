@@ -32,6 +32,6 @@ aws-config = "1.6"
 aws-sdk-s3 = "1.82"
 
 [dev-dependencies]
-rand = "0.8"
+rand = "0.9"
 tempfile = "3.19"
-testcontainers-modules = { version = "0.3", features = ["minio"] }
+testcontainers-modules = { version = "0.11", features = ["minio"] }
