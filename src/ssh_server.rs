@@ -3,15 +3,11 @@ use crate::error::Error;
 use crate::sftp_session::SftpSession;
 use crate::sftp_stream::SftpStream;
 use crate::storage::{s3::S3StorageFactory, Storage, StorageFactory};
-use async_trait::async_trait;
+use russh::keys::PublicKey;
 use russh::SshId;
 use russh::{
     server::{Auth, Config, Handler, Msg, Server, Session},
     Channel, ChannelId,
-};
-use russh_keys::{
-    key::{self, PublicKey},
-    PublicKeyBase64,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -83,7 +79,6 @@ impl Server for DraySshServer {
     }
 }
 
-#[async_trait]
 impl Handler for DraySshServer {
     type Error = Error;
 
@@ -92,14 +87,7 @@ impl Handler for DraySshServer {
         user: &str,
         public_key: &PublicKey,
     ) -> Result<Auth, Self::Error> {
-        let public_key =
-            key::parse_public_key(&public_key.public_key_bytes(), Option::None).unwrap();
-
-        let authorized_keys = match self
-            .object_storage
-            .get_authorized_keys_fingerprints(user)
-            .await
-        {
+        let authorized_keys = match self.object_storage.get_authorized_keys(user).await {
             Ok(authorized_keys) => authorized_keys,
             Err(error) => {
                 error!(
@@ -110,9 +98,7 @@ impl Handler for DraySshServer {
             }
         };
 
-        let public_key_fingerprint = public_key.fingerprint();
-
-        match authorized_keys.contains(&public_key_fingerprint) {
+        match authorized_keys.contains(public_key) {
             true => {
                 info!(
                     "Successfully authenticated {} with public key authentication",
@@ -130,6 +116,7 @@ impl Handler for DraySshServer {
                 info!("Rejected public key authentication attempt from {}", user);
                 Ok(Auth::Reject {
                     proceed_with_methods: Option::None,
+                    partial_success: false,
                 })
             }
         }
@@ -169,7 +156,7 @@ impl Handler for DraySshServer {
     ) -> Result<(), Self::Error> {
         if name != "sftp" {
             error!("Failed to start unsupported subsystem {}", name);
-            session.channel_failure(channel_id);
+            let _ = session.channel_failure(channel_id);
             return Ok(());
         }
 
@@ -184,7 +171,7 @@ impl Handler for DraySshServer {
                 error!(
                     "Failed to start sftp subsystem because a user was not found on the channel"
                 );
-                session.channel_failure(channel_id);
+                let _ = session.channel_failure(channel_id);
                 return Ok(());
             }
         };
@@ -201,12 +188,12 @@ impl Handler for DraySshServer {
                     "Failed to start sftp subsystem because the requested channel {} was not found",
                     channel_id
                 );
-                session.channel_failure(channel_id);
+                let _ = session.channel_failure(channel_id);
                 return Ok(());
             }
         };
 
-        session.channel_success(channel_id);
+        let _ = session.channel_success(channel_id);
 
         let handle = session.handle();
         let sftp_session = SftpSession::new(self.object_storage.clone(), user);

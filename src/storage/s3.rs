@@ -14,6 +14,7 @@ use aws_sdk_s3::types::CompletedMultipartUpload;
 use aws_sdk_s3::types::CompletedPart;
 use aws_sdk_s3::types::Object;
 use bytes::BufMut;
+use russh::keys::PublicKey;
 use serde::Deserialize;
 use std::pin::Pin;
 use std::sync::Arc;
@@ -250,7 +251,7 @@ impl Storage for S3Storage {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>, Error> {
+    async fn get_authorized_keys(&self, user: &str) -> Result<Vec<PublicKey>, Error> {
         let authorized_keys_key = format!(".ssh/{}/authorized_keys", user);
 
         let object = self

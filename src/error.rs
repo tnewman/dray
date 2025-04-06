@@ -59,8 +59,8 @@ impl From<russh::Error> for Error {
     }
 }
 
-impl From<russh_keys::Error> for Error {
-    fn from(russh_error: russh_keys::Error) -> Self {
+impl From<russh::keys::Error> for Error {
+    fn from(russh_error: russh::keys::Error) -> Self {
         Error::Failure(russh_error.to_string())
     }
 }
