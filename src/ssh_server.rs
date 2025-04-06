@@ -156,7 +156,7 @@ impl Handler for DraySshServer {
     ) -> Result<(), Self::Error> {
         if name != "sftp" {
             error!("Failed to start unsupported subsystem {}", name);
-            session.channel_failure(channel_id);
+            let _ = session.channel_failure(channel_id);
             return Ok(());
         }
 
@@ -171,7 +171,7 @@ impl Handler for DraySshServer {
                 error!(
                     "Failed to start sftp subsystem because a user was not found on the channel"
                 );
-                session.channel_failure(channel_id);
+                let _ = session.channel_failure(channel_id);
                 return Ok(());
             }
         };
@@ -188,12 +188,12 @@ impl Handler for DraySshServer {
                     "Failed to start sftp subsystem because the requested channel {} was not found",
                     channel_id
                 );
-                session.channel_failure(channel_id);
+                let _ = session.channel_failure(channel_id);
                 return Ok(());
             }
         };
 
-        session.channel_success(channel_id);
+        let _ = session.channel_success(channel_id);
 
         let handle = session.handle();
         let sftp_session = SftpSession::new(self.object_storage.clone(), user);
