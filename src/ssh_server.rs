@@ -98,7 +98,7 @@ impl Handler for DraySshServer {
             }
         };
 
-        match authorized_keys.contains(&public_key) {
+        match authorized_keys.contains(public_key) {
             true => {
                 info!(
                     "Successfully authenticated {} with public key authentication",
