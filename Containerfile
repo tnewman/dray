@@ -1,4 +1,4 @@
-FROM rust:slim-buster as builder
+FROM rust:slim-bookworm as builder
 RUN apt-get update && apt-get install -y --no-install-recommends \
     file=* libssl-dev=* make=* pkg-config=* && rm -rf /var/lib/apt/lists/*
 WORKDIR /usr/src
@@ -11,7 +11,7 @@ RUN rm src/*.rs
 COPY ./src ./src
 RUN cargo install --path .
 
-FROM debian:buster-slim
+FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y --no-install-recommends \
     openssl=* && rm -rf /var/lib/apt/lists/*
 RUN groupadd -r dray && useradd -r -s /bin/false -g dray dray
