@@ -87,10 +87,7 @@ impl Handler for DraySshServer {
         user: &str,
         public_key: &PublicKey,
     ) -> Result<Auth, Self::Error> {
-        let authorized_keys = match self
-            .object_storage
-            .get_authorized_keys(user)
-            .await {
+        let authorized_keys = match self.object_storage.get_authorized_keys(user).await {
             Ok(authorized_keys) => authorized_keys,
             Err(error) => {
                 error!(
@@ -100,8 +97,6 @@ impl Handler for DraySshServer {
                 return Err(error);
             }
         };
-
-
 
         match authorized_keys.contains(&public_key) {
             true => {
@@ -162,7 +157,7 @@ impl Handler for DraySshServer {
         if name != "sftp" {
             error!("Failed to start unsupported subsystem {}", name);
             session.channel_failure(channel_id);
-            return Ok(())
+            return Ok(());
         }
 
         let user = {
