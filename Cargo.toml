@@ -18,20 +18,20 @@ opentelemetry = { version = "0.22" }
 opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.15", features = ["grpc-tonic"] }
 serde = "1.0"
-russh = { version = "0.43.0", features = ["flate2", "openssl"] }
-russh-keys = { version = "0.43.0", features = ["openssl"] }
-thiserror = "1.0"
+russh = { version = "0.43", features = ["flate2", "openssl"] }
+russh-keys = { version = "0.43", features = ["openssl"] }
+thiserror = "2.0"
 tokio = { version = "1.44", features = ["full", "tracing"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.16.0", features = ["v4"], default-features = false }
+uuid = { version = "1.16", features = ["v4"], default-features = false }
 
 # S3 Dependencies
-aws-config = "1.6.1"
-aws-sdk-s3 = "1.82.0"
+aws-config = "1.6"
+aws-sdk-s3 = "1.82"
 
 [dev-dependencies]
 rand = "0.8"
 tempfile = "3.19"
-testcontainers-modules = { version = "0.3.7", features = ["minio"] }
+testcontainers-modules = { version = "0.3", features = ["minio"] }
