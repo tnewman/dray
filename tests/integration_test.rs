@@ -43,8 +43,7 @@ async fn setup() -> TestClient {
     let minio = MINIO
         .get_or_init(async || {
             let minio = testcontainers_modules::minio::MinIO::default();
-            let minio_container = minio.start().await.unwrap();
-            minio_container
+            minio.start().await.unwrap()
         })
         .await;
 
