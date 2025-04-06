@@ -1,4 +1,4 @@
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 
 use crate::error::Error;
 use crate::protocol::file_attributes::FileAttributes;

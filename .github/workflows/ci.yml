@@ -15,14 +15,6 @@ jobs:
         with:
           key: check-${{ runner.os }}
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
       - name: Generate Test Keypair
         run: rm -rf .ssh && mkdir .ssh && ssh-keygen -t ed25519 -f .ssh/id_ed25519 -q -P ""
 
@@ -51,14 +43,6 @@ jobs:
         with:
           key: release-${{ runner.os }}
 
-      - name: Install stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: stable
-          override: true
-          components: rustfmt, clippy
-
       - name: Run cargo build
         run: cargo build --release
 
@@ -72,6 +56,11 @@ jobs:
 
       - name: Cache OCI Container layers
         uses: jpribyl/action-docker-layer-caching@v0.1.1
+        continue-on-error: true
+        with:
+          key: dray-docker-cache-{hash}
+          restore-keys: |
+            dray-docker-cache-
 
       - name: Build OCI Container image
         run: docker build -f Containerfile .

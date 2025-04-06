@@ -1,6 +1,7 @@
 use crate::error::Error;
 use crate::try_buf::TryBuf;
 
+use bytes::Buf;
 use bytes::Bytes;
 use std::convert::TryFrom;
 

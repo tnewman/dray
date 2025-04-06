@@ -8,12 +8,12 @@ use dray::{
     ssh_server::DraySshServer,
 };
 use rand::Rng;
-use std::sync::OnceLock;
 use tempfile::NamedTempFile;
 use testcontainers_modules::{
     minio::MinIO,
-    testcontainers::{self, Container},
+    testcontainers::{runners::AsyncRunner, ContainerAsync},
 };
+use tokio::sync::OnceCell;
 use tokio::{
     fs,
     io::{AsyncReadExt, AsyncWriteExt},
@@ -30,9 +30,7 @@ struct TestClient {
     bucket: String,
 }
 
-static DOCKER_CLI: OnceLock<testcontainers::clients::Cli> = OnceLock::new();
-
-static MINIO: OnceLock<Container<'_, MinIO>> = OnceLock::new();
+static MINIO: OnceCell<ContainerAsync<MinIO>> = OnceCell::const_new();
 
 static INIT_TRACING: Once = Once::new();
 
@@ -42,14 +40,12 @@ async fn setup() -> TestClient {
         tracing::subscriber::set_global_default(subscriber).unwrap();
     });
 
-    DOCKER_CLI.get_or_init(testcontainers::clients::Cli::default);
-
-    let minio = MINIO.get_or_init(|| {
-        DOCKER_CLI
-            .get()
-            .expect("Docker is initialized")
-            .run(testcontainers_modules::minio::MinIO::default())
-    });
+    let minio = MINIO
+        .get_or_init(async || {
+            let minio = testcontainers_modules::minio::MinIO::default();
+            minio.start().await.unwrap()
+        })
+        .await;
 
     let dray_config = get_config(minio).await;
 
@@ -78,7 +74,7 @@ async fn setup() -> TestClient {
     test_client
 }
 
-async fn get_config(minio: &Container<'_, MinIO>) -> DrayConfig {
+async fn get_config(minio: &ContainerAsync<MinIO>) -> DrayConfig {
     let port = get_free_port()
         .await
         .expect("Could not find a free port to bind!");
@@ -86,7 +82,7 @@ async fn get_config(minio: &Container<'_, MinIO>) -> DrayConfig {
     env::set_var("AWS_ACCESS_KEY_ID", "minioadmin");
     env::set_var("AWS_SECRET_ACCESS_KEY", "minioadmin");
 
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
 
     // Since the tests are multi-threaded, do not use environment variables for configuration
     // that may vary between tests, such as the port binding.
@@ -96,20 +92,20 @@ async fn get_config(minio: &Container<'_, MinIO>) -> DrayConfig {
         s3: S3Config {
             endpoint_name: Some(format!(
                 "http://localhost:{}",
-                minio.get_host_port_ipv4(9000)
+                minio.get_host_port_ipv4(9000).await.unwrap(),
             )),
             endpoint_region: "custom".to_string(),
-            bucket: format!("integration-test-{}", rng.gen::<u32>()),
+            bucket: format!("integration-test-{}", rng.random::<u32>()),
         },
     }
 }
 
 async fn get_free_port() -> Option<u16> {
     spawn_blocking(|| {
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
 
         for _ in 0..10 {
-            let port = rng.gen_range(49152..65535);
+            let port = rng.random_range(49152..65535);
 
             match TcpListener::bind(format!("127.0.0.1:{}", port)) {
                 Ok(_) => return Some(port),

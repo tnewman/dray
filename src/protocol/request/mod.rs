@@ -1,6 +1,6 @@
 use std::convert::TryFrom;
 
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use tracing::Level;
 
 use crate::error::Error;
