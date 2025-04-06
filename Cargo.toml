@@ -18,8 +18,7 @@ opentelemetry = { version = "0.22" }
 opentelemetry_sdk = { version = "0.22", features = ["rt-tokio"] }
 opentelemetry-otlp = { version = "0.15", features = ["grpc-tonic"] }
 serde = "1.0"
-russh = { version = "0.43", features = ["flate2", "openssl"] }
-russh-keys = { version = "0.43", features = ["openssl"] }
+russh = { version = "0.51.1", features = ["async-trait", "flate2"] }
 thiserror = "2.0"
 tokio = { version = "1.44", features = ["full", "tracing"] }
 tracing = "0.1"

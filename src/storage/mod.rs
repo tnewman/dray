@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use async_trait::async_trait;
 use bytes::Bytes;
+use russh::keys::PublicKey;
 
 use crate::{error::Error, protocol::response::name::File};
 
@@ -35,14 +36,13 @@ pub trait Storage: Send + Sync {
     /// operations cannot be performed.
     async fn health_check(&self) -> Result<(), Error>;
 
-    /// Retrieves the authorized key fingerprints for a user that will be compared
-    /// against the fingerprint of the user-supplied key to determine if a user is
-    /// allowed to log in.
+    /// Retrieves the authorized keys for a user that will be compared against the
+    /// user-supplied key to determine if a user is allowed to log in.
     ///
     /// # Warning
     /// An empty list of keys should be returned for missing users instead of an error
     /// to prevent clients from determining whether or not a user exists.
-    async fn get_authorized_keys_fingerprints(&self, user: &str) -> Result<Vec<String>, Error>;
+    async fn get_authorized_keys(&self, user: &str) -> Result<Vec<PublicKey>, Error>;
 
     // Opens a directory handle for a prefix.
     async fn open_dir_handle(&self, dir_name: String) -> Result<String, Error>;

@@ -1,6 +1,7 @@
 use std::{net::SocketAddr, path::Path};
 
-use russh_keys::key;
+use russh::keys::load_secret_key;
+use russh::keys::PrivateKey;
 use serde::Deserialize;
 use tracing::info;
 
@@ -38,17 +39,17 @@ impl DrayConfig {
         self.host.parse::<SocketAddr>().map_err(Error::from)
     }
 
-    pub fn get_ssh_keys(&self) -> Result<Vec<key::KeyPair>, Error> {
+    pub fn get_ssh_keys(&self) -> Result<Vec<PrivateKey>, Error> {
         info!("Loading SSH keys");
 
-        let keys: Result<Vec<key::KeyPair>, _> = self
+        let keys: Result<Vec<PrivateKey>, _> = self
             .ssh_key_paths
             .split(',')
             .map(|key_path| key_path.trim())
             .map(|key_path| {
                 info!("Loading SSH key from {}", key_path);
 
-                russh_keys::load_secret_key(Path::new(key_path), None).map_err(|err| {
+                load_secret_key(Path::new(key_path), None).map_err(|err| {
                     let error_message = format!("Failed to load SSH key {}: {}", key_path, err);
                     Error::Configuration(error_message)
                 })
