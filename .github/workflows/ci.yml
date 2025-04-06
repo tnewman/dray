@@ -56,6 +56,11 @@ jobs:
 
       - name: Cache OCI Container layers
         uses: jpribyl/action-docker-layer-caching@v0.1.1
+        continue-on-error: true
+        with:
+          key: dray-docker-cache-{hash}
+          restore-keys: |
+            dray-docker-cache-
 
       - name: Build OCI Container image
         run: docker build -f Containerfile .
