@@ -6,4 +6,5 @@ mod sftp_stream;
 mod ssh_keys;
 pub mod ssh_server;
 pub mod storage;
+pub mod observability;
 mod try_buf;
