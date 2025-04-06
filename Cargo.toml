@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
-bytes = "1.6"
+bytes = "1.10"
 chrono = "0.4"
 dotenv = "0.15"
 envy = "0.4"
@@ -21,17 +21,17 @@ serde = "1.0"
 russh = { version = "0.43.0", features = ["flate2", "openssl"] }
 russh-keys = { version = "0.43.0", features = ["openssl"] }
 thiserror = "1.0"
-tokio = { version = "1.37", features = ["full", "tracing"] }
+tokio = { version = "1.44", features = ["full", "tracing"] }
 tracing = "0.1"
 tracing-opentelemetry = "0.23"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
-uuid = { version = "1.8.0", features = ["v4"], default-features = false }
+uuid = { version = "1.16.0", features = ["v4"], default-features = false }
 
 # S3 Dependencies
-aws-config = "1.1.9"
-aws-sdk-s3 = "1.21.0"
+aws-config = "1.6.1"
+aws-sdk-s3 = "1.82.0"
 
 [dev-dependencies]
 rand = "0.8"
-tempfile = "3.10"
-testcontainers-modules = { version = "0.3.6", features = ["minio"] }
+tempfile = "3.19"
+testcontainers-modules = { version = "0.3.7", features = ["minio"] }
