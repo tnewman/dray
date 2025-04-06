@@ -8,7 +8,7 @@ edition = "2018"
 
 [dependencies]
 async-trait = "0.1"
-bytes = { version = "1.6", features = ["std"] }
+bytes = "1.6"
 chrono = "0.4"
 dotenv = "0.15"
 envy = "0.4"
