@@ -1,5 +1,6 @@
 pub mod config;
 pub mod error;
+pub mod observability;
 mod protocol;
 mod sftp_session;
 mod sftp_stream;
