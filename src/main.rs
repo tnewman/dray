@@ -1,16 +1,16 @@
 use dotenv::dotenv;
+use dray::{config::DrayConfig, observability::init_observability, ssh_server::DraySshServer};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 use tokio::signal;
 use tracing::info;
-use dray::{config::DrayConfig, observability::init_observability, ssh_server::DraySshServer};
 
 fn main() {
     dotenv().ok();
 
     let runtime = Runtime::new().expect("Tokio Runtime should initialize");
 
-    let _observability = init_observability();
+    let _observability = runtime.block_on(init_observability());
 
     info!("Starting Dray");
 

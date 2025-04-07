@@ -1,17 +1,16 @@
+use opentelemetry::trace::TracerProvider as _;
 use opentelemetry::KeyValue;
 use opentelemetry_otlp::SpanExporter;
 use opentelemetry_sdk::trace::SdkTracerProvider;
-use opentelemetry::trace::TracerProvider as _;
 use opentelemetry_sdk::Resource;
-use opentelemetry_semantic_conventions::resource::{DEPLOYMENT_ENVIRONMENT_NAME, SERVICE_NAME, SERVICE_VERSION};
-use opentelemetry_semantic_conventions::SCHEMA_URL;
+use opentelemetry_semantic_conventions::resource::{SERVICE_NAME, SERVICE_VERSION};
 use tracing::Level;
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
 use tracing_subscriber::EnvFilter;
 
-pub fn init_observability() -> Observability {
+pub async fn init_observability() -> Observability {
     let tracer_provider = init_tracer_provider();
 
     let tracer = tracer_provider.tracer(env!("CARGO_PKG_NAME"));
@@ -31,14 +30,12 @@ pub fn init_observability() -> Observability {
 }
 
 pub struct Observability {
-    tracer_provider: SdkTracerProvider
+    tracer_provider: SdkTracerProvider,
 }
 
 impl Observability {
     fn new(tracer_provider: SdkTracerProvider) -> Observability {
-        Observability {
-            tracer_provider
-        }
+        Observability { tracer_provider }
     }
 }
 
@@ -51,10 +48,7 @@ impl Drop for Observability {
 }
 
 fn init_tracer_provider() -> SdkTracerProvider {
-    let exporter = SpanExporter::builder()
-        .with_tonic()
-        .build()
-        .unwrap();
+    let exporter = SpanExporter::builder().with_tonic().build().unwrap();
 
     SdkTracerProvider::builder()
         .with_resource(resource())
@@ -64,13 +58,7 @@ fn init_tracer_provider() -> SdkTracerProvider {
 
 fn resource() -> Resource {
     Resource::builder()
-        .with_schema_url(
-            [
-                KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME")),
-                KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION")),
-                KeyValue::new(DEPLOYMENT_ENVIRONMENT_NAME, "develop"),
-            ],
-            SCHEMA_URL,
-        )
+        .with_attribute(KeyValue::new(SERVICE_NAME, env!("CARGO_PKG_NAME")))
+        .with_attribute(KeyValue::new(SERVICE_VERSION, env!("CARGO_PKG_VERSION")))
         .build()
 }
